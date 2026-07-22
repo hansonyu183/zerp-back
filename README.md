@@ -157,6 +157,8 @@ unset APP_BOOTSTRAP_PASSWORD
 | 应用访问与权限 | `app` | 用户认证、Cookie 会话、CSRF、角色与 API 权限 | [APP 后端业务域](docs/domains/app.md) |
 | 基础业务对象 | `bob` | 客户、供应商、员工、产品、服务、资金账户及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
 
+Cloudflare Pages、本地 Vite、Cookie、CSRF 和请求封装见 [前端 API 配置说明](docs/frontend-api-configuration.md)。
+
 README 只保留跨领域工程约定。实现具体领域时，应同时满足本文与领域文档；发生冲突时，应先修正文档并明确统一契约，不能由实现自行选择不同语义。
 
 ## API 总则

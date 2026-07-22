@@ -23,6 +23,13 @@ type Config struct {
 	DatabaseHealthTimeout  time.Duration
 	ReadHeaderTimeout      time.Duration
 	ShutdownTimeout        time.Duration
+	SessionCookieName      string
+	SessionCookieSecure    bool
+	SessionIdleTimeout     time.Duration
+	SessionAbsoluteTimeout time.Duration
+	SigninLockThreshold    int
+	SigninLockDuration     time.Duration
+	PasswordMinLength      int
 }
 
 func Load() (Config, error) {
@@ -31,10 +38,14 @@ func Load() (Config, error) {
 		HTTPAddress:        valueOrDefault("HTTP_ADDRESS", ":8080"),
 		DatabaseURL:        strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		CORSAllowedOrigins: splitAndTrim(os.Getenv("CORS_ALLOWED_ORIGINS")),
+		SessionCookieName:  valueOrDefault("APP_SESSION_COOKIE_NAME", "zerp_session"),
 	}
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+	if !validCookieName(cfg.SessionCookieName) {
+		return Config{}, errors.New("APP_SESSION_COOKIE_NAME must contain only letters, numbers, underscore, or hyphen")
 	}
 
 	if cfg.Environment != EnvironmentDevelopment && cfg.Environment != EnvironmentTest && cfg.Environment != EnvironmentProduction {
@@ -54,8 +65,72 @@ func Load() (Config, error) {
 	if cfg.ShutdownTimeout, err = durationOrDefault("SHUTDOWN_TIMEOUT", 10*time.Second); err != nil {
 		return Config{}, err
 	}
+	if cfg.SessionIdleTimeout, err = durationOrDefault("APP_SESSION_IDLE_TIMEOUT", 30*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.SessionAbsoluteTimeout, err = durationOrDefault("APP_SESSION_ABSOLUTE_TIMEOUT", 12*time.Hour); err != nil {
+		return Config{}, err
+	}
+	if cfg.SessionAbsoluteTimeout < cfg.SessionIdleTimeout {
+		return Config{}, errors.New("APP_SESSION_ABSOLUTE_TIMEOUT must be greater than or equal to APP_SESSION_IDLE_TIMEOUT")
+	}
+	if cfg.SigninLockDuration, err = durationOrDefault("APP_SIGNIN_LOCK_DURATION", 15*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.SessionCookieSecure, err = boolOrDefault("APP_SESSION_COOKIE_SECURE", true); err != nil {
+		return Config{}, err
+	}
+	if cfg.SigninLockThreshold, err = intOrDefault("APP_SIGNIN_LOCK_THRESHOLD", 5, 1, 100); err != nil {
+		return Config{}, err
+	}
+	if cfg.PasswordMinLength, err = intOrDefault("APP_PASSWORD_MIN_LENGTH", 12, 8, 128); err != nil {
+		return Config{}, err
+	}
 
 	return cfg, nil
+}
+
+func validCookieName(value string) bool {
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	for _, character := range value {
+		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') && character != '_' && character != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func boolOrDefault(key string, fallback bool) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	switch strings.ToLower(value) {
+	case "true", "1", "yes":
+		return true, nil
+	case "false", "0", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be true or false", key)
+	}
+}
+
+func intOrDefault(key string, fallback, minimum, maximum int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	var parsed int
+	if _, err := fmt.Sscanf(value, "%d", &parsed); err != nil || fmt.Sprintf("%d", parsed) != value {
+		return 0, fmt.Errorf("%s must be an integer", key)
+	}
+	if parsed < minimum || parsed > maximum {
+		return 0, fmt.Errorf("%s must be between %d and %d", key, minimum, maximum)
+	}
+	return parsed, nil
 }
 
 func valueOrDefault(key, fallback string) string {

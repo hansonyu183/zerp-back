@@ -5,7 +5,7 @@ include $(ENV_FILE)
 export
 endif
 
-.PHONY: run build test generate migrate-status migrate-up migrate-down compose-up compose-down
+.PHONY: run build test generate migrate-status migrate-up migrate-down bootstrap-admin compose-up compose-down
 
 run:
 	go run ./cmd/server
@@ -27,6 +27,9 @@ migrate-up:
 
 migrate-down:
 	@go -C tools tool goose -dir ../db/migrations postgres "$(DATABASE_URL)" down
+
+bootstrap-admin:
+	@go run ./cmd/bootstrap-admin
 
 compose-up:
 	docker compose --env-file $(ENV_FILE) up --build -d

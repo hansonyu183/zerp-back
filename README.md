@@ -74,6 +74,7 @@ make run
 | `make migrate-status` | 查看数据库迁移状态 |
 | `make migrate-up` | 升级数据库到最新迁移 |
 | `make migrate-down` | 回滚一个数据库迁移版本 |
+| `make bootstrap-admin` | 在空用户库中创建首个超级管理员（密码取自 `APP_BOOTSTRAP_PASSWORD`） |
 | `make compose-up` | 构建并启动 API 与 PostgreSQL |
 | `make compose-down` | 停止容器 |
 
@@ -92,19 +93,41 @@ make ENV_FILE=.env.test compose-up
 | `POSTGRES_PORT` | 否 | `5432` | Compose 暴露到宿主机的 PostgreSQL 端口 |
 | `APP_ENV` | 否 | `development` | `development`、`test` 或 `production` |
 | `HTTP_ADDRESS` | 否 | `:8080` | HTTP 监听地址 |
-| `CORS_ALLOWED_ORIGINS` | 否 | 空 | 允许携带凭证的前端 Origin，多个值用逗号分隔 |
+| `CORS_ALLOWED_ORIGINS` | 否 | 直跑为空；Compose 为 `http://localhost:5173` | 允许携带凭证的前端 Origin，多个值用逗号分隔 |
 | `DATABASE_CONNECT_TIMEOUT` | 否 | `5s` | 首次连接数据库超时 |
 | `DATABASE_HEALTH_TIMEOUT` | 否 | `2s` | 数据库就绪检查超时 |
 | `HTTP_READ_HEADER_TIMEOUT` | 否 | `5s` | HTTP 请求头读取超时 |
 | `SHUTDOWN_TIMEOUT` | 否 | `10s` | 优雅关闭等待时间 |
+| `APP_SESSION_COOKIE_NAME` | 否 | `zerp_session` | 服务端会话 Cookie 名称 |
+| `APP_SESSION_COOKIE_SECURE` | 否 | `true` | 是否仅通过 HTTPS 发送会话 Cookie；纯 HTTP 本地调试可设为 `false` |
+| `APP_SESSION_IDLE_TIMEOUT` | 否 | `30m` | 会话空闲有效期 |
+| `APP_SESSION_ABSOLUTE_TIMEOUT` | 否 | `12h` | 会话绝对有效期 |
+| `APP_SIGNIN_LOCK_THRESHOLD` | 否 | `5` | 连续登录失败后的锁定阈值 |
+| `APP_SIGNIN_LOCK_DURATION` | 否 | `15m` | 登录临时锁定时长 |
+| `APP_PASSWORD_MIN_LENGTH` | 否 | `12` | 新用户密码最小长度，允许范围为 8–128 |
 
-未配置 CORS Origin 时，不允许任何跨域浏览器请求；同源请求和不携带 `Origin` 的服务间请求不受影响。
+本机直接运行服务且未配置 CORS Origin 时，不允许任何跨域浏览器请求；同源请求和不携带 `Origin` 的服务间请求不受影响。Docker Compose 为本地开发默认允许 `http://localhost:5173`，生产环境必须显式配置实际前端 Origin。
+
+执行全部迁移后，可在用户表为空时创建初始管理员。密码长度不得超过 256 个字符，并且必须同时包含小写字母、大写字母、数字和符号。该命令在已有任意用户后会拒绝执行。
+
+使用隐藏输入，避免将真实密码写入命令行历史：
+
+```bash
+printf 'Bootstrap password: '
+read -r -s APP_BOOTSTRAP_PASSWORD
+printf '\n'
+export APP_BOOTSTRAP_PASSWORD
+make bootstrap-admin
+unset APP_BOOTSTRAP_PASSWORD
+```
 
 ## 目录结构
 
 ```text
 .
-├─ cmd/server/                  # 服务入口与优雅关闭
+├─ cmd/
+│  ├─ server/                  # 服务入口与优雅关闭
+│  └─ bootstrap-admin/         # 首个超级管理员初始化命令
 ├─ db/
 │  ├─ migrations/              # Goose SQL 迁移
 │  └─ queries/                 # sqlc SQL 查询
@@ -116,6 +139,7 @@ make ENV_FILE=.env.test compose-up
 │  │  └─ response/             # 统一业务响应包络与错误码
 │  ├─ config/                  # 环境变量解析与校验
 │  ├─ database/                # pgx 连接池及 sqlc 生成代码
+│  ├─ domains/                 # 领域服务、Handler 和领域类型
 │  └─ httpserver/              # Gin 路由与健康检查
 ├─ tools/                      # sqlc、Goose 独立工具模块
 ├─ compose.yaml

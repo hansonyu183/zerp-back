@@ -8,6 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hansonyu183/zerp-back/internal/api/middleware"
 	"github.com/hansonyu183/zerp-back/internal/config"
+	appdomain "github.com/hansonyu183/zerp-back/internal/domains/app"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type databasePinger interface {
@@ -31,6 +33,9 @@ func New(cfg config.Config, db databasePinger, logger *slog.Logger) *gin.Engine 
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 	router.GET("/readyz", readinessHandler(db, cfg.DatabaseHealthTimeout))
+	if pool, ok := db.(*pgxpool.Pool); ok {
+		appdomain.NewHandler(appdomain.NewService(pool, cfg, logger), cfg, logger).Register(router)
+	}
 
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{

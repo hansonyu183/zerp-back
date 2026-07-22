@@ -52,3 +52,12 @@ func TestLoadRejectsInvalidDuration(t *testing.T) {
 		t.Fatal("Load() error = nil, want an error")
 	}
 }
+
+func TestLoadRejectsUnsafeCookieName(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("APP_SESSION_COOKIE_NAME", "bad;cookie")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() error = nil, want an error")
+	}
+}

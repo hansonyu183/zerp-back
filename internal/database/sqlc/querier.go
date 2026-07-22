@@ -9,7 +9,50 @@ import (
 )
 
 type Querier interface {
+	AcquireAppAuthorizationLock(ctx context.Context) error
+	CountAllAppUsers(ctx context.Context) (int64, error)
+	CountAppPermissions(ctx context.Context, arg CountAppPermissionsParams) (int64, error)
+	CountAppRoles(ctx context.Context, arg CountAppRolesParams) (int64, error)
+	CountAppRolesUsingPermission(ctx context.Context, permissionID string) (int64, error)
+	CountAppUsers(ctx context.Context, arg CountAppUsersParams) (int64, error)
+	CountEnabledAppPermissionsByIDs(ctx context.Context, ids []string) (int64, error)
+	CountEnabledAppRolesByIDs(ctx context.Context, ids []string) (int64, error)
+	CountEnabledUsersMissingPermission(ctx context.Context, path string) (int64, error)
+	CountEnabledUsersWithPermission(ctx context.Context, path string) (int64, error)
+	CountEnabledUsersWithPermissionExcludingRole(ctx context.Context, arg CountEnabledUsersWithPermissionExcludingRoleParams) (int64, error)
+	CountOtherEnabledUsersWithPermission(ctx context.Context, arg CountOtherEnabledUsersWithPermissionParams) (int64, error)
+	CreateAppAuditEvent(ctx context.Context, arg CreateAppAuditEventParams) error
+	CreateAppSession(ctx context.Context, arg CreateAppSessionParams) error
+	DeleteAppRolePermissions(ctx context.Context, roleID string) error
+	DeleteAppUserRoles(ctx context.Context, userID string) error
+	GetAppPermissionByID(ctx context.Context, id string) (AppPermission, error)
+	GetAppRoleByID(ctx context.Context, id string) (AppRole, error)
+	GetAppRolePermissionIDs(ctx context.Context, roleID string) ([]string, error)
+	GetAppSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetAppSessionByTokenHashRow, error)
+	GetAppUserByID(ctx context.Context, id string) (AppUser, error)
+	GetAppUserByUsername(ctx context.Context, username string) (AppUser, error)
+	GetAppUserPermissions(ctx context.Context, userID string) ([]string, error)
+	GetAppUserRoleIDs(ctx context.Context, userID string) ([]string, error)
+	InsertAppRole(ctx context.Context, arg InsertAppRoleParams) error
+	InsertAppRolePermission(ctx context.Context, arg InsertAppRolePermissionParams) error
+	InsertAppUser(ctx context.Context, arg InsertAppUserParams) error
+	InsertAppUserRole(ctx context.Context, arg InsertAppUserRoleParams) error
+	ListAllEnabledAppPermissionIDs(ctx context.Context) ([]string, error)
+	ListAppPermissionPathsByIDs(ctx context.Context, ids []string) ([]string, error)
+	ListAppPermissions(ctx context.Context, arg ListAppPermissionsParams) ([]AppPermission, error)
+	ListAppRoles(ctx context.Context, arg ListAppRolesParams) ([]AppRole, error)
+	ListAppUsers(ctx context.Context, arg ListAppUsersParams) ([]ListAppUsersRow, error)
 	Ping(ctx context.Context) (int32, error)
+	RecordSigninFailure(ctx context.Context, arg RecordSigninFailureParams) (AppUser, error)
+	ResetSigninFailures(ctx context.Context, id string) error
+	RevokeAppSession(ctx context.Context, arg RevokeAppSessionParams) error
+	RevokeAppUserSessions(ctx context.Context, arg RevokeAppUserSessionsParams) error
+	RotateAppSessionCSRF(ctx context.Context, arg RotateAppSessionCSRFParams) (int64, error)
+	SetAppRoleStatus(ctx context.Context, arg SetAppRoleStatusParams) (int64, error)
+	SetAppUserStatus(ctx context.Context, arg SetAppUserStatusParams) (int64, error)
+	TouchAppSession(ctx context.Context, arg TouchAppSessionParams) error
+	UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (int64, error)
+	UpdateAppUser(ctx context.Context, arg UpdateAppUserParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

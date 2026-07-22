@@ -3,3 +3,91 @@
 //   sqlc v1.31.1
 
 package sqlc
+
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type AppAuditEvent struct {
+	ID          string             `db:"id" json:"id"`
+	EventType   string             `db:"event_type" json:"event_type"`
+	ActorUserID *string            `db:"actor_user_id" json:"actor_user_id"`
+	TargetType  *string            `db:"target_type" json:"target_type"`
+	TargetID    *string            `db:"target_id" json:"target_id"`
+	Result      string             `db:"result" json:"result"`
+	RequestID   *string            `db:"request_id" json:"request_id"`
+	Summary     []byte             `db:"summary" json:"summary"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy   *string            `db:"created_by" json:"created_by"`
+}
+
+type AppPermission struct {
+	ID          string             `db:"id" json:"id"`
+	Path        string             `db:"path" json:"path"`
+	Domain      string             `db:"domain" json:"domain"`
+	Entity      string             `db:"entity" json:"entity"`
+	Action      string             `db:"action" json:"action"`
+	Description *string            `db:"description" json:"description"`
+	Status      string             `db:"status" json:"status"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy   *string            `db:"created_by" json:"created_by"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy   *string            `db:"updated_by" json:"updated_by"`
+	Revision    int64              `db:"revision" json:"revision"`
+}
+
+type AppRole struct {
+	ID          string             `db:"id" json:"id"`
+	Code        string             `db:"code" json:"code"`
+	Name        string             `db:"name" json:"name"`
+	Description *string            `db:"description" json:"description"`
+	Status      string             `db:"status" json:"status"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy   *string            `db:"created_by" json:"created_by"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy   *string            `db:"updated_by" json:"updated_by"`
+	Revision    int64              `db:"revision" json:"revision"`
+}
+
+type AppRolePermission struct {
+	RoleID       string             `db:"role_id" json:"role_id"`
+	PermissionID string             `db:"permission_id" json:"permission_id"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy    *string            `db:"created_by" json:"created_by"`
+}
+
+type AppSession struct {
+	ID                string             `db:"id" json:"id"`
+	UserID            string             `db:"user_id" json:"user_id"`
+	TokenHash         []byte             `db:"token_hash" json:"token_hash"`
+	CsrfTokenHash     []byte             `db:"csrf_token_hash" json:"csrf_token_hash"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	IdleExpiresAt     pgtype.Timestamptz `db:"idle_expires_at" json:"idle_expires_at"`
+	AbsoluteExpiresAt pgtype.Timestamptz `db:"absolute_expires_at" json:"absolute_expires_at"`
+	RevokedAt         pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	RevokedReason     *string            `db:"revoked_reason" json:"revoked_reason"`
+}
+
+type AppUser struct {
+	ID                string             `db:"id" json:"id"`
+	Username          string             `db:"username" json:"username"`
+	DisplayName       string             `db:"display_name" json:"display_name"`
+	PasswordHash      string             `db:"password_hash" json:"password_hash"`
+	Status            string             `db:"status" json:"status"`
+	FailedSigninCount int32              `db:"failed_signin_count" json:"failed_signin_count"`
+	LockedUntil       pgtype.Timestamptz `db:"locked_until" json:"locked_until"`
+	PasswordChangedAt pgtype.Timestamptz `db:"password_changed_at" json:"password_changed_at"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy         *string            `db:"created_by" json:"created_by"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy         *string            `db:"updated_by" json:"updated_by"`
+	Revision          int64              `db:"revision" json:"revision"`
+}
+
+type AppUserRole struct {
+	UserID    string             `db:"user_id" json:"user_id"`
+	RoleID    string             `db:"role_id" json:"role_id"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy *string            `db:"created_by" json:"created_by"`
+}

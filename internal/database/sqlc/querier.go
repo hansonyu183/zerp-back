@@ -10,11 +10,22 @@ import (
 
 type Querier interface {
 	AcquireAppAuthorizationLock(ctx context.Context) error
+	AdvanceBobObjectForEdit(ctx context.Context, arg AdvanceBobObjectForEditParams) (int64, error)
+	ApproveBobVersion(ctx context.Context, arg ApproveBobVersionParams) (int64, error)
+	CopyBobCustomerDetail(ctx context.Context, arg CopyBobCustomerDetailParams) error
+	CopyBobEmployeeDetail(ctx context.Context, arg CopyBobEmployeeDetailParams) error
+	CopyBobFundAccountDetail(ctx context.Context, arg CopyBobFundAccountDetailParams) error
+	CopyBobProductDetail(ctx context.Context, arg CopyBobProductDetailParams) error
+	CopyBobServiceDetail(ctx context.Context, arg CopyBobServiceDetailParams) error
+	CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplierDetailParams) error
 	CountAllAppUsers(ctx context.Context) (int64, error)
 	CountAppPermissions(ctx context.Context, arg CountAppPermissionsParams) (int64, error)
 	CountAppRoles(ctx context.Context, arg CountAppRolesParams) (int64, error)
 	CountAppRolesUsingPermission(ctx context.Context, permissionID string) (int64, error)
 	CountAppUsers(ctx context.Context, arg CountAppUsersParams) (int64, error)
+	CountBobAuditEvents(ctx context.Context, arg CountBobAuditEventsParams) (int64, error)
+	CountBobObjects(ctx context.Context, arg CountBobObjectsParams) (int64, error)
+	CountBobVersions(ctx context.Context, arg CountBobVersionsParams) (int64, error)
 	CountEnabledAppPermissionsByIDs(ctx context.Context, ids []string) (int64, error)
 	CountEnabledAppRolesByIDs(ctx context.Context, ids []string) (int64, error)
 	CountEnabledUsersMissingPermission(ctx context.Context, path string) (int64, error)
@@ -34,27 +45,55 @@ type Querier interface {
 	GetAppUserByUsername(ctx context.Context, username string) (AppUser, error)
 	GetAppUserPermissions(ctx context.Context, userID string) ([]string, error)
 	GetAppUserRoleIDs(ctx context.Context, userID string) ([]string, error)
+	GetBobVersionView(ctx context.Context, arg GetBobVersionViewParams) (BobVersionView, error)
 	InsertAppRole(ctx context.Context, arg InsertAppRoleParams) error
 	InsertAppRolePermission(ctx context.Context, arg InsertAppRolePermissionParams) error
 	InsertAppUser(ctx context.Context, arg InsertAppUserParams) error
 	InsertAppUserRole(ctx context.Context, arg InsertAppUserRoleParams) error
+	InsertBobAuditEvent(ctx context.Context, arg InsertBobAuditEventParams) error
+	InsertBobCustomerDetail(ctx context.Context, arg InsertBobCustomerDetailParams) error
+	InsertBobEmployeeDetail(ctx context.Context, arg InsertBobEmployeeDetailParams) error
+	InsertBobFundAccountDetail(ctx context.Context, arg InsertBobFundAccountDetailParams) error
+	InsertBobObject(ctx context.Context, arg InsertBobObjectParams) error
+	InsertBobProductDetail(ctx context.Context, arg InsertBobProductDetailParams) error
+	InsertBobServiceDetail(ctx context.Context, arg InsertBobServiceDetailParams) error
+	InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error
+	InsertBobVersion(ctx context.Context, arg InsertBobVersionParams) error
+	InvalidateBobVersion(ctx context.Context, arg InvalidateBobVersionParams) (int64, error)
 	ListAllEnabledAppPermissionIDs(ctx context.Context) ([]string, error)
 	ListAppPermissionPathsByIDs(ctx context.Context, ids []string) ([]string, error)
 	ListAppPermissions(ctx context.Context, arg ListAppPermissionsParams) ([]AppPermission, error)
 	ListAppRoles(ctx context.Context, arg ListAppRolesParams) ([]AppRole, error)
 	ListAppUsers(ctx context.Context, arg ListAppUsersParams) ([]ListAppUsersRow, error)
+	ListBobAuditEvents(ctx context.Context, arg ListBobAuditEventsParams) ([]BobAuditEvent, error)
+	ListBobObjects(ctx context.Context, arg ListBobObjectsParams) ([]BobVersionView, error)
+	ListBobVersions(ctx context.Context, arg ListBobVersionsParams) ([]BobVersionView, error)
+	LockBobObject(ctx context.Context, arg LockBobObjectParams) (LockBobObjectRow, error)
+	LockBobVersion(ctx context.Context, arg LockBobVersionParams) (LockBobVersionRow, error)
+	MarkBobVersionSaved(ctx context.Context, arg MarkBobVersionSavedParams) (int64, error)
 	Ping(ctx context.Context) (int32, error)
 	RecordSigninFailure(ctx context.Context, arg RecordSigninFailureParams) (AppUser, error)
+	RejectBobVersion(ctx context.Context, arg RejectBobVersionParams) (int64, error)
 	ResetSigninFailures(ctx context.Context, id string) error
+	ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (ResolveBobEffectiveReferenceRow, error)
 	RevokeAppSession(ctx context.Context, arg RevokeAppSessionParams) error
 	RevokeAppUserSessions(ctx context.Context, arg RevokeAppUserSessionsParams) error
 	RotateAppSessionCSRF(ctx context.Context, arg RotateAppSessionCSRFParams) (int64, error)
 	SetAppRoleStatus(ctx context.Context, arg SetAppRoleStatusParams) (int64, error)
 	SetAppUserStatus(ctx context.Context, arg SetAppUserStatusParams) (int64, error)
+	SetBobObjectEffective(ctx context.Context, arg SetBobObjectEffectiveParams) (int64, error)
+	SubmitBobVersion(ctx context.Context, arg SubmitBobVersionParams) (int64, error)
 	TouchAppSession(ctx context.Context, arg TouchAppSessionParams) error
+	TouchBobObject(ctx context.Context, arg TouchBobObjectParams) error
 	UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (int64, error)
 	UpdateAppUser(ctx context.Context, arg UpdateAppUserParams) (int64, error)
 	UpdateAppUserPassword(ctx context.Context, arg UpdateAppUserPasswordParams) (int64, error)
+	UpdateBobCustomerDetail(ctx context.Context, arg UpdateBobCustomerDetailParams) (int64, error)
+	UpdateBobEmployeeDetail(ctx context.Context, arg UpdateBobEmployeeDetailParams) (int64, error)
+	UpdateBobFundAccountDetail(ctx context.Context, arg UpdateBobFundAccountDetailParams) (int64, error)
+	UpdateBobProductDetail(ctx context.Context, arg UpdateBobProductDetailParams) (int64, error)
+	UpdateBobServiceDetail(ctx context.Context, arg UpdateBobServiceDetailParams) (int64, error)
+	UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

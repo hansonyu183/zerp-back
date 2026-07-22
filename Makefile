@@ -5,7 +5,7 @@ include $(ENV_FILE)
 export
 endif
 
-.PHONY: run build test generate migrate-status migrate-up migrate-down bootstrap-admin compose-up compose-down
+.PHONY: run build test test-integration generate migrate-status migrate-up migrate-down bootstrap-admin compose-up compose-down
 
 run:
 	go run ./cmd/server
@@ -15,6 +15,10 @@ build:
 
 test:
 	go test ./...
+
+test-integration:
+	@test -n "$(TEST_DATABASE_URL)" || (echo "TEST_DATABASE_URL is required" && exit 1)
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test ./internal/domains/bob -run 'Integration|Database' -count=1
 
 generate:
 	go -C tools tool sqlc generate -f ../sqlc.yaml

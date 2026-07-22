@@ -91,3 +91,115 @@ type AppUserRole struct {
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	CreatedBy *string            `db:"created_by" json:"created_by"`
 }
+
+type BobAuditEvent struct {
+	ID         string             `db:"id" json:"id"`
+	ObjectID   string             `db:"object_id" json:"object_id"`
+	VersionID  string             `db:"version_id" json:"version_id"`
+	Entity     string             `db:"entity" json:"entity"`
+	EventType  string             `db:"event_type" json:"event_type"`
+	FromStatus *string            `db:"from_status" json:"from_status"`
+	ToStatus   string             `db:"to_status" json:"to_status"`
+	ActorID    string             `db:"actor_id" json:"actor_id"`
+	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	Comment    *string            `db:"comment" json:"comment"`
+	RequestID  string             `db:"request_id" json:"request_id"`
+	Summary    []byte             `db:"summary" json:"summary"`
+}
+
+type BobCustomerVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+}
+
+type BobEmployeeVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+}
+
+type BobFundAccountVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+	Currency  string `db:"currency" json:"currency"`
+}
+
+type BobObject struct {
+	ID                 string             `db:"id" json:"id"`
+	Entity             string             `db:"entity" json:"entity"`
+	Code               string             `db:"code" json:"code"`
+	CurrentVersionID   string             `db:"current_version_id" json:"current_version_id"`
+	EffectiveVersionID *string            `db:"effective_version_id" json:"effective_version_id"`
+	NextVersionNo      int32              `db:"next_version_no" json:"next_version_no"`
+	Revision           int64              `db:"revision" json:"revision"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy          string             `db:"created_by" json:"created_by"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy          string             `db:"updated_by" json:"updated_by"`
+}
+
+type BobProductVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+	Unit      string `db:"unit" json:"unit"`
+}
+
+type BobServiceVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+	Unit      string `db:"unit" json:"unit"`
+}
+
+type BobSupplierVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+}
+
+type BobVersion struct {
+	ID            string             `db:"id" json:"id"`
+	ObjectID      string             `db:"object_id" json:"object_id"`
+	Entity        string             `db:"entity" json:"entity"`
+	VersionNo     int32              `db:"version_no" json:"version_no"`
+	Status        string             `db:"status" json:"status"`
+	Revision      int64              `db:"revision" json:"revision"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy     string             `db:"created_by" json:"created_by"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy     string             `db:"updated_by" json:"updated_by"`
+	SubmittedAt   pgtype.Timestamptz `db:"submitted_at" json:"submitted_at"`
+	SubmittedBy   *string            `db:"submitted_by" json:"submitted_by"`
+	ReviewedAt    pgtype.Timestamptz `db:"reviewed_at" json:"reviewed_at"`
+	ReviewedBy    *string            `db:"reviewed_by" json:"reviewed_by"`
+	ReviewComment *string            `db:"review_comment" json:"review_comment"`
+}
+
+type BobVersionView struct {
+	ObjectID           string             `db:"object_id" json:"object_id"`
+	Entity             string             `db:"entity" json:"entity"`
+	Code               string             `db:"code" json:"code"`
+	CurrentVersionID   string             `db:"current_version_id" json:"current_version_id"`
+	EffectiveVersionID *string            `db:"effective_version_id" json:"effective_version_id"`
+	ObjectRevision     int64              `db:"object_revision" json:"object_revision"`
+	ObjectUpdatedAt    pgtype.Timestamptz `db:"object_updated_at" json:"object_updated_at"`
+	VersionID          string             `db:"version_id" json:"version_id"`
+	VersionNo          int32              `db:"version_no" json:"version_no"`
+	Status             string             `db:"status" json:"status"`
+	VersionRevision    int64              `db:"version_revision" json:"version_revision"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy          string             `db:"created_by" json:"created_by"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy          string             `db:"updated_by" json:"updated_by"`
+	SubmittedAt        pgtype.Timestamptz `db:"submitted_at" json:"submitted_at"`
+	SubmittedBy        *string            `db:"submitted_by" json:"submitted_by"`
+	ReviewedAt         pgtype.Timestamptz `db:"reviewed_at" json:"reviewed_at"`
+	ReviewedBy         *string            `db:"reviewed_by" json:"reviewed_by"`
+	ReviewComment      *string            `db:"review_comment" json:"review_comment"`
+	Name               string             `db:"name" json:"name"`
+	Unit               string             `db:"unit" json:"unit"`
+	Currency           *string            `db:"currency" json:"currency"`
+}

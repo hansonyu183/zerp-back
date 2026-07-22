@@ -9,6 +9,7 @@ import (
 	"github.com/hansonyu183/zerp-back/internal/api/middleware"
 	"github.com/hansonyu183/zerp-back/internal/config"
 	appdomain "github.com/hansonyu183/zerp-back/internal/domains/app"
+	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -34,7 +35,9 @@ func New(cfg config.Config, db databasePinger, logger *slog.Logger) *gin.Engine 
 	})
 	router.GET("/readyz", readinessHandler(db, cfg.DatabaseHealthTimeout))
 	if pool, ok := db.(*pgxpool.Pool); ok {
-		appdomain.NewHandler(appdomain.NewService(pool, cfg, logger), cfg, logger).Register(router)
+		appService := appdomain.NewService(pool, cfg, logger)
+		appdomain.NewHandler(appService, cfg, logger).Register(router)
+		bobdomain.NewHandler(bobdomain.NewService(pool, logger), appAuthorizer{service: appService, cfg: cfg}, logger).Register(router)
 	}
 
 	router.NoRoute(func(c *gin.Context) {

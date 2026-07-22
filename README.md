@@ -70,6 +70,7 @@ make run
 | `make run` | 启动本机 Go 服务 |
 | `make build` | 编译全部 Go 包 |
 | `make test` | 执行全部测试 |
+| `make TEST_DATABASE_URL=... test-integration` | 在已迁移的独立 PostgreSQL 测试库执行 BOB 数据库契约测试 |
 | `make generate` | 根据 SQL 重新生成 sqlc 代码 |
 | `make migrate-status` | 查看数据库迁移状态 |
 | `make migrate-up` | 升级数据库到最新迁移 |

@@ -282,10 +282,10 @@ GET https://zerp-api.bytesucceed.com/readyz
 截至 2026-07-22：
 
 - HTTPS、`/healthz` 和 `/readyz` 正常；
-- `zerp.bytesucceed.com`、原始 Pages 域名、`localhost:5173` 和 `127.0.0.1:5173` 的 CORS 预检已放行；
-- 自定义域名已经可访问，但当前前端构建仍未设置 `VITE_API_BASE_URL`，需要配置后重新部署；
-- 线上 APP 业务路由仍返回 404，需等待后端部署当前版本并执行 APP 数据库迁移；
+- 线上 APP 已部署，数据库迁移已执行到 `00003_app_self_service.sql`，初始超级管理员已创建；
+- `zerp.bytesucceed.com`、原始 Pages 域名，以及 `localhost`/`127.0.0.1` 的 `5173`、`4173` Origin 均已放行；
+- 生产会话 Cookie 使用 `Secure; SameSite=None`，登录、恢复会话、CSRF、权限、资料查询和退出链路已通过外部探针验证；
+- 前端使用 `VITE_API_BASE_URL=https://zerp-api.bytesucceed.com`，认证及自助接口统一使用 `/app/user/*`；
 - 线上 BOB 路由尚未实现；
-- 自定义前端域名与 API 同属 `bytesucceed.com`，当前 `SameSite=Lax` 会话 Cookie 可以用于生产登录链路。
 
-前端在收到后端“业务 API 已部署并完成 Cookie 联调”的通知前，可以先完成环境变量、请求封装、业务码处理和登录页面交互，但不能把健康检查成功视为登录链路验收通过。
+后端 APP 登录链路已经具备联调条件。浏览器若禁用第三方 Cookie，本地页面直连远端 API 仍可能被浏览器策略阻止，此时使用第 2 节的 Vite 同源代理方案。

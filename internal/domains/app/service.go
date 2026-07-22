@@ -269,6 +269,84 @@ func (s *Service) Signout(ctx context.Context, principal Principal, requestID st
 	return nil
 }
 
+func (s *Service) GetProfile(ctx context.Context, userID string) (ProfileView, error) {
+	user, err := s.queries.GetAppUserByID(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && user.Status != StatusEnabled) {
+		return ProfileView{}, domainError(ErrorUnauthenticated, "session expired", nil)
+	}
+	if err != nil {
+		return ProfileView{}, s.internal("get current user profile", err)
+	}
+	return ProfileView{
+		ID: user.ID, Username: user.Username, DisplayName: user.DisplayName,
+		PasswordChangedAt: user.PasswordChangedAt.Time, Revision: user.Revision,
+	}, nil
+}
+
+func (s *Service) ChangePassword(ctx context.Context, principal Principal, input ChangePasswordInput, requestID string) error {
+	if input.CurrentPassword == "" || len(input.CurrentPassword) > 1024 {
+		return domainError(ErrorValidation, "current password is incorrect", nil)
+	}
+	if err := validatePassword(input.NewPassword, s.cfg.PasswordMinLength); err != nil {
+		return domainError(ErrorValidation, err.Error(), nil)
+	}
+
+	current, err := s.queries.GetAppUserByID(ctx, principal.User.ID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && current.Status != StatusEnabled) {
+		return domainError(ErrorUnauthenticated, "session expired", nil)
+	}
+	if err != nil {
+		return s.internal("read password user", err)
+	}
+	if !verifyPassword(current.PasswordHash, input.CurrentPassword) {
+		_ = s.audit(ctx, s.queries, "USER_CHANGE_PASSWORD", &current.ID, "user", &current.ID, "FAILURE", requestID, map[string]any{"reason": "invalid_current_password"})
+		return domainError(ErrorValidation, "current password is incorrect", nil)
+	}
+	if verifyPassword(current.PasswordHash, input.NewPassword) {
+		return domainError(ErrorValidation, "new password must differ from current password", nil)
+	}
+	newHash, err := hashPassword(input.NewPassword)
+	if err != nil {
+		return s.internal("hash new password", err)
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return s.internal("begin password change", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	qtx := s.queries.WithTx(tx)
+	locked, err := qtx.GetAppUserByIDForUpdate(ctx, current.ID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && locked.Status != StatusEnabled) {
+		return domainError(ErrorUnauthenticated, "session expired", nil)
+	}
+	if err != nil {
+		return s.internal("lock password user", err)
+	}
+	if locked.Revision != current.Revision || locked.PasswordHash != current.PasswordHash {
+		return domainError(ErrorConflict, "user changed concurrently; retry with the current password", nil)
+	}
+	rows, err := qtx.UpdateAppUserPassword(ctx, dbsqlc.UpdateAppUserPasswordParams{
+		ID: locked.ID, Revision: locked.Revision, PasswordHash: newHash, ActorID: &locked.ID,
+	})
+	if err != nil {
+		return s.writeError("update password", err)
+	}
+	if rows != 1 {
+		return domainError(ErrorConflict, "user changed concurrently", nil)
+	}
+	if err = qtx.RevokeAppUserSessions(ctx, dbsqlc.RevokeAppUserSessionsParams{UserID: locked.ID, Reason: stringPointer("password_changed")}); err != nil {
+		return s.internal("revoke sessions after password change", err)
+	}
+	if err = s.audit(ctx, qtx, "USER_CHANGE_PASSWORD", &locked.ID, "user", &locked.ID, "SUCCESS", requestID, nil); err != nil {
+		return s.internal("audit password change", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return s.internal("commit password change", err)
+	}
+	return nil
+}
+
 func (s *Service) QueryUsers(ctx context.Context, request PageRequest) (Page[UserView], error) {
 	page, pageSize, sortField, sortOrder, err := validatePage(request, map[string]bool{"createdAt": true, "username": true, "displayName": true}, "createdAt")
 	if err != nil {
@@ -746,7 +824,7 @@ func validatePermissions(ctx context.Context, q *dbsqlc.Queries, ids []string) e
 	}
 	for _, path := range paths {
 		parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
-		if len(parts) != 3 || parts[2] == "query" || path == signoutPath {
+		if len(parts) != 3 || parts[2] == "query" || path == signoutPath || path == "/app/user/profile" || path == "/app/user/change-password" {
 			continue
 		}
 		queryPath := "/" + parts[0] + "/" + parts[1] + "/query"

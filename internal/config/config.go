@@ -25,6 +25,7 @@ type Config struct {
 	ShutdownTimeout        time.Duration
 	SessionCookieName      string
 	SessionCookieSecure    bool
+	SessionCookieSameSite  string
 	SessionIdleTimeout     time.Duration
 	SessionAbsoluteTimeout time.Duration
 	SigninLockThreshold    int
@@ -34,11 +35,12 @@ type Config struct {
 
 func Load() (Config, error) {
 	cfg := Config{
-		Environment:        valueOrDefault("APP_ENV", EnvironmentDevelopment),
-		HTTPAddress:        valueOrDefault("HTTP_ADDRESS", ":8080"),
-		DatabaseURL:        strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		CORSAllowedOrigins: splitAndTrim(os.Getenv("CORS_ALLOWED_ORIGINS")),
-		SessionCookieName:  valueOrDefault("APP_SESSION_COOKIE_NAME", "zerp_session"),
+		Environment:           valueOrDefault("APP_ENV", EnvironmentDevelopment),
+		HTTPAddress:           valueOrDefault("HTTP_ADDRESS", ":8080"),
+		DatabaseURL:           strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		CORSAllowedOrigins:    splitAndTrim(os.Getenv("CORS_ALLOWED_ORIGINS")),
+		SessionCookieName:     valueOrDefault("APP_SESSION_COOKIE_NAME", "zerp_session"),
+		SessionCookieSameSite: strings.ToLower(valueOrDefault("APP_SESSION_COOKIE_SAME_SITE", "lax")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -79,6 +81,12 @@ func Load() (Config, error) {
 	}
 	if cfg.SessionCookieSecure, err = boolOrDefault("APP_SESSION_COOKIE_SECURE", true); err != nil {
 		return Config{}, err
+	}
+	if cfg.SessionCookieSameSite != "lax" && cfg.SessionCookieSameSite != "strict" && cfg.SessionCookieSameSite != "none" {
+		return Config{}, errors.New("APP_SESSION_COOKIE_SAME_SITE must be one of lax, strict, or none")
+	}
+	if cfg.SessionCookieSameSite == "none" && !cfg.SessionCookieSecure {
+		return Config{}, errors.New("APP_SESSION_COOKIE_SECURE must be true when APP_SESSION_COOKIE_SAME_SITE is none")
 	}
 	if cfg.SigninLockThreshold, err = intOrDefault("APP_SIGNIN_LOCK_THRESHOLD", 5, 1, 100); err != nil {
 		return Config{}, err

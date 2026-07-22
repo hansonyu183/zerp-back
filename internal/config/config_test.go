@@ -61,3 +61,21 @@ func TestLoadRejectsUnsafeCookieName(t *testing.T) {
 		t.Fatal("Load() error = nil, want an error")
 	}
 }
+
+func TestLoadValidatesCookieSameSite(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("APP_SESSION_COOKIE_SAME_SITE", "none")
+	t.Setenv("APP_SESSION_COOKIE_SECURE", "false")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted SameSite=None without a Secure cookie")
+	}
+
+	t.Setenv("APP_SESSION_COOKIE_SECURE", "true")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.SessionCookieSameSite != "none" {
+		t.Fatalf("SessionCookieSameSite = %q, want none", cfg.SessionCookieSameSite)
+	}
+}

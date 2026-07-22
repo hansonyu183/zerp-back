@@ -23,6 +23,8 @@ type applicationService interface {
 	RestoreSession(context.Context, string) (SessionResult, error)
 	Authorize(context.Context, string, string, string) (Principal, error)
 	Signout(context.Context, Principal, string) error
+	GetProfile(context.Context, string) (ProfileView, error)
+	ChangePassword(context.Context, Principal, ChangePasswordInput, string) error
 	QueryUsers(context.Context, PageRequest) (Page[UserView], error)
 	GetUser(context.Context, string) (UserView, error)
 	CreateUser(context.Context, CreateUserInput, string, string) (UserView, error)
@@ -58,6 +60,8 @@ func (h *Handler) Register(router *gin.Engine) {
 	protectedUser := user.Group("")
 	protectedUser.Use(h.authorize())
 	protectedUser.POST("/query", h.queryUsers)
+	protectedUser.POST("/profile", h.profile)
+	protectedUser.POST("/change-password", h.changePassword)
 	protectedUser.POST("/get", h.getUser)
 	protectedUser.POST("/create", h.createUser)
 	protectedUser.POST("/save", h.saveUser)
@@ -171,6 +175,30 @@ func (h *Handler) queryUsers(c *gin.Context) {
 	}
 	result, err := h.service.QueryUsers(c.Request.Context(), input)
 	h.result(c, result, err)
+}
+
+func (h *Handler) profile(c *gin.Context) {
+	if err := decodeEmptyObject(c); err != nil {
+		h.writeError(c, domainError(ErrorValidation, "request body must be an empty object", err))
+		return
+	}
+	principal := currentPrincipal(c)
+	result, err := h.service.GetProfile(c.Request.Context(), principal.User.ID)
+	h.result(c, result, err)
+}
+
+func (h *Handler) changePassword(c *gin.Context) {
+	var input ChangePasswordInput
+	if !h.bind(c, &input) {
+		return
+	}
+	principal := currentPrincipal(c)
+	if err := h.service.ChangePassword(c.Request.Context(), principal, input, response.RequestID(c)); err != nil {
+		h.writeError(c, err)
+		return
+	}
+	h.clearSessionCookie(c)
+	response.OK(c, map[string]any{})
 }
 
 func (h *Handler) getUser(c *gin.Context) {
@@ -326,27 +354,42 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 func (h *Handler) setSessionCookie(c *gin.Context, value string, expiresAt time.Time) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name: h.cfg.SessionCookieName, Value: value, Path: "/", Expires: expiresAt,
-		MaxAge: int(time.Until(expiresAt).Seconds()), HttpOnly: true, Secure: h.cfg.SessionCookieSecure, SameSite: http.SameSiteLaxMode,
+		MaxAge: int(time.Until(expiresAt).Seconds()), HttpOnly: true, Secure: h.cfg.SessionCookieSecure, SameSite: h.cookieSameSite(),
 	})
 }
 
 func (h *Handler) clearSessionCookie(c *gin.Context) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name: h.cfg.SessionCookieName, Value: "", Path: "/", Expires: time.Unix(1, 0),
-		MaxAge: -1, HttpOnly: true, Secure: h.cfg.SessionCookieSecure, SameSite: http.SameSiteLaxMode,
+		MaxAge: -1, HttpOnly: true, Secure: h.cfg.SessionCookieSecure, SameSite: h.cookieSameSite(),
 	})
 }
 
+func (h *Handler) cookieSameSite() http.SameSite {
+	switch h.cfg.SessionCookieSameSite {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteLaxMode
+	}
+}
+
 func actorID(c *gin.Context) string {
+	return currentPrincipal(c).User.ID
+}
+
+func currentPrincipal(c *gin.Context) Principal {
 	value, exists := c.Get(principalContextKey)
 	if !exists {
-		return ""
+		return Principal{}
 	}
 	principal, ok := value.(Principal)
 	if !ok {
-		return ""
+		return Principal{}
 	}
-	return principal.User.ID
+	return principal
 }
 
 func decodeJSON(c *gin.Context, target any) error {

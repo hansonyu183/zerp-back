@@ -93,20 +93,21 @@ make ENV_FILE=.env.test compose-up
 | `POSTGRES_PORT` | 否 | `5432` | Compose 暴露到宿主机的 PostgreSQL 端口 |
 | `APP_ENV` | 否 | `development` | `development`、`test` 或 `production` |
 | `HTTP_ADDRESS` | 否 | `:8080` | HTTP 监听地址 |
-| `CORS_ALLOWED_ORIGINS` | 否 | 直跑为空；Compose 为 `http://localhost:5173` | 允许携带凭证的前端 Origin，多个值用逗号分隔 |
+| `CORS_ALLOWED_ORIGINS` | 否 | 直跑为空；Compose 允许本地 `5173`/`4173` 联调 Origin | 允许携带凭证的前端 Origin，多个值用逗号分隔 |
 | `DATABASE_CONNECT_TIMEOUT` | 否 | `5s` | 首次连接数据库超时 |
 | `DATABASE_HEALTH_TIMEOUT` | 否 | `2s` | 数据库就绪检查超时 |
 | `HTTP_READ_HEADER_TIMEOUT` | 否 | `5s` | HTTP 请求头读取超时 |
 | `SHUTDOWN_TIMEOUT` | 否 | `10s` | 优雅关闭等待时间 |
 | `APP_SESSION_COOKIE_NAME` | 否 | `zerp_session` | 服务端会话 Cookie 名称 |
 | `APP_SESSION_COOKIE_SECURE` | 否 | `true` | 是否仅通过 HTTPS 发送会话 Cookie；纯 HTTP 本地调试可设为 `false` |
+| `APP_SESSION_COOKIE_SAME_SITE` | 否 | `lax` | Cookie SameSite：`lax`、`strict` 或 `none`；`none` 强制要求 Secure |
 | `APP_SESSION_IDLE_TIMEOUT` | 否 | `30m` | 会话空闲有效期 |
 | `APP_SESSION_ABSOLUTE_TIMEOUT` | 否 | `12h` | 会话绝对有效期 |
 | `APP_SIGNIN_LOCK_THRESHOLD` | 否 | `5` | 连续登录失败后的锁定阈值 |
 | `APP_SIGNIN_LOCK_DURATION` | 否 | `15m` | 登录临时锁定时长 |
 | `APP_PASSWORD_MIN_LENGTH` | 否 | `12` | 新用户密码最小长度，允许范围为 8–128 |
 
-本机直接运行服务且未配置 CORS Origin 时，不允许任何跨域浏览器请求；同源请求和不携带 `Origin` 的服务间请求不受影响。Docker Compose 为本地开发默认允许 `http://localhost:5173`，生产环境必须显式配置实际前端 Origin。
+本机直接运行服务且未配置 CORS Origin 时，不允许任何跨域浏览器请求；同源请求和不携带 `Origin` 的服务间请求不受影响。Docker Compose 为本地开发默认允许 `http://localhost:5173`、`http://127.0.0.1:4173` 和 `http://localhost:4173`，生产环境必须显式配置实际前端 Origin。
 
 执行全部迁移后，可在用户表为空时创建初始管理员。密码长度不得超过 256 个字符，并且必须同时包含小写字母、大写字母、数字和符号。该命令在已有任意用户后会拒绝执行。
 

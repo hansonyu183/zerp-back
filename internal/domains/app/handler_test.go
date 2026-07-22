@@ -23,6 +23,8 @@ type handlerServiceStub struct {
 	authorizeResult Principal
 	authorizeError  error
 	authorizedPath  string
+	profileResult   ProfileView
+	changedPassword ChangePasswordInput
 }
 
 func (stub *handlerServiceStub) Signin(context.Context, string, string, string) (SessionResult, error) {
@@ -36,6 +38,15 @@ func (stub *handlerServiceStub) Authorize(_ context.Context, _, _, path string) 
 
 func (stub *handlerServiceStub) QueryUsers(context.Context, PageRequest) (Page[UserView], error) {
 	return Page[UserView]{Items: []UserView{}, Page: 1, PageSize: 20}, nil
+}
+
+func (stub *handlerServiceStub) GetProfile(context.Context, string) (ProfileView, error) {
+	return stub.profileResult, nil
+}
+
+func (stub *handlerServiceStub) ChangePassword(_ context.Context, _ Principal, input ChangePasswordInput, _ string) error {
+	stub.changedPassword = input
+	return nil
 }
 
 func testRouter(stub *handlerServiceStub) *gin.Engine {
@@ -131,5 +142,64 @@ func TestRequestRejectsUnknownFields(t *testing.T) {
 	}
 	if envelope.Code != response.CodeValidation {
 		t.Fatalf("code = %d, want %d", envelope.Code, response.CodeValidation)
+	}
+}
+
+func TestProfileUsesCurrentPrincipalAndExactPermission(t *testing.T) {
+	stub := &handlerServiceStub{
+		authorizeResult: Principal{User: UserSummary{ID: "user-1"}},
+		profileResult:   ProfileView{ID: "user-1", Username: "alice", DisplayName: "Alice"},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/app/user/profile", strings.NewReader(`{}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-CSRF-Token", "csrf")
+	request.AddCookie(&http.Cookie{Name: "zerp_session", Value: "session"})
+	recorder := httptest.NewRecorder()
+	testRouter(stub).ServeHTTP(recorder, request)
+
+	if stub.authorizedPath != "/app/user/profile" {
+		t.Fatalf("authorized path = %q", stub.authorizedPath)
+	}
+	var envelope response.Envelope
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode envelope: %v", err)
+	}
+	if envelope.Code != response.CodeOK {
+		t.Fatalf("code = %d, want 0", envelope.Code)
+	}
+}
+
+func TestChangePasswordClearsSessionCookie(t *testing.T) {
+	stub := &handlerServiceStub{authorizeResult: Principal{User: UserSummary{ID: "user-1"}}}
+	request := httptest.NewRequest(http.MethodPost, "/app/user/change-password", strings.NewReader(`{"currentPassword":"Current-password-1!","newPassword":"New-password-2!"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-CSRF-Token", "csrf")
+	request.AddCookie(&http.Cookie{Name: "zerp_session", Value: "session"})
+	recorder := httptest.NewRecorder()
+	testRouter(stub).ServeHTTP(recorder, request)
+
+	if stub.authorizedPath != "/app/user/change-password" || stub.changedPassword.NewPassword != "New-password-2!" {
+		t.Fatalf("change password was not dispatched correctly: path=%q input=%#v", stub.authorizedPath, stub.changedPassword)
+	}
+	cookies := recorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].MaxAge >= 0 {
+		t.Fatalf("cookies = %#v, want expired session cookie", cookies)
+	}
+}
+
+func TestSigninSupportsSameSiteNone(t *testing.T) {
+	stub := &handlerServiceStub{signinResult: SessionResult{
+		Data: SessionData{User: UserSummary{ID: "user-1"}}, SessionToken: "session-token", ExpiresAt: time.Now().Add(time.Hour),
+	}}
+	router := gin.New()
+	router.Use(middleware.RequestID())
+	NewHandler(stub, config.Config{SessionCookieName: "zerp_session", SessionCookieSecure: true, SessionCookieSameSite: "none"}, slog.New(slog.NewTextHandler(io.Discard, nil))).Register(router)
+	request := httptest.NewRequest(http.MethodPost, "/app/user/signin", strings.NewReader(`{"username":"alice","password":"Strong-password-1!"}`))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	cookies := recorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].SameSite != http.SameSiteNoneMode || !cookies[0].Secure {
+		t.Fatalf("cookie = %#v, want Secure SameSite=None", cookies)
 	}
 }

@@ -32,11 +32,13 @@ Cloudflare Pages 的其他预览部署域名不在生产白名单内。需要联
 
 ## 2. 本地开发配置
 
-后端当前允许以下两个本地 Origin：
+后端当前允许以下本地 Origin：
 
 ```text
 http://localhost:5173
 http://127.0.0.1:5173
+http://localhost:4173
+http://127.0.0.1:4173
 ```
 
 推荐开发者统一在端口 `5173` 启动 Vite：
@@ -62,7 +64,7 @@ http://192.168.1.10:5173
 
 ### 推荐：使用 Vite 开发代理
 
-涉及登录 Cookie 时，推荐让浏览器请求本地同源 `/api`，再由 Vite 转发到正式 API。前端开发环境配置：
+涉及登录 Cookie 时，推荐让浏览器请求本地同源 `/api`，再由 Vite 转发到正式 API。若本地页面直接跨站请求远端 API，后端必须使用 `SameSite=None; Secure`，且浏览器的第三方 Cookie 策略仍可能阻止会话；开发代理更稳定。前端开发环境配置：
 
 ```env
 VITE_API_BASE_URL=/api
@@ -203,6 +205,30 @@ await postApi('/app/user/signout', {}, csrfToken)
 ```
 
 无论退出请求结果如何，前端都应在最终清理本地用户资料、权限和 CSRF Token。
+
+### 当前用户资料
+
+```ts
+const result = await postApi<{
+  id: string
+  username: string
+  displayName: string
+  passwordChangedAt: string
+  revision: number
+}>('/app/user/profile', {}, csrfToken)
+```
+
+### 修改密码
+
+```ts
+await postApi(
+  '/app/user/change-password',
+  { currentPassword, newPassword },
+  csrfToken,
+)
+```
+
+修改成功后后端会撤销该用户全部会话并清除当前 Cookie，前端应清理本地状态并进入登录页。
 
 ## 5. 响应与错误处理
 

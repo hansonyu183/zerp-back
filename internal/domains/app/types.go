@@ -46,6 +46,19 @@ type UserSummary struct {
 	DisplayName string `json:"displayName"`
 }
 
+type ProfileView struct {
+	ID                string    `json:"id"`
+	Username          string    `json:"username"`
+	DisplayName       string    `json:"displayName"`
+	PasswordChangedAt time.Time `json:"passwordChangedAt"`
+	Revision          int64     `json:"revision"`
+}
+
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 type SessionData struct {
 	User        UserSummary `json:"user"`
 	CSRFToken   string      `json:"csrfToken"`

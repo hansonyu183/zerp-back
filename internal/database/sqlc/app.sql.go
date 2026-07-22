@@ -415,6 +415,31 @@ func (q *Queries) GetAppUserByID(ctx context.Context, id string) (AppUser, error
 	return i, err
 }
 
+const getAppUserByIDForUpdate = `-- name: GetAppUserByIDForUpdate :one
+SELECT id, username, display_name, password_hash, status, failed_signin_count, locked_until, password_changed_at, created_at, created_by, updated_at, updated_by, revision FROM app_users WHERE id = $1 LIMIT 1 FOR UPDATE
+`
+
+func (q *Queries) GetAppUserByIDForUpdate(ctx context.Context, id string) (AppUser, error) {
+	row := q.db.QueryRow(ctx, getAppUserByIDForUpdate, id)
+	var i AppUser
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.Status,
+		&i.FailedSigninCount,
+		&i.LockedUntil,
+		&i.PasswordChangedAt,
+		&i.CreatedAt,
+		&i.CreatedBy,
+		&i.UpdatedAt,
+		&i.UpdatedBy,
+		&i.Revision,
+	)
+	return i, err
+}
+
 const getAppUserByUsername = `-- name: GetAppUserByUsername :one
 SELECT id, username, display_name, password_hash, status, failed_signin_count, locked_until, password_changed_at, created_at, created_by, updated_at, updated_by, revision FROM app_users WHERE lower(username) = lower($1) LIMIT 1
 `
@@ -1019,6 +1044,38 @@ type UpdateAppUserParams struct {
 func (q *Queries) UpdateAppUser(ctx context.Context, arg UpdateAppUserParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateAppUser,
 		arg.DisplayName,
+		arg.ActorID,
+		arg.ID,
+		arg.Revision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateAppUserPassword = `-- name: UpdateAppUserPassword :execrows
+UPDATE app_users SET
+  password_hash = $1,
+  password_changed_at = now(),
+  failed_signin_count = 0,
+  locked_until = NULL,
+  updated_at = now(),
+  updated_by = $2,
+  revision = revision + 1
+WHERE id = $3 AND revision = $4
+`
+
+type UpdateAppUserPasswordParams struct {
+	PasswordHash string  `db:"password_hash" json:"password_hash"`
+	ActorID      *string `db:"actor_id" json:"actor_id"`
+	ID           string  `db:"id" json:"id"`
+	Revision     int64   `db:"revision" json:"revision"`
+}
+
+func (q *Queries) UpdateAppUserPassword(ctx context.Context, arg UpdateAppUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateAppUserPassword,
+		arg.PasswordHash,
 		arg.ActorID,
 		arg.ID,
 		arg.Revision,

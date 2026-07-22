@@ -7,6 +7,9 @@ SELECT pg_advisory_xact_lock(74155001);
 -- name: GetAppUserByID :one
 SELECT * FROM app_users WHERE id = sqlc.arg(id) LIMIT 1;
 
+-- name: GetAppUserByIDForUpdate :one
+SELECT * FROM app_users WHERE id = sqlc.arg(id) LIMIT 1 FOR UPDATE;
+
 -- name: RecordSigninFailure :one
 UPDATE app_users SET
   failed_signin_count = failed_signin_count + 1,
@@ -138,6 +141,17 @@ INSERT INTO app_user_roles (user_id, role_id, created_by) VALUES (sqlc.arg(user_
 
 -- name: UpdateAppUser :execrows
 UPDATE app_users SET display_name = sqlc.arg(display_name), updated_at = now(), updated_by = sqlc.narg(actor_id), revision = revision + 1
+WHERE id = sqlc.arg(id) AND revision = sqlc.arg(revision);
+
+-- name: UpdateAppUserPassword :execrows
+UPDATE app_users SET
+  password_hash = sqlc.arg(password_hash),
+  password_changed_at = now(),
+  failed_signin_count = 0,
+  locked_until = NULL,
+  updated_at = now(),
+  updated_by = sqlc.narg(actor_id),
+  revision = revision + 1
 WHERE id = sqlc.arg(id) AND revision = sqlc.arg(revision);
 
 -- name: SetAppUserStatus :execrows

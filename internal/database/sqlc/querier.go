@@ -30,6 +30,7 @@ type Querier interface {
 	GetAppRolePermissionIDs(ctx context.Context, roleID string) ([]string, error)
 	GetAppSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetAppSessionByTokenHashRow, error)
 	GetAppUserByID(ctx context.Context, id string) (AppUser, error)
+	GetAppUserByIDForUpdate(ctx context.Context, id string) (AppUser, error)
 	GetAppUserByUsername(ctx context.Context, username string) (AppUser, error)
 	GetAppUserPermissions(ctx context.Context, userID string) ([]string, error)
 	GetAppUserRoleIDs(ctx context.Context, userID string) ([]string, error)
@@ -53,6 +54,7 @@ type Querier interface {
 	TouchAppSession(ctx context.Context, arg TouchAppSessionParams) error
 	UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (int64, error)
 	UpdateAppUser(ctx context.Context, arg UpdateAppUserParams) (int64, error)
+	UpdateAppUserPassword(ctx context.Context, arg UpdateAppUserPasswordParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

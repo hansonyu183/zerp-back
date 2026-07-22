@@ -24,8 +24,10 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Local environment files
 .env
+.env.*
+!.env.example
 
 # Editor/IDE
 # .idea/

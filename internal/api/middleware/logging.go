@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hansonyu183/zerp-back/internal/api/response"
 )
 
 func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
@@ -12,12 +13,16 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		startedAt := time.Now()
 		c.Next()
 
-		logger.Info("http request",
+		attributes := []any{
 			"requestId", c.GetString(requestIDContextKey),
 			"method", c.Request.Method,
 			"path", c.Request.URL.Path,
 			"status", c.Writer.Status(),
 			"durationMs", time.Since(startedAt).Milliseconds(),
-		)
+		}
+		if code, ok := response.ResultCode(c); ok {
+			attributes = append(attributes, "businessCode", code)
+		}
+		logger.Info("http request", attributes...)
 	}
 }

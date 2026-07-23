@@ -324,7 +324,11 @@ func (q *Queries) GetAppRoleByID(ctx context.Context, id string) (AppRole, error
 }
 
 const getAppRolePermissionIDs = `-- name: GetAppRolePermissionIDs :many
-SELECT permission_id FROM app_role_permissions WHERE role_id = $1 ORDER BY permission_id
+SELECT rp.permission_id
+FROM app_role_permissions rp
+JOIN app_permissions p ON p.id = rp.permission_id
+WHERE rp.role_id = $1
+ORDER BY p.path
 `
 
 func (q *Queries) GetAppRolePermissionIDs(ctx context.Context, roleID string) ([]string, error) {
@@ -650,13 +654,17 @@ SELECT id, path, domain, entity, action, description, status, created_at, create
 WHERE ($1::text IS NULL OR domain = $1)
   AND ($2::text IS NULL OR entity = $2)
   AND ($3::text IS NULL OR status = $3)
-ORDER BY path ASC LIMIT $5 OFFSET $4
+ORDER BY
+  CASE WHEN $4::text = 'asc' THEN path END ASC,
+  path DESC
+LIMIT $6 OFFSET $5
 `
 
 type ListAppPermissionsParams struct {
 	Domain     *string `db:"domain" json:"domain"`
 	Entity     *string `db:"entity" json:"entity"`
 	Status     *string `db:"status" json:"status"`
+	SortOrder  string  `db:"sort_order" json:"sort_order"`
 	PageOffset int32   `db:"page_offset" json:"page_offset"`
 	PageSize   int32   `db:"page_size" json:"page_size"`
 }
@@ -666,6 +674,7 @@ func (q *Queries) ListAppPermissions(ctx context.Context, arg ListAppPermissions
 		arg.Domain,
 		arg.Entity,
 		arg.Status,
+		arg.SortOrder,
 		arg.PageOffset,
 		arg.PageSize,
 	)

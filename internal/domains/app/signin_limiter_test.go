@@ -1,27 +1,43 @@
 package app
 
 import (
-	"net/http/httptest"
 	"testing"
 	"time"
 )
 
-func TestSigninLimiterUsesFixedWindowPerRemoteAddress(t *testing.T) {
+func TestSigninLimiterUsesFixedWindowPerNormalizedUsername(t *testing.T) {
 	limiter := newSigninLimiter()
 	now := time.Unix(1_700_000_000, 0)
 	limiter.now = func() time.Time { return now }
-	request := httptest.NewRequest("POST", "/app/user/signin", nil)
-	request.RemoteAddr = "192.0.2.1:12345"
 	for attempt := 0; attempt < signinWindowLimit; attempt++ {
-		if !limiter.allow(request) {
+		username := " Alice "
+		if attempt%2 == 1 {
+			username = "alice"
+		}
+		if !limiter.allow(username) {
 			t.Fatalf("attempt %d was denied too early", attempt+1)
 		}
 	}
-	if limiter.allow(request) {
+	if limiter.allow("ALICE") {
 		t.Fatal("request beyond the limit was allowed")
 	}
+	if !limiter.allow("bob") {
+		t.Fatal("a different username shared the limit")
+	}
 	now = now.Add(signinWindow)
-	if !limiter.allow(request) {
+	if !limiter.allow("alice") {
 		t.Fatal("new window did not reset the limiter")
+	}
+}
+
+func TestSigninLimiterBucketsInvalidUsernames(t *testing.T) {
+	limiter := newSigninLimiter()
+	for attempt := 0; attempt < signinWindowLimit; attempt++ {
+		if !limiter.allow("") {
+			t.Fatalf("invalid attempt %d was denied too early", attempt+1)
+		}
+	}
+	if limiter.allow("x") {
+		t.Fatal("invalid usernames did not share the invalid bucket")
 	}
 }

@@ -1,8 +1,6 @@
 package app
 
 import (
-	"net"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -28,14 +26,8 @@ func newSigninLimiter() *signinLimiter {
 	return &signinLimiter{entries: make(map[string]signinWindowEntry), now: time.Now}
 }
 
-func (limiter *signinLimiter) allow(request *http.Request) bool {
-	key := request.RemoteAddr
-	if host, _, err := net.SplitHostPort(request.RemoteAddr); err == nil {
-		key = host
-	}
-	if key == "" {
-		key = "unknown"
-	}
+func (limiter *signinLimiter) allow(username string) bool {
+	key := signinLimiterKey(username)
 	now := limiter.now()
 	limiter.mu.Lock()
 	defer limiter.mu.Unlock()
@@ -60,4 +52,12 @@ func (limiter *signinLimiter) allow(request *http.Request) bool {
 	}
 	limiter.entries[key] = signinWindowEntry{startedAt: now, count: 1}
 	return true
+}
+
+func signinLimiterKey(username string) string {
+	username = normalizeUsername(username)
+	if !runeLengthBetween(username, 3, 64) {
+		return "<invalid>"
+	}
+	return username
 }

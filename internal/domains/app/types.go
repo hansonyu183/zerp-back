@@ -59,6 +59,35 @@ type ChangePasswordInput struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+type CreateUserInput struct {
+	Username    string   `json:"username"`
+	DisplayName string   `json:"displayName"`
+	Password    string   `json:"password"`
+	RoleIDs     []string `json:"roleIds"`
+}
+
+type SaveUserInput struct {
+	ID          string   `json:"id"`
+	DisplayName string   `json:"displayName"`
+	RoleIDs     []string `json:"roleIds"`
+	Revision    int64    `json:"revision"`
+}
+
+type CreateRoleInput struct {
+	Code          string   `json:"code"`
+	Name          string   `json:"name"`
+	Description   *string  `json:"description"`
+	PermissionIDs []string `json:"permissionIds"`
+}
+
+type SaveRoleInput struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Description   *string  `json:"description"`
+	PermissionIDs []string `json:"permissionIds"`
+	Revision      int64    `json:"revision"`
+}
+
 type SessionData struct {
 	User        UserSummary `json:"user"`
 	CSRFToken   string      `json:"csrfToken"`
@@ -97,6 +126,14 @@ type Page[T any] struct {
 	Total    int64 `json:"total"`
 	Page     int   `json:"page"`
 	PageSize int   `json:"pageSize"`
+}
+
+type pageSpec struct {
+	Page      int
+	PageSize  int
+	Offset    int32
+	SortField string
+	SortOrder string
 }
 
 type UserView struct {

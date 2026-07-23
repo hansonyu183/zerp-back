@@ -137,7 +137,7 @@ func TestHandlerDispatchesEveryAction(t *testing.T) {
 		{"versions", `{"objectId":"` + objectID + `","page":1,"pageSize":20}`},
 		{"audit-history", `{"objectId":"` + objectID + `","page":1,"pageSize":20}`},
 	}
-	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, _ string) (authorization.Principal, error) {
+	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, _, _ string) (authorization.Principal, error) {
 		return authorization.Principal{ActorID: "01J00000000000000000000000"}, nil
 	})
 	for _, test := range tests {
@@ -162,8 +162,11 @@ func TestHandlerDispatchesEveryAction(t *testing.T) {
 func TestHandlerUsesExactPermissionPathAndPrincipal(t *testing.T) {
 	service := &serviceStub{}
 	var permission string
-	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, path string) (authorization.Principal, error) {
+	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, path, requestID string) (authorization.Principal, error) {
 		permission = path
+		if requestID == "" {
+			t.Fatal("requestId was not forwarded")
+		}
 		return authorization.Principal{ActorID: "01J00000000000000000000000"}, nil
 	})
 	router := newBOBTestRouter(service, authorizer)
@@ -201,7 +204,7 @@ func TestHandlerFailsClosedWithoutAuthorizer(t *testing.T) {
 
 func TestHandlerDoesNotReadGuessedIDWithoutPermission(t *testing.T) {
 	service := &serviceStub{}
-	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, _ string) (authorization.Principal, error) {
+	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, _, _ string) (authorization.Principal, error) {
 		return authorization.Principal{}, authorization.NewError(authorization.ErrorForbidden, "permission denied", nil)
 	})
 	router := newBOBTestRouter(service, authorizer)
@@ -228,7 +231,7 @@ func TestHandlerDoesNotReadGuessedIDWithoutPermission(t *testing.T) {
 
 func TestHandlerRejectsUnknownJSONFields(t *testing.T) {
 	service := &serviceStub{}
-	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, _ string) (authorization.Principal, error) {
+	authorizer := authorization.Func(func(_ context.Context, _ *http.Request, _, _ string) (authorization.Principal, error) {
 		return authorization.Principal{ActorID: "01J00000000000000000000000"}, nil
 	})
 	router := newBOBTestRouter(service, authorizer)

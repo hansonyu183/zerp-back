@@ -1,17 +1,13 @@
 package bob
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
-	"mime"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hansonyu183/zerp-back/internal/api/authorization"
+	"github.com/hansonyu183/zerp-back/internal/api/requestbody"
 	"github.com/hansonyu183/zerp-back/internal/api/response"
 )
 
@@ -79,7 +75,7 @@ func (h *Handler) Register(router *gin.Engine) {
 
 func (h *Handler) authorize(path string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		principal, err := h.authorizer.Authorize(c.Request.Context(), c.Request, path)
+		principal, err := h.authorizer.Authorize(c.Request.Context(), c.Request, path, response.RequestID(c))
 		if err != nil {
 			h.writeAuthorizationError(c, err)
 			c.Abort()
@@ -176,32 +172,11 @@ func (h *Handler) auditHistory(c *gin.Context, entity string) {
 }
 
 func (h *Handler) bind(c *gin.Context, target any) bool {
-	if err := decodeJSON(c, target); err != nil {
+	if err := requestbody.DecodeJSON(c, target); err != nil {
 		h.writeError(c, domainError(ErrorValidation, "invalid request", nil, err))
 		return false
 	}
 	return true
-}
-
-func decodeJSON(c *gin.Context, target any) error {
-	contentType, _, err := mime.ParseMediaType(c.GetHeader("Content-Type"))
-	if err != nil || contentType != "application/json" {
-		return errors.New("content type must be application/json")
-	}
-	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20))
-	if err != nil {
-		return err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err = decoder.Decode(target); err != nil {
-		return err
-	}
-	var trailing any
-	if err = decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return errors.New("request body must contain one JSON object")
-	}
-	return nil
 }
 
 func (h *Handler) actorID(c *gin.Context) string {

@@ -31,7 +31,7 @@ func (stub *handlerServiceStub) Signin(context.Context, string, string, string) 
 	return stub.signinResult, nil
 }
 
-func (stub *handlerServiceStub) Authorize(_ context.Context, _, _, path string) (Principal, error) {
+func (stub *handlerServiceStub) Authorize(_ context.Context, _, _, path, _ string) (Principal, error) {
 	stub.authorizedPath = path
 	return stub.authorizeResult, stub.authorizeError
 }
@@ -55,6 +55,36 @@ func testRouter(stub *handlerServiceStub) *gin.Engine {
 	router.Use(middleware.RequestID())
 	NewHandler(stub, config.Config{SessionCookieName: "zerp_session", SessionCookieSecure: true}, slog.New(slog.NewTextHandler(io.Discard, nil))).Register(router)
 	return router
+}
+
+func TestHandlerRegistersCompleteAPIRouteSet(t *testing.T) {
+	router := testRouter(&handlerServiceStub{})
+	expected := []string{
+		"/app/user/signin", "/app/user/session", "/app/user/signout",
+		"/app/user/profile", "/app/user/change-password", "/app/user/query",
+		"/app/user/get", "/app/user/create", "/app/user/save", "/app/user/enable", "/app/user/disable",
+		"/app/role/query", "/app/role/get", "/app/role/create", "/app/role/save", "/app/role/enable", "/app/role/disable",
+		"/app/permission/query", "/app/permission/get",
+	}
+	found := make(map[string]bool, len(expected))
+	for _, path := range expected {
+		found[path] = false
+	}
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodPost {
+			if _, exists := found[route.Path]; exists {
+				found[route.Path] = true
+			}
+		}
+	}
+	for path, registered := range found {
+		if !registered {
+			t.Errorf("route %s is not registered", path)
+		}
+	}
+	if len(router.Routes()) != len(expected) {
+		t.Fatalf("route count = %d, want %d", len(router.Routes()), len(expected))
+	}
 }
 
 func TestSigninSetsHardenedCookieAndEnvelope(t *testing.T) {

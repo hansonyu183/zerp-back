@@ -11,7 +11,7 @@ import (
 )
 
 type appAuthorizationService interface {
-	Authorize(context.Context, string, string, string) (appdomain.Principal, error)
+	Authorize(context.Context, string, string, string, string) (appdomain.Principal, error)
 }
 
 type appAuthorizer struct {
@@ -19,7 +19,7 @@ type appAuthorizer struct {
 	cfg     config.Config
 }
 
-func (a appAuthorizer) Authorize(ctx context.Context, request *http.Request, path string) (authorization.Principal, error) {
+func (a appAuthorizer) Authorize(ctx context.Context, request *http.Request, path, requestID string) (authorization.Principal, error) {
 	cookie, err := request.Cookie(a.cfg.SessionCookieName)
 	if errors.Is(err, http.ErrNoCookie) {
 		return authorization.Principal{}, authorization.NewError(authorization.ErrorUnauthenticated, "session expired", nil)
@@ -27,7 +27,7 @@ func (a appAuthorizer) Authorize(ctx context.Context, request *http.Request, pat
 	if err != nil {
 		return authorization.Principal{}, authorization.NewError(authorization.ErrorInternal, "authorization failed", err)
 	}
-	principal, err := a.service.Authorize(ctx, cookie.Value, request.Header.Get("X-CSRF-Token"), path)
+	principal, err := a.service.Authorize(ctx, cookie.Value, request.Header.Get("X-CSRF-Token"), path, requestID)
 	if err != nil {
 		var appErr *appdomain.DomainError
 		if !errors.As(err, &appErr) {

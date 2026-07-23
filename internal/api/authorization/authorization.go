@@ -37,17 +37,17 @@ func IsKind(err error, kind ErrorKind) bool {
 }
 
 type Authorizer interface {
-	Authorize(context.Context, *http.Request, string) (Principal, error)
+	Authorize(context.Context, *http.Request, string, string) (Principal, error)
 }
 
 type FailClosed struct{}
 
-func (FailClosed) Authorize(context.Context, *http.Request, string) (Principal, error) {
+func (FailClosed) Authorize(context.Context, *http.Request, string, string) (Principal, error) {
 	return Principal{}, NewError(ErrorUnauthenticated, "session expired", nil)
 }
 
-type Func func(context.Context, *http.Request, string) (Principal, error)
+type Func func(context.Context, *http.Request, string, string) (Principal, error)
 
-func (fn Func) Authorize(ctx context.Context, request *http.Request, path string) (Principal, error) {
-	return fn(ctx, request, path)
+func (fn Func) Authorize(ctx context.Context, request *http.Request, path, requestID string) (Principal, error) {
+	return fn(ctx, request, path, requestID)
 }

@@ -15,6 +15,8 @@ const (
 	CodeInternal        = 5000
 )
 
+const resultCodeContextKey = "businessCode"
+
 type Envelope struct {
 	Code      int    `json:"code"`
 	Message   string `json:"message"`
@@ -23,6 +25,7 @@ type Envelope struct {
 }
 
 func OK(c *gin.Context, data any) {
+	c.Set(resultCodeContextKey, CodeOK)
 	c.JSON(http.StatusOK, Envelope{
 		Code:      CodeOK,
 		Message:   "ok",
@@ -32,12 +35,22 @@ func OK(c *gin.Context, data any) {
 }
 
 func BusinessError(c *gin.Context, code int, message string, data any) {
+	c.Set(resultCodeContextKey, code)
 	c.JSON(http.StatusOK, Envelope{
 		Code:      code,
 		Message:   message,
 		Data:      data,
 		RequestID: RequestID(c),
 	})
+}
+
+func ResultCode(c *gin.Context) (int, bool) {
+	value, exists := c.Get(resultCodeContextKey)
+	if !exists {
+		return 0, false
+	}
+	code, ok := value.(int)
+	return code, ok
 }
 
 func RequestID(c *gin.Context) string {

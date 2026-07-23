@@ -180,7 +180,11 @@ LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(page_offset);
 SELECT * FROM app_roles WHERE id = sqlc.arg(id) LIMIT 1;
 
 -- name: GetAppRolePermissionIDs :many
-SELECT permission_id FROM app_role_permissions WHERE role_id = sqlc.arg(role_id) ORDER BY permission_id;
+SELECT rp.permission_id
+FROM app_role_permissions rp
+JOIN app_permissions p ON p.id = rp.permission_id
+WHERE rp.role_id = sqlc.arg(role_id)
+ORDER BY p.path;
 
 -- name: CountEnabledAppPermissionsByIDs :one
 SELECT count(*) FROM app_permissions WHERE status = 'ENABLED' AND id = ANY(sqlc.arg(ids)::text[]);
@@ -220,7 +224,10 @@ SELECT * FROM app_permissions
 WHERE (sqlc.narg(domain)::text IS NULL OR domain = sqlc.narg(domain))
   AND (sqlc.narg(entity)::text IS NULL OR entity = sqlc.narg(entity))
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status))
-ORDER BY path ASC LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(page_offset);
+ORDER BY
+  CASE WHEN sqlc.arg(sort_order)::text = 'asc' THEN path END ASC,
+  path DESC
+LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(page_offset);
 
 -- name: GetAppPermissionByID :one
 SELECT * FROM app_permissions WHERE id = sqlc.arg(id) LIMIT 1;

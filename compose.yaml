@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -50,5 +50,39 @@ services:
       retries: 5
       start_period: 10s
 
+  pgadmin:
+    image: dpage/pgadmin4:9.16
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?set PGADMIN_DEFAULT_EMAIL in .env}
+      PGADMIN_DEFAULT_PASSWORD_FILE: /run/secrets/pgadmin_password
+      PGADMIN_DISABLE_POSTFIX: "1"
+      PGADMIN_LISTEN_PORT: "5050"
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
+      PGPASS_FILE: /run/secrets/postgres_pgpass
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:5050"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./config/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    secrets:
+      - pgadmin_password
+      - postgres_pgpass
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+secrets:
+  pgadmin_password:
+    file: ${PGADMIN_PASSWORD_FILE:?set PGADMIN_PASSWORD_FILE in .env}
+  postgres_pgpass:
+    file: ${PGADMIN_PGPASS_FILE:?set PGADMIN_PGPASS_FILE in .env}
+
 volumes:
   postgres-data:
+  pgadmin-data:

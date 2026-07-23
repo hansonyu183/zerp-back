@@ -2,7 +2,6 @@ package bob
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
 )
 
@@ -21,18 +20,13 @@ const (
 	StatusInvalid   = "INVALID"
 )
 
-var Entities = []string{
+var entities = [...]string{
 	EntityCustomer,
 	EntitySupplier,
 	EntityEmployee,
 	EntityProduct,
 	EntityService,
 	EntityFundAccount,
-}
-
-var Actions = []string{
-	"query", "get", "create", "edit", "save",
-	"submit", "approve", "reject", "versions", "audit-history",
 }
 
 type ErrorKind int
@@ -55,11 +49,6 @@ func (e *DomainError) Unwrap() error { return e.Cause }
 
 func domainError(kind ErrorKind, message string, data any, cause error) error {
 	return &DomainError{Kind: kind, Message: message, Data: data, Cause: cause}
-}
-
-func errorIsKind(err error, kind ErrorKind) bool {
-	var target *DomainError
-	return errors.As(err, &target) && target.Kind == kind
 }
 
 type DetailInput struct {

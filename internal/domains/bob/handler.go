@@ -36,6 +36,24 @@ type Handler struct {
 	logger     *slog.Logger
 }
 
+type actionRoute struct {
+	action string
+	handle func(*Handler, *gin.Context, string)
+}
+
+var actionRoutes = [...]actionRoute{
+	{action: "query", handle: (*Handler).query},
+	{action: "get", handle: (*Handler).get},
+	{action: "create", handle: (*Handler).create},
+	{action: "edit", handle: (*Handler).edit},
+	{action: "save", handle: (*Handler).save},
+	{action: "submit", handle: (*Handler).submit},
+	{action: "approve", handle: (*Handler).approve},
+	{action: "reject", handle: (*Handler).reject},
+	{action: "versions", handle: (*Handler).versions},
+	{action: "audit-history", handle: (*Handler).auditHistory},
+}
+
 func NewHandler(service applicationService, authorizer authorization.Authorizer, logger *slog.Logger) *Handler {
 	if authorizer == nil {
 		authorizer = authorization.FailClosed{}
@@ -45,13 +63,16 @@ func NewHandler(service applicationService, authorizer authorization.Authorizer,
 
 func (h *Handler) Register(router *gin.Engine) {
 	group := router.Group("/bob")
-	for _, registeredEntity := range Entities {
+	for _, registeredEntity := range entities {
 		entity := registeredEntity
 		entityGroup := group.Group("/" + entity)
-		for _, registeredAction := range Actions {
-			action := registeredAction
+		for _, route := range actionRoutes {
+			action := route.action
+			handle := route.handle
 			path := "/bob/" + entity + "/" + action
-			entityGroup.POST("/"+action, h.authorize(path), h.endpoint(entity, action))
+			entityGroup.POST("/"+action, h.authorize(path), func(c *gin.Context) {
+				handle(h, c, entity)
+			})
 		}
 	}
 }
@@ -74,72 +95,83 @@ func (h *Handler) authorize(path string) gin.HandlerFunc {
 	}
 }
 
-func (h *Handler) endpoint(entity, action string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		switch action {
-		case "query":
-			var input QueryInput
-			if h.bind(c, &input) {
-				result, err := h.service.Query(c.Request.Context(), entity, input)
-				h.result(c, result, err)
-			}
-		case "get":
-			var input GetInput
-			if h.bind(c, &input) {
-				result, err := h.service.Get(c.Request.Context(), entity, input)
-				h.result(c, result, err)
-			}
-		case "create":
-			var input CreateInput
-			if h.bind(c, &input) {
-				result, err := h.service.Create(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
-				h.result(c, result, err)
-			}
-		case "edit":
-			var input ObjectRevisionInput
-			if h.bind(c, &input) {
-				result, err := h.service.Edit(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
-				h.result(c, result, err)
-			}
-		case "save":
-			var input SaveInput
-			if h.bind(c, &input) {
-				result, err := h.service.Save(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
-				h.result(c, result, err)
-			}
-		case "submit":
-			var input VersionRevisionInput
-			if h.bind(c, &input) {
-				result, err := h.service.Submit(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
-				h.result(c, result, err)
-			}
-		case "approve":
-			var input ReviewInput
-			if h.bind(c, &input) {
-				result, err := h.service.Approve(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
-				h.result(c, result, err)
-			}
-		case "reject":
-			var input ReviewInput
-			if h.bind(c, &input) {
-				result, err := h.service.Reject(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
-				h.result(c, result, err)
-			}
-		case "versions":
-			var input HistoryInput
-			if h.bind(c, &input) {
-				result, err := h.service.Versions(c.Request.Context(), entity, input)
-				h.result(c, result, err)
-			}
-		case "audit-history":
-			var input HistoryInput
-			if h.bind(c, &input) {
-				result, err := h.service.AuditHistory(c.Request.Context(), entity, input)
-				h.result(c, result, err)
-			}
-		default:
-			h.writeError(c, domainError(ErrorInternal, "internal server error", nil, errors.New("unregistered BOB action")))
-		}
+func (h *Handler) query(c *gin.Context, entity string) {
+	var input QueryInput
+	if h.bind(c, &input) {
+		result, err := h.service.Query(c.Request.Context(), entity, input)
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) get(c *gin.Context, entity string) {
+	var input GetInput
+	if h.bind(c, &input) {
+		result, err := h.service.Get(c.Request.Context(), entity, input)
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) create(c *gin.Context, entity string) {
+	var input CreateInput
+	if h.bind(c, &input) {
+		result, err := h.service.Create(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) edit(c *gin.Context, entity string) {
+	var input ObjectRevisionInput
+	if h.bind(c, &input) {
+		result, err := h.service.Edit(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) save(c *gin.Context, entity string) {
+	var input SaveInput
+	if h.bind(c, &input) {
+		result, err := h.service.Save(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) submit(c *gin.Context, entity string) {
+	var input VersionRevisionInput
+	if h.bind(c, &input) {
+		result, err := h.service.Submit(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) approve(c *gin.Context, entity string) {
+	var input ReviewInput
+	if h.bind(c, &input) {
+		result, err := h.service.Approve(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) reject(c *gin.Context, entity string) {
+	var input ReviewInput
+	if h.bind(c, &input) {
+		result, err := h.service.Reject(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) versions(c *gin.Context, entity string) {
+	var input HistoryInput
+	if h.bind(c, &input) {
+		result, err := h.service.Versions(c.Request.Context(), entity, input)
+		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) auditHistory(c *gin.Context, entity string) {
+	var input HistoryInput
+	if h.bind(c, &input) {
+		result, err := h.service.AuditHistory(c.Request.Context(), entity, input)
+		h.result(c, result, err)
 	}
 }
 

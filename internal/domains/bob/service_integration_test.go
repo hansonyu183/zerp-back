@@ -1,11 +1,12 @@
+//go:build integration
+
 package bob
 
 import (
 	"context"
 	"errors"
-	"io"
-	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,15 +22,31 @@ const (
 
 func integrationPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	databaseURL := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL"))
 	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set")
+		t.Fatal("TEST_DATABASE_URL is required")
+	}
+	testDatabaseName := strings.TrimSpace(os.Getenv("TEST_POSTGRES_DB"))
+	if testDatabaseName == "" {
+		t.Fatal("TEST_POSTGRES_DB is required")
+	}
+	if !strings.HasSuffix(testDatabaseName, "_test") {
+		t.Fatalf("TEST_POSTGRES_DB %q must end with _test", testDatabaseName)
 	}
 	pool, err := pgxpool.New(t.Context(), databaseURL)
 	if err != nil {
 		t.Fatalf("connect integration database: %v", err)
 	}
 	t.Cleanup(pool.Close)
+
+	var currentDatabase string
+	if err = pool.QueryRow(t.Context(), "select current_database()").Scan(&currentDatabase); err != nil {
+		t.Fatalf("read integration database name: %v", err)
+	}
+	if currentDatabase != testDatabaseName {
+		t.Fatalf("connected database %q does not match TEST_POSTGRES_DB %q", currentDatabase, testDatabaseName)
+	}
+
 	var table *string
 	if err = pool.QueryRow(t.Context(), "select to_regclass('bob_objects')::text").Scan(&table); err != nil || table == nil {
 		t.Fatalf("BOB migrations are not applied: table=%v err=%v", table, err)
@@ -39,7 +56,7 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 
 func TestLifecycleIntegration(t *testing.T) {
 	pool := integrationPool(t)
-	service := NewService(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	service := NewService(pool)
 	code := "IT" + newID()
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: code, Name: "Integration Customer",
@@ -71,17 +88,33 @@ func TestLifecycleIntegration(t *testing.T) {
 	if err != nil || saved.Revision != 4 {
 		t.Fatalf("save: result=%+v err=%v", saved, err)
 	}
+	if _, err = service.Save(t.Context(), EntityCustomer, SaveInput{
+		ObjectID: created.ObjectID, VersionID: created.VersionID, Revision: rejected.Revision,
+		Data: DetailInput{Name: "Stale Save"},
+	}, integrationActorOne, "integration-stale-save"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("stale save error = %v", err)
+	}
 	submitted, err = service.Submit(t.Context(), EntityCustomer, VersionRevisionInput{
 		ObjectID: created.ObjectID, VersionID: created.VersionID, Revision: saved.Revision,
 	}, integrationActorOne, "integration-submit-2")
 	if err != nil || submitted.Revision != 5 {
 		t.Fatalf("resubmit: result=%+v err=%v", submitted, err)
 	}
+	if _, err = service.Submit(t.Context(), EntityCustomer, VersionRevisionInput{
+		ObjectID: created.ObjectID, VersionID: created.VersionID, Revision: saved.Revision,
+	}, integrationActorOne, "integration-stale-submit"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("stale submit error = %v", err)
+	}
 	approved, err := service.Approve(t.Context(), EntityCustomer, ReviewInput{
 		ObjectID: created.ObjectID, VersionID: created.VersionID, Revision: submitted.Revision,
 	}, integrationActorTwo, "integration-approve")
 	if err != nil || approved.Status != StatusEffective || approved.Revision != 6 || approved.ObjectRevision != 2 {
 		t.Fatalf("approve: result=%+v err=%v", approved, err)
+	}
+	if _, err = service.Approve(t.Context(), EntityCustomer, ReviewInput{
+		ObjectID: created.ObjectID, VersionID: created.VersionID, Revision: submitted.Revision,
+	}, integrationActorTwo, "integration-stale-approve"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("stale approve error = %v", err)
 	}
 
 	view, err := service.Get(t.Context(), EntityCustomer, GetInput{ObjectID: created.ObjectID})
@@ -143,7 +176,7 @@ func TestLifecycleIntegration(t *testing.T) {
 
 func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 	pool := integrationPool(t)
-	service := NewService(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	service := NewService(pool)
 	tests := []struct {
 		entity string
 		data   CreateDetailInput
@@ -205,7 +238,7 @@ func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 
 func TestConcurrentEditAllowsOneWinnerIntegration(t *testing.T) {
 	pool := integrationPool(t)
-	service := NewService(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	service := NewService(pool)
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "CC" + newID(), Name: "Concurrent Customer",
 	}}, integrationActorOne, "concurrent-create")
@@ -256,7 +289,7 @@ func TestConcurrentEditAllowsOneWinnerIntegration(t *testing.T) {
 
 func TestEffectiveReferenceLockBlocksEditIntegration(t *testing.T) {
 	pool := integrationPool(t)
-	service := NewService(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	service := NewService(pool)
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "RL" + newID(), Name: "Reference Lock Customer",
 	}}, integrationActorOne, "lock-create")
@@ -333,5 +366,34 @@ func TestDatabaseRejectsVersionWithoutTypedDetail(t *testing.T) {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
 		t.Fatalf("commit error = %v, want check violation", err)
+	}
+}
+
+func TestDuplicateCodeReturnsConflictAndRollsBackIntegration(t *testing.T) {
+	pool := integrationPool(t)
+	service := NewService(pool)
+	code := "DU" + newID()
+	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
+		Code: code, Name: "Original",
+	}}, integrationActorOne, "duplicate-create-original"); err != nil {
+		t.Fatalf("create original: %v", err)
+	}
+	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
+		Code: code, Name: "Duplicate",
+	}}, integrationActorOne, "duplicate-create-conflict"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("duplicate create error = %v", err)
+	}
+
+	var objects, versions int
+	if err := pool.QueryRow(t.Context(), `
+		SELECT count(DISTINCT o.id), count(v.id)
+		FROM bob_objects o
+		JOIN bob_versions v ON v.object_id = o.id
+		WHERE o.entity = $1 AND o.code = $2
+	`, EntityCustomer, code).Scan(&objects, &versions); err != nil {
+		t.Fatalf("count duplicate code rows: %v", err)
+	}
+	if objects != 1 || versions != 1 {
+		t.Fatalf("objects=%d versions=%d, want one committed aggregate", objects, versions)
 	}
 }

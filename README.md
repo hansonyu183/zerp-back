@@ -69,14 +69,15 @@ make run
 | --- | --- |
 | `make run` | 启动本机 Go 服务 |
 | `make build` | 编译全部 Go 包 |
-| `make test` | 执行全部测试 |
-| `make TEST_DATABASE_URL=... test-integration` | 在已迁移的独立 PostgreSQL 测试库执行 BOB 数据库契约测试 |
+| `make test` | 自动准备独立测试库并执行单元测试和数据库集成测试 |
+| `make test-unit` | 执行不依赖数据库的单元测试 |
+| `make test-integration` | 创建或复用独立测试库、应用全部迁移并执行 BOB 数据库契约测试 |
 | `make generate` | 根据 SQL 重新生成 sqlc 代码 |
 | `make migrate-status` | 查看数据库迁移状态 |
 | `make migrate-up` | 升级数据库到最新迁移 |
 | `make migrate-down` | 回滚一个数据库迁移版本 |
 | `make bootstrap-admin` | 在空用户库中创建首个超级管理员（密码取自 `APP_BOOTSTRAP_PASSWORD`） |
-| `make compose-up` | 构建并启动 API 与 PostgreSQL |
+| `make compose-up` | 构建并启动 API、PostgreSQL 与 pgAdmin |
 | `make compose-down` | 停止容器 |
 
 ## 配置
@@ -90,8 +91,14 @@ make ENV_FILE=.env.test compose-up
 | 变量 | 必填 | 默认值 | 用途 |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | 是 | 无 | PostgreSQL 连接串 |
+| `TEST_POSTGRES_DB` | 测试时是 | 无 | 独立测试数据库名；必须以 `_test` 结尾且不得与 `POSTGRES_DB` 相同 |
+| `TEST_DATABASE_URL` | 测试时是 | 无 | 独立测试数据库连接串；实际连接库必须与 `TEST_POSTGRES_DB` 一致 |
 | `API_PORT` | 否 | `8080` | Compose 暴露到宿主机的 API 端口 |
 | `POSTGRES_PORT` | 否 | `5432` | Compose 暴露到宿主机的 PostgreSQL 端口 |
+| `PGADMIN_DEFAULT_EMAIL` | Compose 启动时是 | 无 | pgAdmin 初始管理员邮箱 |
+| `PGADMIN_PORT` | 否 | `5050` | pgAdmin 仅在宿主机回环地址监听的端口 |
+| `PGADMIN_PASSWORD_FILE` | Compose 启动时是 | 无 | pgAdmin 初始管理员密码文件 |
+| `PGADMIN_PGPASS_FILE` | Compose 启动时是 | 无 | pgAdmin 连接项目 PostgreSQL 的 pgpass 文件 |
 | `APP_ENV` | 否 | `development` | `development`、`test` 或 `production` |
 | `HTTP_ADDRESS` | 否 | `:8080` | HTTP 监听地址 |
 | `CORS_ALLOWED_ORIGINS` | 否 | 直跑为空；Compose 允许本地 `5173`/`4173` 联调 Origin | 允许携带凭证的前端 Origin，多个值用逗号分隔 |
@@ -107,6 +114,8 @@ make ENV_FILE=.env.test compose-up
 | `APP_SIGNIN_LOCK_THRESHOLD` | 否 | `5` | 连续登录失败后的锁定阈值 |
 | `APP_SIGNIN_LOCK_DURATION` | 否 | `15m` | 登录临时锁定时长 |
 | `APP_PASSWORD_MIN_LENGTH` | 否 | `12` | 新用户密码最小长度，允许范围为 8–128 |
+
+`make test` 会启动并等待 Compose 的 `db` 服务，幂等创建 `TEST_POSTGRES_DB`，使用 Goose 应用全部迁移，再执行带 `integration` 构建标签的数据库测试。测试库会保留供后续运行复用；安全校验会拒绝非 `_test` 后缀、与 `POSTGRES_DB` 相同或实际连接库名不匹配的配置。
 
 本机直接运行服务且未配置 CORS Origin 时，不允许任何跨域浏览器请求；同源请求和不携带 `Origin` 的服务间请求不受影响。Docker Compose 为本地开发默认允许 `http://localhost:5173`、`http://127.0.0.1:4173` 和 `http://localhost:4173`，生产环境必须显式配置实际前端 Origin。
 

@@ -17,7 +17,20 @@ type databasePinger interface {
 	Ping(context.Context) error
 }
 
-func New(cfg config.Config, db databasePinger, logger *slog.Logger) *gin.Engine {
+func New(cfg config.Config, db *pgxpool.Pool, logger *slog.Logger) *gin.Engine {
+	appService := appdomain.NewService(db, cfg, logger)
+	return newRouter(cfg, db, logger, func(router *gin.Engine) {
+		appdomain.NewHandler(appService, cfg, logger).Register(router)
+		bobdomain.NewHandler(bobdomain.NewService(db), appAuthorizer{service: appService, cfg: cfg}, logger).Register(router)
+	})
+}
+
+func newRouter(
+	cfg config.Config,
+	db databasePinger,
+	logger *slog.Logger,
+	registerBusinessRoutes func(*gin.Engine),
+) *gin.Engine {
 	if cfg.Environment == config.EnvironmentProduction {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -34,10 +47,8 @@ func New(cfg config.Config, db databasePinger, logger *slog.Logger) *gin.Engine 
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 	router.GET("/readyz", readinessHandler(db, cfg.DatabaseHealthTimeout))
-	if pool, ok := db.(*pgxpool.Pool); ok {
-		appService := appdomain.NewService(pool, cfg, logger)
-		appdomain.NewHandler(appService, cfg, logger).Register(router)
-		bobdomain.NewHandler(bobdomain.NewService(pool, logger), appAuthorizer{service: appService, cfg: cfg}, logger).Register(router)
+	if registerBusinessRoutes != nil {
+		registerBusinessRoutes(router)
 	}
 
 	router.NoRoute(func(c *gin.Context) {

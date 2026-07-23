@@ -1,9 +1,16 @@
 package bob
 
 import (
+	"errors"
 	"math"
+	"strings"
 	"testing"
 )
+
+func errorIsKind(err error, kind ErrorKind) bool {
+	var target *DomainError
+	return errors.As(err, &target) && target.Kind == kind
+}
 
 func TestValidateCreateNormalizesCodeAndEntityFields(t *testing.T) {
 	tests := []struct {
@@ -23,7 +30,7 @@ func TestValidateCreateNormalizesCodeAndEntityFields(t *testing.T) {
 			if err != nil {
 				t.Fatalf("validateCreate: %v", err)
 			}
-			if code == "" || code != normalizeExpectedCode(test.input.Code) {
+			if code == "" || code != strings.ToUpper(strings.TrimSpace(test.input.Code)) {
 				t.Fatalf("code = %q", code)
 			}
 			if data.Name == "" {
@@ -72,20 +79,34 @@ func TestQueryValidationBoundaries(t *testing.T) {
 	}
 }
 
-func normalizeExpectedCode(value string) string {
-	result := make([]byte, 0, len(value))
-	start, end := 0, len(value)
-	for start < end && value[start] == ' ' {
-		start++
+func TestValidateDetailCountsUnicodeCharacters(t *testing.T) {
+	if _, err := validateDetail(EntityCustomer, DetailInput{Name: strings.Repeat("客", 200)}); err != nil {
+		t.Fatalf("200-character name rejected: %v", err)
 	}
-	for end > start && value[end-1] == ' ' {
-		end--
+	if _, err := validateDetail(EntityCustomer, DetailInput{Name: strings.Repeat("客", 201)}); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("201-character name error = %v", err)
 	}
-	for _, b := range []byte(value[start:end]) {
-		if b >= 'a' && b <= 'z' {
-			b -= 'a' - 'A'
-		}
-		result = append(result, b)
+	if _, err := validateDetail(EntityProduct, DetailInput{
+		Name: "产品",
+		Unit: strings.Repeat("箱", 32),
+	}); err != nil {
+		t.Fatalf("32-character unit rejected: %v", err)
 	}
-	return string(result)
+	if _, err := validateDetail(EntityProduct, DetailInput{
+		Name: "产品",
+		Unit: strings.Repeat("箱", 33),
+	}); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("33-character unit error = %v", err)
+	}
+}
+
+func TestCommentCountsUnicodeCharacters(t *testing.T) {
+	accepted := strings.Repeat("改", 1000)
+	if comment, err := optionalComment(&accepted); err != nil || comment == nil {
+		t.Fatalf("1000-character comment rejected: comment=%v err=%v", comment, err)
+	}
+	rejected := strings.Repeat("改", 1001)
+	if _, err := optionalComment(&rejected); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("1001-character comment error = %v", err)
+	}
 }

@@ -2,34 +2,23 @@ package bob
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"log/slog"
-	"regexp"
 	"slices"
 	"strings"
-	"time"
+	"unicode/utf8"
 
 	dbsqlc "github.com/hansonyu183/zerp-back/internal/database/sqlc"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/oklog/ulid/v2"
 )
-
-var codePattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9._-]*$`)
-var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *dbsqlc.Queries
-	logger  *slog.Logger
 }
 
-func NewService(pool *pgxpool.Pool, logger *slog.Logger) *Service {
-	return &Service{pool: pool, queries: dbsqlc.New(pool), logger: logger}
+func NewService(pool *pgxpool.Pool) *Service {
+	return &Service{pool: pool, queries: dbsqlc.New(pool)}
 }
 
 func (s *Service) Query(ctx context.Context, entity string, input QueryInput) (Page[QueryItem], error) {
@@ -38,7 +27,7 @@ func (s *Service) Query(ctx context.Context, entity string, input QueryInput) (P
 		return Page[QueryItem]{}, domainError(ErrorValidation, "invalid query", nil, nil)
 	}
 	input.Filters.Keyword = strings.TrimSpace(input.Filters.Keyword)
-	if len(input.Filters.Keyword) > 128 || len(input.Filters.Status) > 5 {
+	if utf8.RuneCountInString(input.Filters.Keyword) > 128 || len(input.Filters.Status) > 5 {
 		return Page[QueryItem]{}, domainError(ErrorValidation, "invalid query filters", nil, nil)
 	}
 	statuses := uniqueStrings(input.Filters.Status)
@@ -497,321 +486,4 @@ func (s *Service) validateStoredDetail(ctx context.Context, q *dbsqlc.Queries, e
 	}
 	_, err = validateDetail(entity, DetailInput{Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency)})
 	return err
-}
-
-func validateCreate(entity string, input CreateDetailInput) (DetailInput, string, error) {
-	code := strings.ToUpper(strings.TrimSpace(input.Code))
-	if len(code) < 1 || len(code) > 64 || !codePattern.MatchString(code) {
-		return DetailInput{}, "", domainError(ErrorValidation, "invalid code", nil, nil)
-	}
-	data, err := validateDetail(entity, DetailInput{Name: input.Name, Unit: input.Unit, Currency: input.Currency})
-	return data, code, err
-}
-
-func validateDetail(entity string, input DetailInput) (DetailInput, error) {
-	if !validEntity(entity) {
-		return DetailInput{}, domainError(ErrorValidation, "invalid entity", nil, nil)
-	}
-	input.Name = strings.TrimSpace(input.Name)
-	input.Unit = strings.TrimSpace(input.Unit)
-	input.Currency = strings.ToUpper(strings.TrimSpace(input.Currency))
-	if len(input.Name) < 1 || len(input.Name) > 200 {
-		return DetailInput{}, domainError(ErrorValidation, "invalid name", nil, nil)
-	}
-	switch entity {
-	case EntityProduct, EntityService:
-		if len(input.Unit) < 1 || len(input.Unit) > 32 || input.Currency != "" {
-			return DetailInput{}, domainError(ErrorValidation, "invalid unit or unexpected currency", nil, nil)
-		}
-	case EntityFundAccount:
-		if input.Unit != "" || !currencyPattern.MatchString(input.Currency) {
-			return DetailInput{}, domainError(ErrorValidation, "invalid currency or unexpected unit", nil, nil)
-		}
-	default:
-		if input.Unit != "" || input.Currency != "" {
-			return DetailInput{}, domainError(ErrorValidation, "unexpected entity fields", nil, nil)
-		}
-	}
-	return input, nil
-}
-
-func validWriteInput(entity, objectID, versionID string, revision int64, actorID, requestID string) bool {
-	return validEntity(entity) && validID(objectID) && validID(versionID) && revision >= 1 && validActorAndRequest(actorID, requestID)
-}
-
-func validActorAndRequest(actorID, requestID string) bool {
-	return validID(actorID) && requestID != "" && len(requestID) <= 128
-}
-
-func validHistoryInput(entity string, input HistoryInput) bool {
-	_, validPage := pageOffset(input.Page, input.PageSize)
-	return validEntity(entity) && validID(input.ObjectID) && validPage
-}
-
-func pageOffset(page, pageSize int) (int32, bool) {
-	if page < 1 || pageSize < 1 || pageSize > 100 {
-		return 0, false
-	}
-	pageIndex := int64(page - 1)
-	if pageIndex > int64(1<<31-1)/int64(pageSize) {
-		return 0, false
-	}
-	offset := pageIndex * int64(pageSize)
-	return int32(offset), true
-}
-
-func mustPageOffset(page, pageSize int) int32 {
-	offset, _ := pageOffset(page, pageSize)
-	return offset
-}
-
-func validEntity(entity string) bool { return slices.Contains(Entities, entity) }
-
-func validStatus(status string) bool {
-	return slices.Contains([]string{StatusDraft, StatusPending, StatusRejected, StatusEffective, StatusInvalid}, status)
-}
-
-func validID(id string) bool {
-	parsed, err := ulid.ParseStrict(id)
-	return err == nil && parsed.String() == id
-}
-
-func uniqueStrings(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result
-}
-
-func optionalComment(value *string) (*string, error) {
-	if value == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*value)
-	if len(trimmed) > 1000 {
-		return nil, domainError(ErrorValidation, "comment is too long", nil, nil)
-	}
-	if trimmed == "" {
-		return nil, nil
-	}
-	return &trimmed, nil
-}
-
-func requiredComment(value *string) (*string, error) {
-	comment, err := optionalComment(value)
-	if err != nil {
-		return nil, err
-	}
-	if comment == nil {
-		return nil, domainError(ErrorValidation, "rejection comment is required", nil, nil)
-	}
-	return comment, nil
-}
-
-func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string, data DetailInput) error {
-	switch entity {
-	case EntityCustomer:
-		return q.InsertBobCustomerDetail(ctx, dbsqlc.InsertBobCustomerDetailParams{VersionID: versionID, Name: data.Name})
-	case EntitySupplier:
-		return q.InsertBobSupplierDetail(ctx, dbsqlc.InsertBobSupplierDetailParams{VersionID: versionID, Name: data.Name})
-	case EntityEmployee:
-		return q.InsertBobEmployeeDetail(ctx, dbsqlc.InsertBobEmployeeDetailParams{VersionID: versionID, Name: data.Name})
-	case EntityProduct:
-		return q.InsertBobProductDetail(ctx, dbsqlc.InsertBobProductDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
-	case EntityService:
-		return q.InsertBobServiceDetail(ctx, dbsqlc.InsertBobServiceDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
-	case EntityFundAccount:
-		return q.InsertBobFundAccountDetail(ctx, dbsqlc.InsertBobFundAccountDetailParams{VersionID: versionID, Name: data.Name, Currency: data.Currency})
-	default:
-		return domainError(ErrorValidation, "invalid entity", nil, nil)
-	}
-}
-
-func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string, data DetailInput) error {
-	var rows int64
-	var err error
-	switch entity {
-	case EntityCustomer:
-		rows, err = q.UpdateBobCustomerDetail(ctx, dbsqlc.UpdateBobCustomerDetailParams{Name: data.Name, VersionID: versionID})
-	case EntitySupplier:
-		rows, err = q.UpdateBobSupplierDetail(ctx, dbsqlc.UpdateBobSupplierDetailParams{Name: data.Name, VersionID: versionID})
-	case EntityEmployee:
-		rows, err = q.UpdateBobEmployeeDetail(ctx, dbsqlc.UpdateBobEmployeeDetailParams{Name: data.Name, VersionID: versionID})
-	case EntityProduct:
-		rows, err = q.UpdateBobProductDetail(ctx, dbsqlc.UpdateBobProductDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
-	case EntityService:
-		rows, err = q.UpdateBobServiceDetail(ctx, dbsqlc.UpdateBobServiceDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
-	case EntityFundAccount:
-		rows, err = q.UpdateBobFundAccountDetail(ctx, dbsqlc.UpdateBobFundAccountDetailParams{Name: data.Name, Currency: data.Currency, VersionID: versionID})
-	default:
-		return domainError(ErrorValidation, "invalid entity", nil, nil)
-	}
-	if err == nil && rows != 1 {
-		return domainError(ErrorConflict, "version detail changed", nil, nil)
-	}
-	return err
-}
-
-func copyDetail(ctx context.Context, q *dbsqlc.Queries, entity, newVersionID, sourceVersionID string) error {
-	switch entity {
-	case EntityCustomer:
-		return q.CopyBobCustomerDetail(ctx, dbsqlc.CopyBobCustomerDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
-	case EntitySupplier:
-		return q.CopyBobSupplierDetail(ctx, dbsqlc.CopyBobSupplierDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
-	case EntityEmployee:
-		return q.CopyBobEmployeeDetail(ctx, dbsqlc.CopyBobEmployeeDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
-	case EntityProduct:
-		return q.CopyBobProductDetail(ctx, dbsqlc.CopyBobProductDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
-	case EntityService:
-		return q.CopyBobServiceDetail(ctx, dbsqlc.CopyBobServiceDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
-	case EntityFundAccount:
-		return q.CopyBobFundAccountDetail(ctx, dbsqlc.CopyBobFundAccountDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
-	default:
-		return domainError(ErrorValidation, "invalid entity", nil, nil)
-	}
-}
-
-type auditInput struct {
-	ObjectID, VersionID, Entity, Event, To, ActorID, RequestID string
-	From, Comment                                              *string
-	Summary                                                    map[string]any
-}
-
-func insertAudit(ctx context.Context, q *dbsqlc.Queries, input auditInput) error {
-	summary := input.Summary
-	if summary == nil {
-		summary = map[string]any{}
-	}
-	encoded, err := json.Marshal(summary)
-	if err != nil {
-		return err
-	}
-	return q.InsertBobAuditEvent(ctx, dbsqlc.InsertBobAuditEventParams{
-		ID: newID(), ObjectID: input.ObjectID, VersionID: input.VersionID, Entity: input.Entity,
-		EventType: input.Event, FromStatus: input.From, ToStatus: input.To, ActorID: input.ActorID,
-		Comment: input.Comment, RequestID: input.RequestID, Summary: encoded,
-	})
-}
-
-func newID() string { return ulid.Make().String() }
-
-func mutation(object dbsqlc.LockBobObjectRow, version dbsqlc.LockBobVersionRow, status string, revision int64) MutationResult {
-	return MutationResult{
-		ObjectID: object.ID, ObjectRevision: object.Revision, VersionID: version.ID,
-		Version: version.VersionNo, Status: status, Revision: revision,
-	}
-}
-
-func conflict(object dbsqlc.LockBobObjectRow, version dbsqlc.LockBobVersionRow, message string) error {
-	return domainError(ErrorConflict, message, conflictData(object, version), nil)
-}
-
-func conflictData(object dbsqlc.LockBobObjectRow, version dbsqlc.LockBobVersionRow) map[string]any {
-	return map[string]any{
-		"objectRevision": object.Revision,
-		"versionId":      version.ID,
-		"revision":       version.Revision,
-		"status":         version.Status,
-	}
-}
-
-func detailFields(entity string) []string {
-	fields := []string{"name"}
-	if entity == EntityProduct || entity == EntityService {
-		fields = append(fields, "unit")
-	}
-	if entity == EntityFundAccount {
-		fields = append(fields, "currency")
-	}
-	return fields
-}
-
-func queryItem(row dbsqlc.BobVersionView) QueryItem {
-	return QueryItem{
-		ObjectID: row.ObjectID, Entity: row.Entity, Code: row.Code, ObjectRevision: row.ObjectRevision,
-		CurrentVersion: versionSummary(row), EffectiveVersionID: row.EffectiveVersionID, UpdatedAt: row.ObjectUpdatedAt.Time,
-	}
-}
-
-func versionSummary(row dbsqlc.BobVersionView) VersionSummary {
-	return VersionSummary{
-		VersionID: row.VersionID, Version: row.VersionNo, Status: row.Status, Revision: row.VersionRevision,
-		Summary: detailView(row),
-	}
-}
-
-func versionHistoryItem(row dbsqlc.BobVersionView) VersionHistoryItem {
-	return VersionHistoryItem{
-		VersionID: row.VersionID, Version: row.VersionNo, Status: row.Status, Revision: row.VersionRevision,
-		CreatedAt: row.CreatedAt.Time, CreatedBy: row.CreatedBy, UpdatedAt: row.UpdatedAt.Time, UpdatedBy: row.UpdatedBy,
-		SubmittedAt: timePointer(row.SubmittedAt), SubmittedBy: row.SubmittedBy,
-		ReviewedAt: timePointer(row.ReviewedAt), ReviewedBy: row.ReviewedBy, ReviewComment: row.ReviewComment,
-		Summary: detailView(row),
-	}
-}
-
-func objectView(row dbsqlc.BobVersionView) ObjectView {
-	return ObjectView{
-		ObjectID: row.ObjectID, Entity: row.Entity, Code: row.Code, ObjectRevision: row.ObjectRevision,
-		CurrentVersionID: row.CurrentVersionID, EffectiveVersionID: row.EffectiveVersionID, UpdatedAt: row.ObjectUpdatedAt.Time,
-		Version: VersionMeta{
-			VersionID: row.VersionID, Version: row.VersionNo, Status: row.Status, Revision: row.VersionRevision,
-			CreatedAt: row.CreatedAt.Time, CreatedBy: row.CreatedBy, UpdatedAt: row.UpdatedAt.Time, UpdatedBy: row.UpdatedBy,
-			SubmittedAt: timePointer(row.SubmittedAt), SubmittedBy: row.SubmittedBy,
-			ReviewedAt: timePointer(row.ReviewedAt), ReviewedBy: row.ReviewedBy, ReviewComment: row.ReviewComment,
-		},
-		Data: detailView(row),
-	}
-}
-
-func detailView(row dbsqlc.BobVersionView) DetailView {
-	return DetailView{Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency)}
-}
-
-func auditEventView(row dbsqlc.BobAuditEvent) AuditEventView {
-	return AuditEventView{
-		ID: row.ID, ObjectID: row.ObjectID, VersionID: row.VersionID, Entity: row.Entity,
-		EventType: row.EventType, FromStatus: row.FromStatus, ToStatus: row.ToStatus, ActorID: row.ActorID,
-		OccurredAt: row.OccurredAt.Time, Comment: row.Comment, RequestID: row.RequestID, Summary: json.RawMessage(row.Summary),
-	}
-}
-
-func timePointer(value pgtype.Timestamptz) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	result := value.Time
-	return &result
-}
-
-func deref(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
-func (s *Service) internal(operation string, err error) error {
-	return domainError(ErrorInternal, "internal server error", nil, fmt.Errorf("%s: %w", operation, err))
-}
-
-func (s *Service) writeError(operation string, err error) error {
-	var domainErr *DomainError
-	if errors.As(err, &domainErr) {
-		return err
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "23505", "23P01", "40001", "40P01":
-			return domainError(ErrorConflict, "data conflict", nil, err)
-		}
-	}
-	return s.internal(operation, err)
 }

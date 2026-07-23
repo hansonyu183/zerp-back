@@ -37,7 +37,7 @@ func testLogger() *slog.Logger {
 }
 
 func TestHealthAndReadiness(t *testing.T) {
-	router := New(testConfig(), pingerStub{}, testLogger())
+	router := newRouter(testConfig(), pingerStub{}, testLogger(), nil)
 
 	for _, path := range []string{"/healthz", "/readyz"} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
@@ -54,7 +54,7 @@ func TestHealthAndReadiness(t *testing.T) {
 }
 
 func TestReadinessFailsWhenDatabaseIsUnavailable(t *testing.T) {
-	router := New(testConfig(), pingerStub{err: errors.New("unavailable")}, testLogger())
+	router := newRouter(testConfig(), pingerStub{err: errors.New("unavailable")}, testLogger(), nil)
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	responseRecorder := httptest.NewRecorder()
 	router.ServeHTTP(responseRecorder, request)
@@ -65,7 +65,7 @@ func TestReadinessFailsWhenDatabaseIsUnavailable(t *testing.T) {
 }
 
 func TestCORSAllowsOnlyConfiguredOrigin(t *testing.T) {
-	router := New(testConfig(), pingerStub{}, testLogger())
+	router := newRouter(testConfig(), pingerStub{}, testLogger(), nil)
 
 	allowedRequest := httptest.NewRequest(http.MethodOptions, "/readyz", nil)
 	allowedRequest.Header.Set("Origin", "https://erp.example.com")
@@ -90,7 +90,7 @@ func TestCORSAllowsOnlyConfiguredOrigin(t *testing.T) {
 }
 
 func TestRecoveryUsesBusinessEnvelope(t *testing.T) {
-	router := New(testConfig(), pingerStub{}, testLogger())
+	router := newRouter(testConfig(), pingerStub{}, testLogger(), nil)
 	router.POST("/test/panic/action", func(*gin.Context) {
 		panic("test panic")
 	})

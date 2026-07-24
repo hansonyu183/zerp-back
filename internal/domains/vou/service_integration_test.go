@@ -178,7 +178,10 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 		}},
 		{EntityIntermediarySaleOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer,
-			Supplier: &refs.supplier, ProductLines: productLine,
+			Supplier: &refs.supplier, ProductLines: []ProductLineInput{{
+				Product: refs.product, OrderedQuantity: "10.5", UnitPrice: "12.34",
+				PurchaseUnitPrice: "10.00", Remark: "商品明细备注",
+			}},
 		}},
 		{EntityReceipt, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",

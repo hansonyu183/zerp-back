@@ -10,11 +10,14 @@ import (
 
 type Querier interface {
 	AcquireAppAuthorizationLock(ctx context.Context) error
+	ActivateLedControl(ctx context.Context, arg ActivateLedControlParams) (int64, error)
 	AdvanceBobObjectForEdit(ctx context.Context, arg AdvanceBobObjectForEditParams) (int64, error)
 	ApproveBobVersion(ctx context.Context, arg ApproveBobVersionParams) (int64, error)
 	ApproveVouDocument(ctx context.Context, arg ApproveVouDocumentParams) (int64, error)
+	ArchiveActiveLedGeneration(ctx context.Context, generationID string) error
 	BobDraftAuditIsDeletable(ctx context.Context, arg BobDraftAuditIsDeletableParams) (*bool, error)
 	BobObjectHasExternalReferences(ctx context.Context, arg BobObjectHasExternalReferencesParams) (bool, error)
+	CancelLedReopen(ctx context.Context, arg CancelLedReopenParams) (int64, error)
 	ClearVouIntermediarySaleOrderExecution(ctx context.Context, documentID string) (int64, error)
 	ClearVouProductLineExecution(ctx context.Context, documentID string) error
 	ClearVouPurchaseOrderExecution(ctx context.Context, documentID string) (int64, error)
@@ -32,6 +35,9 @@ type Querier interface {
 	CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplierDetailParams) error
 	CopyBobVehicleDetail(ctx context.Context, arg CopyBobVehicleDetailParams) error
 	CopyBobWarehouseDetail(ctx context.Context, arg CopyBobWarehouseDetailParams) error
+	CopyLedOpeningToDraftFund(ctx context.Context, generationID string) error
+	CopyLedOpeningToDraftInventory(ctx context.Context, generationID string) error
+	CopyLedOpeningToDraftParty(ctx context.Context, generationID string) error
 	CountAllAppUsers(ctx context.Context) (int64, error)
 	CountAppPermissions(ctx context.Context, arg CountAppPermissionsParams) (int64, error)
 	CountAppRoles(ctx context.Context, arg CountAppRolesParams) (int64, error)
@@ -45,6 +51,13 @@ type Querier interface {
 	CountEnabledUsersMissingPermission(ctx context.Context, path string) (int64, error)
 	CountEnabledUsersWithPermission(ctx context.Context, path string) (int64, error)
 	CountEnabledUsersWithPermissionExcludingRole(ctx context.Context, arg CountEnabledUsersWithPermissionExcludingRoleParams) (int64, error)
+	CountLedAuditEvents(ctx context.Context) (int64, error)
+	CountLedFundBalances(ctx context.Context, arg CountLedFundBalancesParams) (int64, error)
+	CountLedFundEntries(ctx context.Context, arg CountLedFundEntriesParams) (int64, error)
+	CountLedInventoryBalances(ctx context.Context, arg CountLedInventoryBalancesParams) (int64, error)
+	CountLedInventoryEntries(ctx context.Context, arg CountLedInventoryEntriesParams) (int64, error)
+	CountLedPartyBalances(ctx context.Context, arg CountLedPartyBalancesParams) (int64, error)
+	CountLedPartyEntries(ctx context.Context, arg CountLedPartyEntriesParams) (int64, error)
 	CountOtherEnabledUsersWithPermission(ctx context.Context, arg CountOtherEnabledUsersWithPermissionParams) (int64, error)
 	CountPendingVouAttachments(ctx context.Context, documentID string) (int64, error)
 	CountVouAttachments(ctx context.Context, documentID string) (int64, error)
@@ -70,6 +83,9 @@ type Querier interface {
 	DeleteBobVehicleDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobWarehouseDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteExpiredVouDownloadTokens(ctx context.Context) error
+	DeleteLedDraftFund(ctx context.Context) error
+	DeleteLedDraftInventory(ctx context.Context) error
+	DeleteLedDraftParty(ctx context.Context) error
 	DeleteVouAttachmentByFileID(ctx context.Context, fileID string) (int64, error)
 	DeleteVouDocumentAttachment(ctx context.Context, arg DeleteVouDocumentAttachmentParams) (int64, error)
 	DeleteVouExpenseLines(ctx context.Context, documentID string) error
@@ -87,6 +103,7 @@ type Querier interface {
 	GetAppUserPermissions(ctx context.Context, userID string) ([]string, error)
 	GetAppUserRoleIDs(ctx context.Context, userID string) ([]string, error)
 	GetBobVersionView(ctx context.Context, arg GetBobVersionViewParams) (BobVersionView, error)
+	GetLedControl(ctx context.Context) (LedControl, error)
 	GetReadyVouAttachment(ctx context.Context, arg GetReadyVouAttachmentParams) (GetReadyVouAttachmentRow, error)
 	GetVouDocument(ctx context.Context, arg GetVouDocumentParams) (VouDocument, error)
 	GetVouExpenseReimbursementDetail(ctx context.Context, documentID string) (VouExpenseReimbursementDetail, error)
@@ -96,6 +113,8 @@ type Querier interface {
 	GetVouPurchaseOrderDetail(ctx context.Context, documentID string) (VouPurchaseOrderDetail, error)
 	GetVouReceiptDetail(ctx context.Context, documentID string) (VouReceiptDetail, error)
 	GetVouSaleOrderDetail(ctx context.Context, documentID string) (VouSaleOrderDetail, error)
+	HasLedEntriesForSource(ctx context.Context, arg HasLedEntriesForSourceParams) (bool, error)
+	HasNegativeLedInventoryTimeline(ctx context.Context, generationID string) (bool, error)
 	InsertAppRole(ctx context.Context, arg InsertAppRoleParams) error
 	InsertAppRolePermission(ctx context.Context, arg InsertAppRolePermissionParams) error
 	InsertAppUser(ctx context.Context, arg InsertAppUserParams) error
@@ -115,6 +134,20 @@ type Querier interface {
 	InsertBobVehicleDetail(ctx context.Context, arg InsertBobVehicleDetailParams) error
 	InsertBobVersion(ctx context.Context, arg InsertBobVersionParams) error
 	InsertBobWarehouseDetail(ctx context.Context, arg InsertBobWarehouseDetailParams) error
+	InsertLedAuditEvent(ctx context.Context, arg InsertLedAuditEventParams) error
+	InsertLedDraftFund(ctx context.Context, arg InsertLedDraftFundParams) error
+	InsertLedDraftInventory(ctx context.Context, arg InsertLedDraftInventoryParams) error
+	InsertLedDraftParty(ctx context.Context, arg InsertLedDraftPartyParams) error
+	InsertLedFundEntry(ctx context.Context, arg InsertLedFundEntryParams) error
+	InsertLedGeneration(ctx context.Context, arg InsertLedGenerationParams) error
+	InsertLedInventoryEntry(ctx context.Context, arg InsertLedInventoryEntryParams) error
+	InsertLedOpeningFundEntries(ctx context.Context, arg InsertLedOpeningFundEntriesParams) error
+	InsertLedOpeningFundFromDraft(ctx context.Context, generationID string) error
+	InsertLedOpeningInventoryEntries(ctx context.Context, arg InsertLedOpeningInventoryEntriesParams) error
+	InsertLedOpeningInventoryFromDraft(ctx context.Context, generationID string) error
+	InsertLedOpeningPartyEntries(ctx context.Context, arg InsertLedOpeningPartyEntriesParams) error
+	InsertLedOpeningPartyFromDraft(ctx context.Context, generationID string) error
+	InsertLedPartyEntry(ctx context.Context, arg InsertLedPartyEntryParams) error
 	InsertVouAuditEvent(ctx context.Context, arg InsertVouAuditEventParams) error
 	InsertVouDocument(ctx context.Context, arg InsertVouDocumentParams) error
 	InsertVouDocumentAttachment(ctx context.Context, arg InsertVouDocumentAttachmentParams) error
@@ -139,7 +172,24 @@ type Querier interface {
 	ListBobAuditEvents(ctx context.Context, arg ListBobAuditEventsParams) ([]BobAuditEvent, error)
 	ListBobObjects(ctx context.Context, arg ListBobObjectsParams) ([]BobVersionView, error)
 	ListBobVersions(ctx context.Context, arg ListBobVersionsParams) ([]BobVersionView, error)
+	ListExecutedVouDocumentsForLed(ctx context.Context) ([]VouDocument, error)
 	ListExpiredPendingVouFiles(ctx context.Context, batchSize int32) ([]ListExpiredPendingVouFilesRow, error)
+	ListLedAuditEvents(ctx context.Context, arg ListLedAuditEventsParams) ([]LedAuditEvent, error)
+	ListLedDraftFund(ctx context.Context) ([]LedDraftFund, error)
+	ListLedDraftInventory(ctx context.Context) ([]LedDraftInventory, error)
+	ListLedDraftParty(ctx context.Context) ([]LedDraftParty, error)
+	ListLedFundBalances(ctx context.Context, arg ListLedFundBalancesParams) ([]ListLedFundBalancesRow, error)
+	ListLedFundEntries(ctx context.Context, arg ListLedFundEntriesParams) ([]LedFundEntry, error)
+	ListLedFundEntriesBySource(ctx context.Context, arg ListLedFundEntriesBySourceParams) ([]LedFundEntry, error)
+	ListLedInventoryBalances(ctx context.Context, arg ListLedInventoryBalancesParams) ([]ListLedInventoryBalancesRow, error)
+	ListLedInventoryEntries(ctx context.Context, arg ListLedInventoryEntriesParams) ([]LedInventoryEntry, error)
+	ListLedInventoryEntriesBySource(ctx context.Context, arg ListLedInventoryEntriesBySourceParams) ([]LedInventoryEntry, error)
+	ListLedOpeningFund(ctx context.Context, generationID string) ([]LedOpeningFund, error)
+	ListLedOpeningInventory(ctx context.Context, generationID string) ([]LedOpeningInventory, error)
+	ListLedOpeningParty(ctx context.Context, generationID string) ([]LedOpeningParty, error)
+	ListLedPartyBalances(ctx context.Context, arg ListLedPartyBalancesParams) ([]ListLedPartyBalancesRow, error)
+	ListLedPartyEntries(ctx context.Context, arg ListLedPartyEntriesParams) ([]LedPartyEntry, error)
+	ListLedPartyEntriesBySource(ctx context.Context, arg ListLedPartyEntriesBySourceParams) ([]LedPartyEntry, error)
 	ListVouAttachments(ctx context.Context, documentID string) ([]ListVouAttachmentsRow, error)
 	ListVouAuditEvents(ctx context.Context, arg ListVouAuditEventsParams) ([]VouAuditEvent, error)
 	ListVouDocuments(ctx context.Context, arg ListVouDocumentsParams) ([]ListVouDocumentsRow, error)
@@ -151,6 +201,7 @@ type Querier interface {
 	LockEffectiveCategoryReference(ctx context.Context, targetCategoryID string) (string, error)
 	LockEffectiveLogisticsPlatform(ctx context.Context, platformObjectID string) (string, error)
 	LockExpiredPendingVouFile(ctx context.Context, id string) (string, error)
+	LockLedControl(ctx context.Context) (LedControl, error)
 	LockPendingVouUpload(ctx context.Context, uploadTokenHash string) (LockPendingVouUploadRow, error)
 	LockVouAttachmentForRemoval(ctx context.Context, arg LockVouAttachmentForRemovalParams) (LockVouAttachmentForRemovalRow, error)
 	LockVouDocument(ctx context.Context, arg LockVouDocumentParams) (VouDocument, error)
@@ -160,6 +211,7 @@ type Querier interface {
 	Ping(ctx context.Context) (int32, error)
 	RecordSigninFailure(ctx context.Context, arg RecordSigninFailureParams) (AppUser, error)
 	RejectBobVersion(ctx context.Context, arg RejectBobVersionParams) (int64, error)
+	ReopenLedControl(ctx context.Context, arg ReopenLedControlParams) (int64, error)
 	ResetSigninFailures(ctx context.Context, id string) error
 	ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (BobVersionView, error)
 	ResolveCurrentBobEffectiveReference(ctx context.Context, arg ResolveCurrentBobEffectiveReferenceParams) (BobVersionView, error)
@@ -167,6 +219,7 @@ type Querier interface {
 	RevokeAppSession(ctx context.Context, arg RevokeAppSessionParams) error
 	RevokeAppUserSessions(ctx context.Context, arg RevokeAppUserSessionsParams) error
 	RotateAppSessionCSRF(ctx context.Context, arg RotateAppSessionCSRFParams) (int64, error)
+	SaveLedDraftControl(ctx context.Context, arg SaveLedDraftControlParams) (int64, error)
 	SetAppRoleStatus(ctx context.Context, arg SetAppRoleStatusParams) (int64, error)
 	SetAppUserStatus(ctx context.Context, arg SetAppUserStatusParams) (int64, error)
 	SetBobObjectEffective(ctx context.Context, arg SetBobObjectEffectiveParams) (int64, error)

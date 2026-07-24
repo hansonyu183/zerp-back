@@ -189,6 +189,9 @@ func loadProductLines(ctx context.Context, q *dbsqlc.Queries, documentID string)
 			UnitPrice:       formatMoney(row.UnitPriceCents), LineAmount: formatMoney(row.LineAmountCents),
 			Remark: deref(row.Remark),
 		}
+		if row.PurchaseUnitPriceCents != nil {
+			item.PurchaseUnitPrice = formatMoney(*row.PurchaseUnitPriceCents)
+		}
 		item.OutboundQuantity = formatOptionalQuantity(row.OutboundQtyMicros)
 		item.SignedQuantity = formatOptionalQuantity(row.SignedQtyMicros)
 		item.RejectedQuantity = formatOptionalQuantity(row.RejectedQtyMicros)

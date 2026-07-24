@@ -512,12 +512,13 @@ DELETE FROM vou_product_lines WHERE document_id = sqlc.arg(document_id);
 INSERT INTO vou_product_lines (
     id, document_id, document_entity, line_no, product_object_id, product_version_id,
     product_code, product_name, product_unit, ordered_qty_micros, unit_price_cents,
-    line_amount_cents, remark
+    line_amount_cents, purchase_unit_price_cents, remark
 ) VALUES (
     sqlc.arg(id), sqlc.arg(document_id), sqlc.arg(document_entity), sqlc.arg(line_no),
     sqlc.arg(product_object_id), sqlc.arg(product_version_id), sqlc.arg(product_code),
     sqlc.arg(product_name), sqlc.arg(product_unit), sqlc.arg(ordered_qty_micros),
-    sqlc.arg(unit_price_cents), sqlc.arg(line_amount_cents), sqlc.narg(remark)
+    sqlc.arg(unit_price_cents), sqlc.arg(line_amount_cents),
+    sqlc.narg(purchase_unit_price_cents), sqlc.narg(remark)
 );
 
 -- name: ListVouProductLines :many

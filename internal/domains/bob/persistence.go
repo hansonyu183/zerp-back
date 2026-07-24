@@ -93,6 +93,29 @@ func copyDetail(ctx context.Context, q *dbsqlc.Queries, entity, newVersionID, so
 	}
 }
 
+func deleteDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string) (int64, error) {
+	switch entity {
+	case EntityCustomer:
+		return q.DeleteBobCustomerDetail(ctx, versionID)
+	case EntitySupplier:
+		return q.DeleteBobSupplierDetail(ctx, versionID)
+	case EntityEmployee:
+		return q.DeleteBobEmployeeDetail(ctx, versionID)
+	case EntityProduct:
+		return q.DeleteBobProductDetail(ctx, versionID)
+	case EntityService:
+		return q.DeleteBobServiceDetail(ctx, versionID)
+	case EntityWarehouse:
+		return q.DeleteBobWarehouseDetail(ctx, versionID)
+	case EntityVehicle:
+		return q.DeleteBobVehicleDetail(ctx, versionID)
+	case EntityFundAccount:
+		return q.DeleteBobFundAccountDetail(ctx, versionID)
+	default:
+		return 0, domainError(ErrorValidation, "invalid entity", nil, nil)
+	}
+}
+
 type auditInput struct {
 	ObjectID, VersionID, Entity, Event, To, ActorID, RequestID string
 	From, Comment                                              *string

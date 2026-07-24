@@ -13,6 +13,8 @@ type Querier interface {
 	AdvanceBobObjectForEdit(ctx context.Context, arg AdvanceBobObjectForEditParams) (int64, error)
 	ApproveBobVersion(ctx context.Context, arg ApproveBobVersionParams) (int64, error)
 	ApproveVouDocument(ctx context.Context, arg ApproveVouDocumentParams) (int64, error)
+	BobDraftAuditIsDeletable(ctx context.Context, arg BobDraftAuditIsDeletableParams) (*bool, error)
+	BobObjectHasExternalReferences(ctx context.Context, arg BobObjectHasExternalReferencesParams) (bool, error)
 	ClearVouIntermediarySaleOrderExecution(ctx context.Context, documentID string) (int64, error)
 	ClearVouProductLineExecution(ctx context.Context, documentID string) error
 	ClearVouPurchaseOrderExecution(ctx context.Context, documentID string) (int64, error)
@@ -48,6 +50,17 @@ type Querier interface {
 	CreateAppSession(ctx context.Context, arg CreateAppSessionParams) error
 	DeleteAppRolePermissions(ctx context.Context, roleID string) error
 	DeleteAppUserRoles(ctx context.Context, userID string) error
+	DeleteBobAuditEventsForDraft(ctx context.Context, arg DeleteBobAuditEventsForDraftParams) (int64, error)
+	DeleteBobCustomerDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobEmployeeDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobFirstVersion(ctx context.Context, arg DeleteBobFirstVersionParams) (int64, error)
+	DeleteBobFundAccountDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobObject(ctx context.Context, arg DeleteBobObjectParams) (int64, error)
+	DeleteBobProductDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobServiceDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobSupplierDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobVehicleDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobWarehouseDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteExpiredVouDownloadTokens(ctx context.Context) error
 	DeleteVouAttachmentByFileID(ctx context.Context, fileID string) (int64, error)
 	DeleteVouDocumentAttachment(ctx context.Context, arg DeleteVouDocumentAttachmentParams) (int64, error)

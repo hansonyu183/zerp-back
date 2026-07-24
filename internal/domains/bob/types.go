@@ -101,6 +101,13 @@ type VersionRevisionInput struct {
 	Revision  int64  `json:"revision"`
 }
 
+type DeleteInput struct {
+	ObjectID       string `json:"objectId"`
+	ObjectRevision int64  `json:"objectRevision"`
+	VersionID      string `json:"versionId"`
+	Revision       int64  `json:"revision"`
+}
+
 type ReviewInput struct {
 	ObjectID  string  `json:"objectId"`
 	VersionID string  `json:"versionId"`

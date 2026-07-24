@@ -13,8 +13,9 @@ import (
 )
 
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *dbsqlc.Queries
+	pool                   *pgxpool.Pool
+	queries                *dbsqlc.Queries
+	afterDeleteDetailsHook func() error
 }
 
 func NewService(pool *pgxpool.Pool) *Service {
@@ -182,6 +183,114 @@ func (s *Service) Save(ctx context.Context, entity string, input SaveInput, acto
 		return MutationResult{}, s.writeError("commit save", err)
 	}
 	return mutation(object, version, version.Status, input.Revision+1), nil
+}
+
+func (s *Service) Delete(ctx context.Context, entity string, input DeleteInput) error {
+	if !validDeleteInput(entity, input) {
+		return domainError(ErrorValidation, "invalid delete request", nil, nil)
+	}
+	tx, qtx, object, version, err := s.lockTarget(ctx, entity, input.ObjectID, input.VersionID)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if object.Revision != input.ObjectRevision ||
+		object.CurrentVersionID != input.VersionID ||
+		object.EffectiveVersionID != nil ||
+		object.NextVersionNo != 2 ||
+		version.VersionNo != 1 ||
+		version.Status != StatusDraft ||
+		version.Revision != input.Revision ||
+		version.SubmittedAt.Valid ||
+		version.SubmittedBy != nil ||
+		version.ReviewedAt.Valid ||
+		version.ReviewedBy != nil {
+		return conflict(object, version, "first draft cannot be deleted in its current state")
+	}
+	versionCount, err := qtx.CountBobVersions(ctx, dbsqlc.CountBobVersionsParams{
+		ObjectID: input.ObjectID,
+		Entity:   entity,
+	})
+	if err != nil {
+		return s.internal("count versions before delete", err)
+	}
+	if versionCount != 1 {
+		return conflict(object, version, "object has version history")
+	}
+	auditDeletable, err := qtx.BobDraftAuditIsDeletable(ctx, dbsqlc.BobDraftAuditIsDeletableParams{
+		ObjectID:  input.ObjectID,
+		VersionID: input.VersionID,
+		Entity:    entity,
+	})
+	if err != nil {
+		return s.internal("validate draft audit before delete", err)
+	}
+	if auditDeletable == nil || !*auditDeletable {
+		return conflict(object, version, "object has lifecycle history")
+	}
+	referenced, err := qtx.BobObjectHasExternalReferences(ctx, dbsqlc.BobObjectHasExternalReferencesParams{
+		TargetObjectID:  input.ObjectID,
+		TargetVersionID: input.VersionID,
+	})
+	if err != nil {
+		return s.internal("check external references before delete", err)
+	}
+	if referenced {
+		return conflict(object, version, "object or version is referenced")
+	}
+
+	auditRows, err := qtx.DeleteBobAuditEventsForDraft(ctx, dbsqlc.DeleteBobAuditEventsForDraftParams{
+		ObjectID:  input.ObjectID,
+		VersionID: input.VersionID,
+		Entity:    entity,
+	})
+	if err != nil {
+		return s.writeError("delete draft audit events", err)
+	}
+	if auditRows < 1 {
+		return conflict(object, version, "draft audit changed before delete")
+	}
+	detailRows, err := deleteDetail(ctx, qtx, entity, input.VersionID)
+	if err != nil {
+		return s.writeError("delete version detail", err)
+	}
+	if detailRows != 1 {
+		return conflict(object, version, "version detail changed before delete")
+	}
+	if s.afterDeleteDetailsHook != nil {
+		if err = s.afterDeleteDetailsHook(); err != nil {
+			return s.internal("delete draft interrupted", err)
+		}
+	}
+	versionRows, err := qtx.DeleteBobFirstVersion(ctx, dbsqlc.DeleteBobFirstVersionParams{
+		VersionID: input.VersionID,
+		ObjectID:  input.ObjectID,
+		Entity:    entity,
+		Revision:  input.Revision,
+	})
+	if err != nil {
+		return s.writeError("delete first version", err)
+	}
+	if versionRows != 1 {
+		return conflict(object, version, "version changed before delete")
+	}
+	objectRows, err := qtx.DeleteBobObject(ctx, dbsqlc.DeleteBobObjectParams{
+		ObjectID:       input.ObjectID,
+		Entity:         entity,
+		VersionID:      input.VersionID,
+		ObjectRevision: input.ObjectRevision,
+	})
+	if err != nil {
+		return s.writeError("delete object", err)
+	}
+	if objectRows != 1 {
+		return conflict(object, version, "object changed before delete")
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return s.writeError("commit delete", err)
+	}
+	return nil
 }
 
 func (s *Service) Submit(ctx context.Context, entity string, input VersionRevisionInput, actorID, requestID string) (MutationResult, error) {

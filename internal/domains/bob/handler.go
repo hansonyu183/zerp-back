@@ -19,6 +19,7 @@ type applicationService interface {
 	Create(context.Context, string, CreateInput, string, string) (MutationResult, error)
 	Edit(context.Context, string, ObjectRevisionInput, string, string) (MutationResult, error)
 	Save(context.Context, string, SaveInput, string, string) (MutationResult, error)
+	Delete(context.Context, string, DeleteInput) error
 	Submit(context.Context, string, VersionRevisionInput, string, string) (MutationResult, error)
 	Approve(context.Context, string, ReviewInput, string, string) (MutationResult, error)
 	Reject(context.Context, string, ReviewInput, string, string) (MutationResult, error)
@@ -43,6 +44,7 @@ var actionRoutes = [...]actionRoute{
 	{action: "create", handle: (*Handler).create},
 	{action: "edit", handle: (*Handler).edit},
 	{action: "save", handle: (*Handler).save},
+	{action: "delete", handle: (*Handler).delete},
 	{action: "submit", handle: (*Handler).submit},
 	{action: "approve", handle: (*Handler).approve},
 	{action: "reject", handle: (*Handler).reject},
@@ -128,6 +130,14 @@ func (h *Handler) save(c *gin.Context, entity string) {
 	if h.bind(c, &input) {
 		result, err := h.service.Save(c.Request.Context(), entity, input, h.actorID(c), response.RequestID(c))
 		h.result(c, result, err)
+	}
+}
+
+func (h *Handler) delete(c *gin.Context, entity string) {
+	var input DeleteInput
+	if h.bind(c, &input) {
+		err := h.service.Delete(c.Request.Context(), entity, input)
+		h.result(c, nil, err)
 	}
 }
 

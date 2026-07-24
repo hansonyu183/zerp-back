@@ -117,10 +117,154 @@ WHERE entity = sqlc.arg(entity) AND upper(code) = upper(sqlc.arg(code)::text)
 LIMIT 1;
 
 -- name: LockBobVersion :one
-SELECT id, object_id, entity, version_no, status, revision, submitted_by
+SELECT id, object_id, entity, version_no, status, revision,
+       submitted_at, submitted_by, reviewed_at, reviewed_by
 FROM bob_versions
 WHERE id = sqlc.arg(id) AND object_id = sqlc.arg(object_id) AND entity = sqlc.arg(entity)
 FOR UPDATE;
+
+-- name: BobDraftAuditIsDeletable :one
+SELECT count(*) >= 1
+   AND count(*) FILTER (WHERE event_type = 'CREATED') = 1
+   AND bool_and(event_type IN ('CREATED', 'SAVED'))
+FROM bob_audit_events
+WHERE object_id = sqlc.arg(object_id)
+  AND version_id = sqlc.arg(version_id)
+  AND entity = sqlc.arg(entity);
+
+-- name: BobObjectHasExternalReferences :one
+SELECT EXISTS (
+    SELECT 1
+    FROM bob_vehicle_versions vehicle
+    WHERE vehicle.platform_object_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_sale_order_details sale_order
+    WHERE sale_order.customer_object_id = sqlc.arg(target_object_id)
+       OR sale_order.customer_version_id = sqlc.arg(target_version_id)
+       OR sale_order.platform_object_id = sqlc.arg(target_object_id)
+       OR sale_order.platform_version_id = sqlc.arg(target_version_id)
+       OR sale_order.vehicle_object_id = sqlc.arg(target_object_id)
+       OR sale_order.vehicle_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_purchase_order_details purchase_order
+    WHERE purchase_order.supplier_object_id = sqlc.arg(target_object_id)
+       OR purchase_order.supplier_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_intermediary_sale_order_details intermediary
+    WHERE intermediary.customer_object_id = sqlc.arg(target_object_id)
+       OR intermediary.customer_version_id = sqlc.arg(target_version_id)
+       OR intermediary.supplier_object_id = sqlc.arg(target_object_id)
+       OR intermediary.supplier_version_id = sqlc.arg(target_version_id)
+       OR intermediary.platform_object_id = sqlc.arg(target_object_id)
+       OR intermediary.platform_version_id = sqlc.arg(target_version_id)
+       OR intermediary.vehicle_object_id = sqlc.arg(target_object_id)
+       OR intermediary.vehicle_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_receipt_details receipt
+    WHERE receipt.counterparty_object_id = sqlc.arg(target_object_id)
+       OR receipt.counterparty_version_id = sqlc.arg(target_version_id)
+       OR receipt.fund_account_object_id = sqlc.arg(target_object_id)
+       OR receipt.fund_account_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_payment_details payment
+    WHERE payment.counterparty_object_id = sqlc.arg(target_object_id)
+       OR payment.counterparty_version_id = sqlc.arg(target_version_id)
+       OR payment.fund_account_object_id = sqlc.arg(target_object_id)
+       OR payment.fund_account_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_expense_reimbursement_details reimbursement
+    WHERE reimbursement.employee_object_id = sqlc.arg(target_object_id)
+       OR reimbursement.employee_version_id = sqlc.arg(target_version_id)
+       OR reimbursement.fund_account_object_id = sqlc.arg(target_object_id)
+       OR reimbursement.fund_account_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_other_income_details other_income
+    WHERE other_income.counterparty_object_id = sqlc.arg(target_object_id)
+       OR other_income.counterparty_version_id = sqlc.arg(target_version_id)
+       OR other_income.fund_account_object_id = sqlc.arg(target_object_id)
+       OR other_income.fund_account_version_id = sqlc.arg(target_version_id)
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_product_lines product_line
+    WHERE product_line.product_object_id = sqlc.arg(target_object_id)
+       OR product_line.product_version_id = sqlc.arg(target_version_id)
+);
+
+-- name: DeleteBobAuditEventsForDraft :execrows
+DELETE FROM bob_audit_events
+WHERE object_id = sqlc.arg(object_id)
+  AND version_id = sqlc.arg(version_id)
+  AND entity = sqlc.arg(entity)
+  AND event_type IN ('CREATED', 'SAVED');
+
+-- name: DeleteBobCustomerDetail :execrows
+DELETE FROM bob_customer_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobSupplierDetail :execrows
+DELETE FROM bob_supplier_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobEmployeeDetail :execrows
+DELETE FROM bob_employee_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobProductDetail :execrows
+DELETE FROM bob_product_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobServiceDetail :execrows
+DELETE FROM bob_service_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobWarehouseDetail :execrows
+DELETE FROM bob_warehouse_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobVehicleDetail :execrows
+DELETE FROM bob_vehicle_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobFundAccountDetail :execrows
+DELETE FROM bob_fund_account_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobFirstVersion :execrows
+DELETE FROM bob_versions
+WHERE id = sqlc.arg(version_id)
+  AND object_id = sqlc.arg(object_id)
+  AND entity = sqlc.arg(entity)
+  AND version_no = 1
+  AND status = 'DRAFT'
+  AND revision = sqlc.arg(revision)
+  AND submitted_at IS NULL
+  AND submitted_by IS NULL
+  AND reviewed_at IS NULL
+  AND reviewed_by IS NULL;
+
+-- name: DeleteBobObject :execrows
+DELETE FROM bob_objects
+WHERE id = sqlc.arg(object_id)
+  AND entity = sqlc.arg(entity)
+  AND current_version_id = sqlc.arg(version_id)
+  AND effective_version_id IS NULL
+  AND next_version_no = 2
+  AND revision = sqlc.arg(object_revision);
 
 -- name: LockEffectiveLogisticsPlatform :one
 SELECT o.id

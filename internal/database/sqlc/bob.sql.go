@@ -75,6 +75,123 @@ func (q *Queries) ApproveBobVersion(ctx context.Context, arg ApproveBobVersionPa
 	return result.RowsAffected(), nil
 }
 
+const bobDraftAuditIsDeletable = `-- name: BobDraftAuditIsDeletable :one
+SELECT count(*) >= 1
+   AND count(*) FILTER (WHERE event_type = 'CREATED') = 1
+   AND bool_and(event_type IN ('CREATED', 'SAVED'))
+FROM bob_audit_events
+WHERE object_id = $1
+  AND version_id = $2
+  AND entity = $3
+`
+
+type BobDraftAuditIsDeletableParams struct {
+	ObjectID  string `db:"object_id" json:"object_id"`
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+}
+
+func (q *Queries) BobDraftAuditIsDeletable(ctx context.Context, arg BobDraftAuditIsDeletableParams) (*bool, error) {
+	row := q.db.QueryRow(ctx, bobDraftAuditIsDeletable, arg.ObjectID, arg.VersionID, arg.Entity)
+	var column_1 *bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const bobObjectHasExternalReferences = `-- name: BobObjectHasExternalReferences :one
+SELECT EXISTS (
+    SELECT 1
+    FROM bob_vehicle_versions vehicle
+    WHERE vehicle.platform_object_id = $1
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_sale_order_details sale_order
+    WHERE sale_order.customer_object_id = $1
+       OR sale_order.customer_version_id = $2
+       OR sale_order.platform_object_id = $1
+       OR sale_order.platform_version_id = $2
+       OR sale_order.vehicle_object_id = $1
+       OR sale_order.vehicle_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_purchase_order_details purchase_order
+    WHERE purchase_order.supplier_object_id = $1
+       OR purchase_order.supplier_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_intermediary_sale_order_details intermediary
+    WHERE intermediary.customer_object_id = $1
+       OR intermediary.customer_version_id = $2
+       OR intermediary.supplier_object_id = $1
+       OR intermediary.supplier_version_id = $2
+       OR intermediary.platform_object_id = $1
+       OR intermediary.platform_version_id = $2
+       OR intermediary.vehicle_object_id = $1
+       OR intermediary.vehicle_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_receipt_details receipt
+    WHERE receipt.counterparty_object_id = $1
+       OR receipt.counterparty_version_id = $2
+       OR receipt.fund_account_object_id = $1
+       OR receipt.fund_account_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_payment_details payment
+    WHERE payment.counterparty_object_id = $1
+       OR payment.counterparty_version_id = $2
+       OR payment.fund_account_object_id = $1
+       OR payment.fund_account_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_expense_reimbursement_details reimbursement
+    WHERE reimbursement.employee_object_id = $1
+       OR reimbursement.employee_version_id = $2
+       OR reimbursement.fund_account_object_id = $1
+       OR reimbursement.fund_account_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_other_income_details other_income
+    WHERE other_income.counterparty_object_id = $1
+       OR other_income.counterparty_version_id = $2
+       OR other_income.fund_account_object_id = $1
+       OR other_income.fund_account_version_id = $2
+
+    UNION ALL
+
+    SELECT 1
+    FROM vou_product_lines product_line
+    WHERE product_line.product_object_id = $1
+       OR product_line.product_version_id = $2
+)
+`
+
+type BobObjectHasExternalReferencesParams struct {
+	TargetObjectID  string `db:"target_object_id" json:"target_object_id"`
+	TargetVersionID string `db:"target_version_id" json:"target_version_id"`
+}
+
+func (q *Queries) BobObjectHasExternalReferences(ctx context.Context, arg BobObjectHasExternalReferencesParams) (bool, error) {
+	row := q.db.QueryRow(ctx, bobObjectHasExternalReferences, arg.TargetObjectID, arg.TargetVersionID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const copyBobCustomerDetail = `-- name: CopyBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (version_id, name)
 SELECT $1, d.name FROM bob_customer_versions d WHERE d.version_id = $2
@@ -253,6 +370,188 @@ func (q *Queries) CountBobVersions(ctx context.Context, arg CountBobVersionsPara
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const deleteBobAuditEventsForDraft = `-- name: DeleteBobAuditEventsForDraft :execrows
+DELETE FROM bob_audit_events
+WHERE object_id = $1
+  AND version_id = $2
+  AND entity = $3
+  AND event_type IN ('CREATED', 'SAVED')
+`
+
+type DeleteBobAuditEventsForDraftParams struct {
+	ObjectID  string `db:"object_id" json:"object_id"`
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+}
+
+func (q *Queries) DeleteBobAuditEventsForDraft(ctx context.Context, arg DeleteBobAuditEventsForDraftParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobAuditEventsForDraft, arg.ObjectID, arg.VersionID, arg.Entity)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobCustomerDetail = `-- name: DeleteBobCustomerDetail :execrows
+DELETE FROM bob_customer_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobCustomerDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobCustomerDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobEmployeeDetail = `-- name: DeleteBobEmployeeDetail :execrows
+DELETE FROM bob_employee_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobEmployeeDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobEmployeeDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobFirstVersion = `-- name: DeleteBobFirstVersion :execrows
+DELETE FROM bob_versions
+WHERE id = $1
+  AND object_id = $2
+  AND entity = $3
+  AND version_no = 1
+  AND status = 'DRAFT'
+  AND revision = $4
+  AND submitted_at IS NULL
+  AND submitted_by IS NULL
+  AND reviewed_at IS NULL
+  AND reviewed_by IS NULL
+`
+
+type DeleteBobFirstVersionParams struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	ObjectID  string `db:"object_id" json:"object_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Revision  int64  `db:"revision" json:"revision"`
+}
+
+func (q *Queries) DeleteBobFirstVersion(ctx context.Context, arg DeleteBobFirstVersionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobFirstVersion,
+		arg.VersionID,
+		arg.ObjectID,
+		arg.Entity,
+		arg.Revision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobFundAccountDetail = `-- name: DeleteBobFundAccountDetail :execrows
+DELETE FROM bob_fund_account_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobFundAccountDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobFundAccountDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobObject = `-- name: DeleteBobObject :execrows
+DELETE FROM bob_objects
+WHERE id = $1
+  AND entity = $2
+  AND current_version_id = $3
+  AND effective_version_id IS NULL
+  AND next_version_no = 2
+  AND revision = $4
+`
+
+type DeleteBobObjectParams struct {
+	ObjectID       string `db:"object_id" json:"object_id"`
+	Entity         string `db:"entity" json:"entity"`
+	VersionID      string `db:"version_id" json:"version_id"`
+	ObjectRevision int64  `db:"object_revision" json:"object_revision"`
+}
+
+func (q *Queries) DeleteBobObject(ctx context.Context, arg DeleteBobObjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobObject,
+		arg.ObjectID,
+		arg.Entity,
+		arg.VersionID,
+		arg.ObjectRevision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobProductDetail = `-- name: DeleteBobProductDetail :execrows
+DELETE FROM bob_product_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobProductDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobProductDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobServiceDetail = `-- name: DeleteBobServiceDetail :execrows
+DELETE FROM bob_service_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobServiceDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobServiceDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobSupplierDetail = `-- name: DeleteBobSupplierDetail :execrows
+DELETE FROM bob_supplier_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobSupplierDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobSupplierDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobVehicleDetail = `-- name: DeleteBobVehicleDetail :execrows
+DELETE FROM bob_vehicle_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobVehicleDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobVehicleDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteBobWarehouseDetail = `-- name: DeleteBobWarehouseDetail :execrows
+DELETE FROM bob_warehouse_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobWarehouseDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobWarehouseDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const findBobObjectIDByCode = `-- name: FindBobObjectIDByCode :one
@@ -827,7 +1126,8 @@ func (q *Queries) LockBobObject(ctx context.Context, arg LockBobObjectParams) (L
 }
 
 const lockBobVersion = `-- name: LockBobVersion :one
-SELECT id, object_id, entity, version_no, status, revision, submitted_by
+SELECT id, object_id, entity, version_no, status, revision,
+       submitted_at, submitted_by, reviewed_at, reviewed_by
 FROM bob_versions
 WHERE id = $1 AND object_id = $2 AND entity = $3
 FOR UPDATE
@@ -840,13 +1140,16 @@ type LockBobVersionParams struct {
 }
 
 type LockBobVersionRow struct {
-	ID          string  `db:"id" json:"id"`
-	ObjectID    string  `db:"object_id" json:"object_id"`
-	Entity      string  `db:"entity" json:"entity"`
-	VersionNo   int32   `db:"version_no" json:"version_no"`
-	Status      string  `db:"status" json:"status"`
-	Revision    int64   `db:"revision" json:"revision"`
-	SubmittedBy *string `db:"submitted_by" json:"submitted_by"`
+	ID          string             `db:"id" json:"id"`
+	ObjectID    string             `db:"object_id" json:"object_id"`
+	Entity      string             `db:"entity" json:"entity"`
+	VersionNo   int32              `db:"version_no" json:"version_no"`
+	Status      string             `db:"status" json:"status"`
+	Revision    int64              `db:"revision" json:"revision"`
+	SubmittedAt pgtype.Timestamptz `db:"submitted_at" json:"submitted_at"`
+	SubmittedBy *string            `db:"submitted_by" json:"submitted_by"`
+	ReviewedAt  pgtype.Timestamptz `db:"reviewed_at" json:"reviewed_at"`
+	ReviewedBy  *string            `db:"reviewed_by" json:"reviewed_by"`
 }
 
 func (q *Queries) LockBobVersion(ctx context.Context, arg LockBobVersionParams) (LockBobVersionRow, error) {
@@ -859,7 +1162,10 @@ func (q *Queries) LockBobVersion(ctx context.Context, arg LockBobVersionParams) 
 		&i.VersionNo,
 		&i.Status,
 		&i.Revision,
+		&i.SubmittedAt,
 		&i.SubmittedBy,
+		&i.ReviewedAt,
+		&i.ReviewedBy,
 	)
 	return i, err
 }

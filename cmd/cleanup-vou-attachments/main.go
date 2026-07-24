@@ -9,6 +9,7 @@ import (
 	"github.com/hansonyu183/zerp-back/internal/database"
 	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
 	voudomain "github.com/hansonyu183/zerp-back/internal/domains/vou"
+	"github.com/hansonyu183/zerp-back/internal/platform/txevent"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
-	service, err := voudomain.NewService(pool, bobdomain.NewService(pool), voudomain.AttachmentOptions{
+	service, err := voudomain.NewService(pool, bobdomain.NewService(pool), txevent.NewBus(), voudomain.AttachmentOptions{
 		Root: cfg.AttachmentStorageRoot, UploadTTL: cfg.AttachmentUploadTTL, DownloadTTL: cfg.AttachmentDownloadTTL,
 	}, logger)
 	if err != nil {

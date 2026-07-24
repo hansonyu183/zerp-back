@@ -11,6 +11,7 @@ import (
 	appdomain "github.com/hansonyu183/zerp-back/internal/domains/app"
 	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
 	voudomain "github.com/hansonyu183/zerp-back/internal/domains/vou"
+	"github.com/hansonyu183/zerp-back/internal/platform/txevent"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,7 +22,8 @@ type databasePinger interface {
 func New(cfg config.Config, db *pgxpool.Pool, logger *slog.Logger) (*gin.Engine, error) {
 	appService := appdomain.NewService(db, cfg, logger)
 	bobService := bobdomain.NewService(db)
-	vouService, err := voudomain.NewService(db, bobService, voudomain.AttachmentOptions{
+	eventBus := txevent.NewBus()
+	vouService, err := voudomain.NewService(db, bobService, eventBus, voudomain.AttachmentOptions{
 		Root: cfg.AttachmentStorageRoot, UploadTTL: cfg.AttachmentUploadTTL, DownloadTTL: cfg.AttachmentDownloadTTL,
 	}, logger)
 	if err != nil {

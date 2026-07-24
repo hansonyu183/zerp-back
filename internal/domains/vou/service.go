@@ -11,6 +11,7 @@ import (
 
 	dbsqlc "github.com/hansonyu183/zerp-back/internal/database/sqlc"
 	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
+	"github.com/hansonyu183/zerp-back/internal/platform/txevent"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,10 +22,15 @@ type effectiveReferenceResolver interface {
 	ResolveEffectiveReference(context.Context, pgx.Tx, string, string, string) (bobdomain.EffectiveReference, error)
 }
 
+type eventPublisher interface {
+	Publish(context.Context, pgx.Tx, txevent.Event) error
+}
+
 type Service struct {
 	pool        *pgxpool.Pool
 	queries     *dbsqlc.Queries
 	resolver    effectiveReferenceResolver
+	events      eventPublisher
 	storage     *localStorage
 	uploadTTL   time.Duration
 	downloadTTL time.Duration
@@ -40,11 +46,12 @@ type AttachmentOptions struct {
 func NewService(
 	pool *pgxpool.Pool,
 	resolver effectiveReferenceResolver,
+	events eventPublisher,
 	options AttachmentOptions,
 	logger *slog.Logger,
 ) (*Service, error) {
-	if pool == nil || resolver == nil {
-		return nil, errors.New("VOU pool and BOB resolver are required")
+	if pool == nil || resolver == nil || events == nil {
+		return nil, errors.New("VOU pool, BOB resolver, and event publisher are required")
 	}
 	storage, err := newLocalStorage(options.Root)
 	if err != nil {
@@ -60,7 +67,7 @@ func NewService(
 		logger = slog.Default()
 	}
 	return &Service{
-		pool: pool, queries: dbsqlc.New(pool), resolver: resolver, storage: storage,
+		pool: pool, queries: dbsqlc.New(pool), resolver: resolver, events: events, storage: storage,
 		uploadTTL: options.UploadTTL, downloadTTL: options.DownloadTTL, logger: logger,
 	}, nil
 }
@@ -392,6 +399,12 @@ func (s *Service) Execute(
 	}); err != nil {
 		return MutationResult{}, s.writeError("audit execute", err)
 	}
+	if err = s.events.Publish(ctx, tx, DocumentExecutedEvent{
+		Entity: entity, DocumentID: input.DocumentID, DocumentNo: document.DocumentNo,
+		Revision: revision, ActorID: actorID, RequestID: requestID,
+	}); err != nil {
+		return MutationResult{}, s.eventError("publish document executed", err)
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return MutationResult{}, s.writeError("commit execute", err)
 	}
@@ -448,6 +461,12 @@ func (s *Service) Unexecute(
 		Reason: reason, RequestID: requestID, Summary: summary,
 	}); err != nil {
 		return MutationResult{}, s.writeError("audit unexecute", err)
+	}
+	if err = s.events.Publish(ctx, tx, DocumentUnexecutedEvent{
+		Entity: entity, DocumentID: input.DocumentID, DocumentNo: document.DocumentNo,
+		Revision: revision, ActorID: actorID, RequestID: requestID, Reason: *reason,
+	}); err != nil {
+		return MutationResult{}, s.eventError("publish document unexecuted", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return MutationResult{}, s.writeError("commit unexecute", err)

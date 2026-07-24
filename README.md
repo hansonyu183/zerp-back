@@ -161,6 +161,7 @@ unset APP_BOOTSTRAP_PASSWORD
 │  ├─ database/                # pgx 连接池及 sqlc 生成代码
 │  ├─ domains/                 # 领域服务、Handler 和领域类型
 │  ├─ httpserver/              # Gin 路由与健康检查
+│  ├─ platform/                # 跨领域运行时基础设施（事务事件等）
 │  └─ seed/                    # 非生产环境演示数据编排
 ├─ tools/                      # sqlc、Goose 独立工具模块
 ├─ compose.yaml
@@ -182,6 +183,14 @@ unset APP_BOOTSTRAP_PASSWORD
 Cloudflare Pages、本地 Vite、Cookie、CSRF 和请求封装见 [前端 API 配置说明](docs/frontend-api-configuration.md)。
 
 README 只保留跨领域工程约定。实现具体领域时，应同时满足本文与领域文档；发生冲突时，应先修正文档并明确统一契约，不能由实现自行选择不同语义。
+
+## 跨领域事务事件
+
+进程内领域协作使用 `internal/platform/txevent` 提供的同步事务事件总线。发布者负责创建事务，并在自身业务写入完成后、提交前调用 `Publish`；发布器按注册顺序串行调用当前主题的订阅者，并把同一个 `pgx.Tx` 传给它们。任一订阅者返回错误或发生 panic 时立即停止后续投递，由发布者回滚整个事务。
+
+订阅者必须使用传入的事务完成所有需要原子提交的数据库读写，不得改用连接池另开事务。事务订阅期间禁止调用外部服务、写文件、发送消息、启动异步任务或执行其他无法随 PostgreSQL 事务回滚的副作用。没有订阅者的主题视为投递成功。
+
+事件总线只负责当前进程内的同步一致性，不提供持久化事件、异步投递、重试、跨服务事务或 outbox。订阅关系在服务启动装配阶段建立；同一主题内的订阅者名称必须唯一。
 
 ## API 总则
 

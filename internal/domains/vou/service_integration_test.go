@@ -18,6 +18,7 @@ import (
 
 	"github.com/hansonyu183/zerp-back/internal/api/authorization"
 	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
+	"github.com/hansonyu183/zerp-back/internal/platform/txevent"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -126,7 +127,7 @@ func prepareReferences(t *testing.T, pool *pgxpool.Pool) integrationReferences {
 
 func newIntegrationService(t *testing.T, pool *pgxpool.Pool) *Service {
 	t.Helper()
-	service, err := NewService(pool, bobdomain.NewService(pool), AttachmentOptions{Root: t.TempDir()},
+	service, err := NewService(pool, bobdomain.NewService(pool), txevent.NewBus(), AttachmentOptions{Root: t.TempDir()},
 		slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("new VOU service: %v", err)

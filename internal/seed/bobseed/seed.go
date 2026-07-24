@@ -64,35 +64,103 @@ func New(pool *pgxpool.Pool) *Seeder {
 }
 
 type sample struct {
-	entity       string
-	data         bob.CreateDetailInput
-	status       string
-	platformCode string
+	entity              string
+	data                bob.CreateDetailInput
+	status              string
+	platformCode        string
+	categoryCode        string
+	departmentCode      string
+	positionCode        string
+	parentCode          string
+	managerEmployeeCode string
 }
 
 var samples = [...]sample{
-	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{Code: "DEMO-CUST-001", Name: "星河零售有限公司"}, status: bob.StatusEffective},
-	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{Code: "DEMO-CUST-002", Name: "新客户（草稿）"}, status: bob.StatusDraft},
+	{entity: bob.EntityCategory, data: bob.CreateDetailInput{
+		Code: "DEMO-CAT-001", Name: "工业零部件", TargetEntity: bob.EntityProduct, Description: "产品演示分类",
+	}, status: bob.StatusEffective},
+	{entity: bob.EntityCategory, data: bob.CreateDetailInput{
+		Code: "DEMO-CAT-002", Name: "标准件", TargetEntity: bob.EntityProduct, Description: "工业零部件子分类",
+	}, status: bob.StatusEffective, parentCode: "DEMO-CAT-001"},
+	{entity: bob.EntityDepartment, data: bob.CreateDetailInput{
+		Code: "DEMO-DEPT-001", Name: "运营部", Description: "演示有效部门",
+	}, status: bob.StatusEffective},
+	{entity: bob.EntityDepartment, data: bob.CreateDetailInput{
+		Code: "DEMO-DEPT-002", Name: "华东运营组", Description: "演示草稿部门",
+	}, status: bob.StatusDraft, parentCode: "DEMO-DEPT-001"},
+	{entity: bob.EntityPosition, data: bob.CreateDetailInput{
+		Code: "DEMO-POS-001", Name: "运营专员", Description: "演示有效岗位",
+	}, status: bob.StatusEffective},
+	{entity: bob.EntityPosition, data: bob.CreateDetailInput{
+		Code: "DEMO-POS-002", Name: "仓储主管", Description: "演示待审核岗位",
+	}, status: bob.StatusPending},
+	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{
+		Code: "DEMO-CUST-001", Name: "星河零售有限公司", CustomerType: stringPointer(bob.CustomerTypeDealer),
+		ShortName: "星河零售", TaxNumber: "91310000DEMO000001", ContactName: "王经理",
+		ContactPhone: "+86 13800000001", Email: "sales@example.com",
+		Address: "上海市浦东新区示例路1号", Remark: "演示经销商客户",
+	}, status: bob.StatusEffective},
+	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{
+		Code: "DEMO-CUST-002", Name: "新客户（草稿）", CustomerType: stringPointer(bob.CustomerTypeEndUser),
+		ContactName: "陈先生", ContactPhone: "13800000002",
+	}, status: bob.StatusDraft},
 	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{
 		Code: "DEMO-SUP-001", Name: "自营物流平台", SupplierType: stringPointer(bob.SupplierTypeLogisticsPlatform),
+		ShortName: "自营物流", ContactName: "调度中心", ContactPhone: "021-60000001",
+		Address: "上海市闵行区物流路1号", Remark: "演示物流平台供应商",
 	}, status: bob.StatusEffective},
-	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{Code: "DEMO-SUP-002", Name: "待审核供应商"}, status: bob.StatusPending},
-	{entity: bob.EntityEmployee, data: bob.CreateDetailInput{Code: "DEMO-EMP-001", Name: "张伟"}, status: bob.StatusEffective},
-	{entity: bob.EntityEmployee, data: bob.CreateDetailInput{Code: "DEMO-EMP-002", Name: "李娜（已驳回）"}, status: bob.StatusRejected},
-	{entity: bob.EntityProduct, data: bob.CreateDetailInput{Code: "DEMO-PROD-001", Name: "标准零件 A", Unit: "件"}, status: bob.StatusEffective},
-	{entity: bob.EntityProduct, data: bob.CreateDetailInput{Code: "DEMO-PROD-002", Name: "试制零件 B", Unit: "件"}, status: bob.StatusDraft},
-	{entity: bob.EntityService, data: bob.CreateDetailInput{Code: "DEMO-SVC-001", Name: "设备巡检服务", Unit: "次"}, status: bob.StatusEffective},
-	{entity: bob.EntityService, data: bob.CreateDetailInput{Code: "DEMO-SVC-002", Name: "年度维保服务", Unit: "年"}, status: bob.StatusPending},
-	{entity: bob.EntityWarehouse, data: bob.CreateDetailInput{Code: "DEMO-WH-001", Name: "华东主仓"}, status: bob.StatusEffective},
-	{entity: bob.EntityWarehouse, data: bob.CreateDetailInput{Code: "DEMO-WH-002", Name: "临时仓（已驳回）"}, status: bob.StatusRejected},
+	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{
+		Code: "DEMO-SUP-002", Name: "待审核供应商", TaxNumber: "91310000DEMO000002",
+		ContactName: "赵经理", ContactPhone: "13800000003",
+	}, status: bob.StatusPending},
+	{entity: bob.EntityEmployee, data: bob.CreateDetailInput{
+		Code: "DEMO-EMP-001", Name: "张伟", Phone: "13800000004",
+		Email: "zhangwei@example.com", HireDate: "2024-01-15", Remark: "演示在岗员工",
+	}, status: bob.StatusEffective, departmentCode: "DEMO-DEPT-001", positionCode: "DEMO-POS-001"},
+	{entity: bob.EntityEmployee, data: bob.CreateDetailInput{
+		Code: "DEMO-EMP-002", Name: "李娜（已驳回）", Phone: "13800000005",
+	}, status: bob.StatusRejected, departmentCode: "DEMO-DEPT-001", positionCode: "DEMO-POS-001"},
+	{entity: bob.EntityProduct, data: bob.CreateDetailInput{
+		Code: "DEMO-PROD-001", Name: "标准零件 A", Unit: "件",
+		Specification: "M20", Model: "A-20", Barcode: "DEMO-BARCODE-001", Remark: "演示标准产品",
+	}, status: bob.StatusEffective, categoryCode: "DEMO-CAT-002"},
+	{entity: bob.EntityProduct, data: bob.CreateDetailInput{
+		Code: "DEMO-PROD-002", Name: "试制零件 B", Unit: "件",
+		Specification: "M30", Model: "B-30", Barcode: "DEMO-BARCODE-002",
+	}, status: bob.StatusDraft, categoryCode: "DEMO-CAT-002"},
+	{entity: bob.EntityService, data: bob.CreateDetailInput{
+		Code: "DEMO-SVC-001", Name: "设备巡检服务", Unit: "次",
+		Description: "现场设备巡检与报告", Remark: "演示服务",
+	}, status: bob.StatusEffective},
+	{entity: bob.EntityService, data: bob.CreateDetailInput{
+		Code: "DEMO-SVC-002", Name: "年度维保服务", Unit: "年", Description: "年度维保方案",
+	}, status: bob.StatusPending},
+	{entity: bob.EntityWarehouse, data: bob.CreateDetailInput{
+		Code: "DEMO-WH-001", Name: "华东主仓", Address: "上海市嘉定区仓储路1号",
+		ContactName: "张伟", ContactPhone: "13800000004", Remark: "演示主仓",
+	}, status: bob.StatusEffective, managerEmployeeCode: "DEMO-EMP-001"},
+	{entity: bob.EntityWarehouse, data: bob.CreateDetailInput{
+		Code: "DEMO-WH-002", Name: "临时仓（已驳回）", Address: "上海市青浦区临时仓路2号",
+	}, status: bob.StatusRejected},
 	{entity: bob.EntityVehicle, data: bob.CreateDetailInput{
 		Code: "DEMO-VEH-001", Name: "自营配送一号车", PlateNumber: "沪A10001", VehicleType: "厢式货车",
+		VIN: "LSVAA4187N2000001", EngineNumber: "ENG-DEMO-001", LoadCapacityKG: "18000.000",
+		Remark: "演示有效车辆",
 	}, status: bob.StatusEffective, platformCode: "DEMO-SUP-001"},
 	{entity: bob.EntityVehicle, data: bob.CreateDetailInput{
 		Code: "DEMO-VEH-002", Name: "自营配送二号车", PlateNumber: "沪A10002", VehicleType: "厢式货车",
+		VIN: "LSVAA4187N2000002", EngineNumber: "ENG-DEMO-002", LoadCapacityKG: "12000.000",
 	}, status: bob.StatusDraft, platformCode: "DEMO-SUP-001"},
-	{entity: bob.EntityFundAccount, data: bob.CreateDetailInput{Code: "DEMO-FA-001", Name: "人民币基本账户", Currency: "CNY"}, status: bob.StatusEffective},
-	{entity: bob.EntityFundAccount, data: bob.CreateDetailInput{Code: "DEMO-FA-002", Name: "备用结算账户", Currency: "CNY"}, status: bob.StatusDraft},
+	{entity: bob.EntityFundAccount, data: bob.CreateDetailInput{
+		Code: "DEMO-FA-001", Name: "人民币基本账户", Currency: "CNY",
+		AccountName: "上海示例科技有限公司", BankName: "示例银行",
+		BankBranch: "上海浦东支行", AccountNumber: "622200000000000001", Remark: "演示基本账户",
+	}, status: bob.StatusEffective},
+	{entity: bob.EntityFundAccount, data: bob.CreateDetailInput{
+		Code: "DEMO-FA-002", Name: "备用结算账户", Currency: "CNY",
+		AccountName: "上海示例科技有限公司", BankName: "示例银行",
+		BankBranch: "上海虹桥支行", AccountNumber: "622200000000000002",
+	}, status: bob.StatusDraft},
 }
 
 func (s *Seeder) Seed(ctx context.Context) (Result, error) {
@@ -123,15 +191,39 @@ const (
 )
 
 func (s *Seeder) seedOne(ctx context.Context, item sample) (seedOutcome, error) {
-	if item.platformCode != "" {
-		platformObjectID, found, err := s.lookup.Find(ctx, bob.EntitySupplier, item.platformCode)
+	resolve := func(entity, code, label string) (string, error) {
+		if code == "" {
+			return "", nil
+		}
+		objectID, found, err := s.lookup.Find(ctx, entity, code)
 		if err != nil {
-			return 0, fmt.Errorf("find logistics platform: %w", err)
+			return "", fmt.Errorf("find %s: %w", label, err)
 		}
 		if !found {
-			return 0, fmt.Errorf("logistics platform %s is missing", item.platformCode)
+			return "", fmt.Errorf("%s %s is missing", label, code)
 		}
-		item.data.PlatformObjectID = platformObjectID
+		return objectID, nil
+	}
+	var err error
+	if item.data.PlatformObjectID, err = resolve(bob.EntitySupplier, item.platformCode, "logistics platform"); err != nil {
+		return 0, err
+	}
+	if item.data.CategoryID, err = resolve(bob.EntityCategory, item.categoryCode, "category"); err != nil {
+		return 0, err
+	}
+	if item.data.DepartmentID, err = resolve(bob.EntityDepartment, item.departmentCode, "department"); err != nil {
+		return 0, err
+	}
+	if item.data.PositionID, err = resolve(bob.EntityPosition, item.positionCode, "position"); err != nil {
+		return 0, err
+	}
+	if item.data.ManagerEmployeeID, err = resolve(bob.EntityEmployee, item.managerEmployeeCode, "manager employee"); err != nil {
+		return 0, err
+	}
+	if item.parentCode != "" {
+		if item.data.ParentID, err = resolve(item.entity, item.parentCode, "parent"); err != nil {
+			return 0, err
+		}
 	}
 
 	objectID, found, err := s.lookup.Find(ctx, item.entity, item.data.Code)
@@ -147,24 +239,27 @@ func (s *Seeder) seedOne(ctx context.Context, item sample) (seedOutcome, error) 
 			return 0, fmt.Errorf("get existing object: %w", getErr)
 		}
 		if !matches(item, view) {
-			if !isLegacyPlatformSample(item, view) {
+			if !matchesLegacyShape(item, view) && !isLegacyPlatformSample(item, view) {
 				return 0, fmt.Errorf("reserved demo code is occupied by different data")
 			}
-			if reconcileErr := s.reconcileLegacyPlatform(ctx, item, view); reconcileErr != nil {
-				return 0, reconcileErr
+			current, err = s.reconcileExisting(ctx, item, view)
+			if err != nil {
+				return 0, err
 			}
-			return outcomeResumed, nil
+			outcome = outcomeResumed
+		} else {
+			if view.Version.Status == item.status {
+				return outcomeSkipped, nil
+			}
+			current = bob.MutationResult{
+				ObjectID:       view.ObjectID,
+				ObjectRevision: view.ObjectRevision,
+				VersionID:      view.Version.VersionID,
+				Status:         view.Version.Status,
+				Revision:       view.Version.Revision,
+			}
+			outcome = outcomeResumed
 		}
-		if view.Version.Status == item.status {
-			return outcomeSkipped, nil
-		}
-		current = bob.MutationResult{
-			ObjectID:  view.ObjectID,
-			VersionID: view.Version.VersionID,
-			Status:    view.Version.Status,
-			Revision:  view.Version.Revision,
-		}
-		outcome = outcomeResumed
 	} else {
 		current, err = s.service.Create(
 			ctx,
@@ -178,7 +273,8 @@ func (s *Seeder) seedOne(ctx context.Context, item sample) (seedOutcome, error) 
 		}
 	}
 
-	if current.Status == bob.StatusDraft && item.status != bob.StatusDraft {
+	if (current.Status == bob.StatusDraft || current.Status == bob.StatusRejected) &&
+		item.status != current.Status {
 		current, err = s.service.Submit(ctx, item.entity, bob.VersionRevisionInput{
 			ObjectID:  current.ObjectID,
 			VersionID: current.VersionID,
@@ -222,6 +318,56 @@ func matches(item sample, view bob.ObjectView) bool {
 	if item.entity == bob.EntitySupplier && expectedSupplierType == "" {
 		expectedSupplierType = bob.SupplierTypeGeneral
 	}
+	expectedCustomerType := deref(item.data.CustomerType)
+	if item.entity == bob.EntityCustomer && expectedCustomerType == "" {
+		expectedCustomerType = bob.CustomerTypeEndUser
+	}
+	return view.Entity == item.entity &&
+		view.Code == item.data.Code &&
+		view.Data.Name == item.data.Name &&
+		view.Data.Unit == item.data.Unit &&
+		view.Data.Currency == item.data.Currency &&
+		view.Data.SupplierType == expectedSupplierType &&
+		view.Data.CustomerType == expectedCustomerType &&
+		view.Data.PlateNumber == item.data.PlateNumber &&
+		view.Data.VehicleType == item.data.VehicleType &&
+		view.Data.PlatformObjectID == item.data.PlatformObjectID &&
+		view.Data.TargetEntity == item.data.TargetEntity &&
+		view.Data.ShortName == item.data.ShortName &&
+		view.Data.CategoryID == item.data.CategoryID &&
+		view.Data.TaxNumber == item.data.TaxNumber &&
+		view.Data.ContactName == item.data.ContactName &&
+		view.Data.ContactPhone == item.data.ContactPhone &&
+		view.Data.Email == item.data.Email &&
+		view.Data.Address == item.data.Address &&
+		view.Data.Remark == item.data.Remark &&
+		view.Data.DepartmentID == item.data.DepartmentID &&
+		view.Data.PositionID == item.data.PositionID &&
+		view.Data.Phone == item.data.Phone &&
+		view.Data.HireDate == item.data.HireDate &&
+		view.Data.Specification == item.data.Specification &&
+		view.Data.Model == item.data.Model &&
+		view.Data.Barcode == item.data.Barcode &&
+		view.Data.Description == item.data.Description &&
+		view.Data.ManagerEmployeeID == item.data.ManagerEmployeeID &&
+		view.Data.VIN == item.data.VIN &&
+		view.Data.EngineNumber == item.data.EngineNumber &&
+		view.Data.LoadCapacityKG == item.data.LoadCapacityKG &&
+		view.Data.AccountName == item.data.AccountName &&
+		view.Data.BankName == item.data.BankName &&
+		view.Data.BankBranch == item.data.BankBranch &&
+		view.Data.AccountNumber == item.data.AccountNumber &&
+		view.Data.ParentID == item.data.ParentID
+}
+
+func matchesLegacyShape(item sample, view bob.ObjectView) bool {
+	if item.entity == bob.EntityCategory || item.entity == bob.EntityDepartment || item.entity == bob.EntityPosition {
+		return false
+	}
+	expectedSupplierType := deref(item.data.SupplierType)
+	if item.entity == bob.EntitySupplier && expectedSupplierType == "" {
+		expectedSupplierType = bob.SupplierTypeGeneral
+	}
 	return view.Entity == item.entity &&
 		view.Code == item.data.Code &&
 		view.Data.Name == item.data.Name &&
@@ -246,39 +392,59 @@ func isLegacyPlatformSample(item sample, view bob.ObjectView) bool {
 		view.Version.Status == bob.StatusEffective
 }
 
-func (s *Seeder) reconcileLegacyPlatform(ctx context.Context, item sample, view bob.ObjectView) error {
-	edited, err := s.service.Edit(ctx, item.entity, bob.ObjectRevisionInput{
+func (s *Seeder) reconcileExisting(ctx context.Context, item sample, view bob.ObjectView) (bob.MutationResult, error) {
+	current := bob.MutationResult{
 		ObjectID: view.ObjectID, ObjectRevision: view.ObjectRevision,
-	}, submitterID, requestID(item.data.Code, "upgrade-edit"))
+		VersionID: view.Version.VersionID, Status: view.Version.Status, Revision: view.Version.Revision,
+	}
+	var err error
+	switch current.Status {
+	case bob.StatusEffective:
+		current, err = s.service.Edit(ctx, item.entity, bob.ObjectRevisionInput{
+			ObjectID: current.ObjectID, ObjectRevision: current.ObjectRevision,
+		}, submitterID, requestID(item.data.Code, "upgrade-edit"))
+	case bob.StatusPending:
+		comment := "演示数据：补齐新增属性"
+		current, err = s.service.Reject(ctx, item.entity, bob.ReviewInput{
+			ObjectID: current.ObjectID, VersionID: current.VersionID,
+			Revision: current.Revision, Comment: &comment,
+		}, reviewerID, requestID(item.data.Code, "upgrade-reject"))
+	case bob.StatusDraft, bob.StatusRejected:
+	default:
+		return bob.MutationResult{}, fmt.Errorf("cannot reconcile status %s", current.Status)
+	}
 	if err != nil {
-		return fmt.Errorf("edit legacy logistics platform: %w", err)
+		return bob.MutationResult{}, fmt.Errorf("prepare demo data upgrade: %w", err)
 	}
 	saved, err := s.service.Save(ctx, item.entity, bob.SaveInput{
-		ObjectID: edited.ObjectID, VersionID: edited.VersionID, Revision: edited.Revision,
+		ObjectID: current.ObjectID, VersionID: current.VersionID, Revision: current.Revision,
 		Data: detailInput(item.data),
 	}, submitterID, requestID(item.data.Code, "upgrade-save"))
 	if err != nil {
-		return fmt.Errorf("save legacy logistics platform: %w", err)
+		return bob.MutationResult{}, fmt.Errorf("save upgraded demo data: %w", err)
 	}
-	submitted, err := s.service.Submit(ctx, item.entity, bob.VersionRevisionInput{
-		ObjectID: saved.ObjectID, VersionID: saved.VersionID, Revision: saved.Revision,
-	}, submitterID, requestID(item.data.Code, "upgrade-submit"))
-	if err != nil {
-		return fmt.Errorf("submit legacy logistics platform: %w", err)
-	}
-	if _, err = s.service.Approve(ctx, item.entity, bob.ReviewInput{
-		ObjectID: submitted.ObjectID, VersionID: submitted.VersionID, Revision: submitted.Revision,
-	}, reviewerID, requestID(item.data.Code, "upgrade-approve")); err != nil {
-		return fmt.Errorf("approve legacy logistics platform: %w", err)
-	}
-	return nil
+	return saved, nil
 }
 
 func detailInput(input bob.CreateDetailInput) bob.DetailInput {
 	return bob.DetailInput{
 		Name: input.Name, Unit: input.Unit, Currency: input.Currency,
 		SupplierType: input.SupplierType, PlateNumber: input.PlateNumber,
-		VehicleType: input.VehicleType, PlatformObjectID: input.PlatformObjectID,
+		CustomerType: input.CustomerType, VehicleType: input.VehicleType,
+		PlatformObjectID: input.PlatformObjectID, TargetEntity: stringPointer(input.TargetEntity),
+		ShortName: bob.Optional(input.ShortName), CategoryID: bob.Optional(input.CategoryID),
+		TaxNumber: bob.Optional(input.TaxNumber), ContactName: bob.Optional(input.ContactName),
+		ContactPhone: bob.Optional(input.ContactPhone), Email: bob.Optional(input.Email),
+		Address: bob.Optional(input.Address), Remark: bob.Optional(input.Remark),
+		DepartmentID: bob.Optional(input.DepartmentID), PositionID: bob.Optional(input.PositionID),
+		Phone: bob.Optional(input.Phone), HireDate: bob.Optional(input.HireDate),
+		Specification: bob.Optional(input.Specification), Model: bob.Optional(input.Model),
+		Barcode: bob.Optional(input.Barcode), Description: bob.Optional(input.Description),
+		ManagerEmployeeID: bob.Optional(input.ManagerEmployeeID), VIN: bob.Optional(input.VIN),
+		EngineNumber: bob.Optional(input.EngineNumber), LoadCapacityKG: bob.Optional(input.LoadCapacityKG),
+		AccountName: bob.Optional(input.AccountName), BankName: bob.Optional(input.BankName),
+		BankBranch: bob.Optional(input.BankBranch), AccountNumber: bob.Optional(input.AccountNumber),
+		ParentID: bob.Optional(input.ParentID),
 	}
 }
 

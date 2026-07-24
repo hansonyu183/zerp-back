@@ -8,59 +8,159 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string, data DetailInput) error {
+func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string, data DetailView) error {
 	switch entity {
 	case EntityCustomer:
-		return q.InsertBobCustomerDetail(ctx, dbsqlc.InsertBobCustomerDetailParams{VersionID: versionID, Name: data.Name})
+		return q.InsertBobCustomerDetail(ctx, dbsqlc.InsertBobCustomerDetailParams{
+			VersionID: versionID, Name: data.Name, CustomerType: data.CustomerType,
+			ShortName: nilIfEmpty(data.ShortName), CategoryID: nilIfEmpty(data.CategoryID),
+			TaxNumber: nilIfEmpty(data.TaxNumber), ContactName: nilIfEmpty(data.ContactName),
+			ContactPhone: nilIfEmpty(data.ContactPhone), Email: nilIfEmpty(data.Email),
+			Address: nilIfEmpty(data.Address), Remark: nilIfEmpty(data.Remark),
+		})
 	case EntitySupplier:
 		return q.InsertBobSupplierDetail(ctx, dbsqlc.InsertBobSupplierDetailParams{
-			VersionID: versionID, Name: data.Name, SupplierType: deref(data.SupplierType),
+			VersionID: versionID, Name: data.Name, SupplierType: data.SupplierType,
+			ShortName: nilIfEmpty(data.ShortName), CategoryID: nilIfEmpty(data.CategoryID),
+			TaxNumber: nilIfEmpty(data.TaxNumber), ContactName: nilIfEmpty(data.ContactName),
+			ContactPhone: nilIfEmpty(data.ContactPhone), Email: nilIfEmpty(data.Email),
+			Address: nilIfEmpty(data.Address), Remark: nilIfEmpty(data.Remark),
 		})
 	case EntityEmployee:
-		return q.InsertBobEmployeeDetail(ctx, dbsqlc.InsertBobEmployeeDetailParams{VersionID: versionID, Name: data.Name})
+		return q.InsertBobEmployeeDetail(ctx, dbsqlc.InsertBobEmployeeDetailParams{
+			VersionID: versionID, Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
+			DepartmentID: nilIfEmpty(data.DepartmentID), PositionID: nilIfEmpty(data.PositionID),
+			Phone: nilIfEmpty(data.Phone), Email: nilIfEmpty(data.Email),
+			HireDate: data.HireDate, Remark: nilIfEmpty(data.Remark),
+		})
 	case EntityProduct:
-		return q.InsertBobProductDetail(ctx, dbsqlc.InsertBobProductDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
+		return q.InsertBobProductDetail(ctx, dbsqlc.InsertBobProductDetailParams{
+			VersionID: versionID, Name: data.Name, Unit: data.Unit, CategoryID: nilIfEmpty(data.CategoryID),
+			Specification: nilIfEmpty(data.Specification), Model: nilIfEmpty(data.Model),
+			Barcode: nilIfEmpty(data.Barcode), Remark: nilIfEmpty(data.Remark),
+		})
 	case EntityService:
-		return q.InsertBobServiceDetail(ctx, dbsqlc.InsertBobServiceDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
+		return q.InsertBobServiceDetail(ctx, dbsqlc.InsertBobServiceDetailParams{
+			VersionID: versionID, Name: data.Name, Unit: data.Unit, CategoryID: nilIfEmpty(data.CategoryID),
+			Description: nilIfEmpty(data.Description), Remark: nilIfEmpty(data.Remark),
+		})
 	case EntityWarehouse:
-		return q.InsertBobWarehouseDetail(ctx, dbsqlc.InsertBobWarehouseDetailParams{VersionID: versionID, Name: data.Name})
+		return q.InsertBobWarehouseDetail(ctx, dbsqlc.InsertBobWarehouseDetailParams{
+			VersionID: versionID, Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
+			Address: nilIfEmpty(data.Address), ContactName: nilIfEmpty(data.ContactName),
+			ContactPhone: nilIfEmpty(data.ContactPhone), ManagerEmployeeID: nilIfEmpty(data.ManagerEmployeeID),
+			Remark: nilIfEmpty(data.Remark),
+		})
 	case EntityVehicle:
 		return q.InsertBobVehicleDetail(ctx, dbsqlc.InsertBobVehicleDetailParams{
 			VersionID: versionID, Name: data.Name, PlateNumber: data.PlateNumber,
 			VehicleType: data.VehicleType, PlatformObjectID: data.PlatformObjectID,
+			CategoryID: nilIfEmpty(data.CategoryID), Vin: nilIfEmpty(data.VIN),
+			EngineNumber: nilIfEmpty(data.EngineNumber), LoadCapacityKg: data.LoadCapacityKG,
+			Remark: nilIfEmpty(data.Remark),
 		})
 	case EntityFundAccount:
-		return q.InsertBobFundAccountDetail(ctx, dbsqlc.InsertBobFundAccountDetailParams{VersionID: versionID, Name: data.Name, Currency: data.Currency})
+		return q.InsertBobFundAccountDetail(ctx, dbsqlc.InsertBobFundAccountDetailParams{
+			VersionID: versionID, Name: data.Name, Currency: data.Currency,
+			CategoryID: nilIfEmpty(data.CategoryID), AccountName: nilIfEmpty(data.AccountName),
+			BankName: nilIfEmpty(data.BankName), BankBranch: nilIfEmpty(data.BankBranch),
+			AccountNumber: nilIfEmpty(data.AccountNumber), Remark: nilIfEmpty(data.Remark),
+		})
+	case EntityCategory:
+		return q.InsertBobCategoryDetail(ctx, dbsqlc.InsertBobCategoryDetailParams{
+			VersionID: versionID, Name: data.Name, TargetEntity: data.TargetEntity,
+			ParentID: nilIfEmpty(data.ParentID), Description: nilIfEmpty(data.Description),
+		})
+	case EntityDepartment:
+		return q.InsertBobDepartmentDetail(ctx, dbsqlc.InsertBobDepartmentDetailParams{
+			VersionID: versionID, Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
+			ParentID: nilIfEmpty(data.ParentID), Description: nilIfEmpty(data.Description),
+		})
+	case EntityPosition:
+		return q.InsertBobPositionDetail(ctx, dbsqlc.InsertBobPositionDetailParams{
+			VersionID: versionID, Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
+			Description: nilIfEmpty(data.Description),
+		})
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
 }
 
-func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string, data DetailInput) error {
+func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID string, data DetailView) error {
 	var rows int64
 	var err error
 	switch entity {
 	case EntityCustomer:
-		rows, err = q.UpdateBobCustomerDetail(ctx, dbsqlc.UpdateBobCustomerDetailParams{Name: data.Name, VersionID: versionID})
+		rows, err = q.UpdateBobCustomerDetail(ctx, dbsqlc.UpdateBobCustomerDetailParams{
+			Name: data.Name, CustomerType: data.CustomerType, ShortName: nilIfEmpty(data.ShortName),
+			CategoryID: nilIfEmpty(data.CategoryID), TaxNumber: nilIfEmpty(data.TaxNumber),
+			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
+			Email: nilIfEmpty(data.Email), Address: nilIfEmpty(data.Address),
+			Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+		})
 	case EntitySupplier:
 		rows, err = q.UpdateBobSupplierDetail(ctx, dbsqlc.UpdateBobSupplierDetailParams{
-			Name: data.Name, SupplierType: deref(data.SupplierType), VersionID: versionID,
+			Name: data.Name, SupplierType: data.SupplierType, ShortName: nilIfEmpty(data.ShortName),
+			CategoryID: nilIfEmpty(data.CategoryID), TaxNumber: nilIfEmpty(data.TaxNumber),
+			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
+			Email: nilIfEmpty(data.Email), Address: nilIfEmpty(data.Address),
+			Remark: nilIfEmpty(data.Remark), VersionID: versionID,
 		})
 	case EntityEmployee:
-		rows, err = q.UpdateBobEmployeeDetail(ctx, dbsqlc.UpdateBobEmployeeDetailParams{Name: data.Name, VersionID: versionID})
+		rows, err = q.UpdateBobEmployeeDetail(ctx, dbsqlc.UpdateBobEmployeeDetailParams{
+			Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
+			DepartmentID: nilIfEmpty(data.DepartmentID), PositionID: nilIfEmpty(data.PositionID),
+			Phone: nilIfEmpty(data.Phone), Email: nilIfEmpty(data.Email), HireDate: data.HireDate,
+			Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+		})
 	case EntityProduct:
-		rows, err = q.UpdateBobProductDetail(ctx, dbsqlc.UpdateBobProductDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
+		rows, err = q.UpdateBobProductDetail(ctx, dbsqlc.UpdateBobProductDetailParams{
+			Name: data.Name, Unit: data.Unit, CategoryID: nilIfEmpty(data.CategoryID),
+			Specification: nilIfEmpty(data.Specification), Model: nilIfEmpty(data.Model),
+			Barcode: nilIfEmpty(data.Barcode), Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+		})
 	case EntityService:
-		rows, err = q.UpdateBobServiceDetail(ctx, dbsqlc.UpdateBobServiceDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
+		rows, err = q.UpdateBobServiceDetail(ctx, dbsqlc.UpdateBobServiceDetailParams{
+			Name: data.Name, Unit: data.Unit, CategoryID: nilIfEmpty(data.CategoryID),
+			Description: nilIfEmpty(data.Description), Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+		})
 	case EntityWarehouse:
-		rows, err = q.UpdateBobWarehouseDetail(ctx, dbsqlc.UpdateBobWarehouseDetailParams{Name: data.Name, VersionID: versionID})
+		rows, err = q.UpdateBobWarehouseDetail(ctx, dbsqlc.UpdateBobWarehouseDetailParams{
+			Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID), Address: nilIfEmpty(data.Address),
+			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
+			ManagerEmployeeID: nilIfEmpty(data.ManagerEmployeeID), Remark: nilIfEmpty(data.Remark),
+			VersionID: versionID,
+		})
 	case EntityVehicle:
 		rows, err = q.UpdateBobVehicleDetail(ctx, dbsqlc.UpdateBobVehicleDetailParams{
 			Name: data.Name, PlateNumber: data.PlateNumber, VehicleType: data.VehicleType,
 			PlatformObjectID: data.PlatformObjectID, VersionID: versionID,
+			CategoryID: nilIfEmpty(data.CategoryID), Vin: nilIfEmpty(data.VIN),
+			EngineNumber: nilIfEmpty(data.EngineNumber), LoadCapacityKg: data.LoadCapacityKG,
+			Remark: nilIfEmpty(data.Remark),
 		})
 	case EntityFundAccount:
-		rows, err = q.UpdateBobFundAccountDetail(ctx, dbsqlc.UpdateBobFundAccountDetailParams{Name: data.Name, Currency: data.Currency, VersionID: versionID})
+		rows, err = q.UpdateBobFundAccountDetail(ctx, dbsqlc.UpdateBobFundAccountDetailParams{
+			Name: data.Name, Currency: data.Currency, CategoryID: nilIfEmpty(data.CategoryID),
+			AccountName: nilIfEmpty(data.AccountName), BankName: nilIfEmpty(data.BankName),
+			BankBranch: nilIfEmpty(data.BankBranch), AccountNumber: nilIfEmpty(data.AccountNumber),
+			Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+		})
+	case EntityCategory:
+		rows, err = q.UpdateBobCategoryDetail(ctx, dbsqlc.UpdateBobCategoryDetailParams{
+			Name: data.Name, TargetEntity: data.TargetEntity, ParentID: nilIfEmpty(data.ParentID),
+			Description: nilIfEmpty(data.Description), VersionID: versionID,
+		})
+	case EntityDepartment:
+		rows, err = q.UpdateBobDepartmentDetail(ctx, dbsqlc.UpdateBobDepartmentDetailParams{
+			Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID), ParentID: nilIfEmpty(data.ParentID),
+			Description: nilIfEmpty(data.Description), VersionID: versionID,
+		})
+	case EntityPosition:
+		rows, err = q.UpdateBobPositionDetail(ctx, dbsqlc.UpdateBobPositionDetailParams{
+			Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
+			Description: nilIfEmpty(data.Description), VersionID: versionID,
+		})
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -88,6 +188,12 @@ func copyDetail(ctx context.Context, q *dbsqlc.Queries, entity, newVersionID, so
 		return q.CopyBobVehicleDetail(ctx, dbsqlc.CopyBobVehicleDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	case EntityFundAccount:
 		return q.CopyBobFundAccountDetail(ctx, dbsqlc.CopyBobFundAccountDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
+	case EntityCategory:
+		return q.CopyBobCategoryDetail(ctx, dbsqlc.CopyBobCategoryDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
+	case EntityDepartment:
+		return q.CopyBobDepartmentDetail(ctx, dbsqlc.CopyBobDepartmentDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
+	case EntityPosition:
+		return q.CopyBobPositionDetail(ctx, dbsqlc.CopyBobPositionDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -111,9 +217,22 @@ func deleteDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 		return q.DeleteBobVehicleDetail(ctx, versionID)
 	case EntityFundAccount:
 		return q.DeleteBobFundAccountDetail(ctx, versionID)
+	case EntityCategory:
+		return q.DeleteBobCategoryDetail(ctx, versionID)
+	case EntityDepartment:
+		return q.DeleteBobDepartmentDetail(ctx, versionID)
+	case EntityPosition:
+		return q.DeleteBobPositionDetail(ctx, versionID)
 	default:
 		return 0, domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
+}
+
+func nilIfEmpty(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 type auditInput struct {

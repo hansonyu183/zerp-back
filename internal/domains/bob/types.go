@@ -1,7 +1,10 @@
 package bob
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"time"
 )
 
@@ -14,9 +17,14 @@ const (
 	EntityWarehouse   = "warehouse"
 	EntityVehicle     = "vehicle"
 	EntityFundAccount = "fund-account"
+	EntityCategory    = "category"
+	EntityDepartment  = "department"
+	EntityPosition    = "position"
 
 	SupplierTypeGeneral           = "GENERAL"
 	SupplierTypeLogisticsPlatform = "LOGISTICS_PLATFORM"
+	CustomerTypeEndUser           = "END_USER"
+	CustomerTypeDealer            = "DEALER"
 
 	StatusDraft     = "DRAFT"
 	StatusPending   = "PENDING"
@@ -34,6 +42,9 @@ var entities = [...]string{
 	EntityWarehouse,
 	EntityVehicle,
 	EntityFundAccount,
+	EntityCategory,
+	EntityDepartment,
+	EntityPosition,
 }
 
 type ErrorKind int
@@ -59,24 +70,101 @@ func domainError(kind ErrorKind, message string, data any, cause error) error {
 }
 
 type DetailInput struct {
-	Name             string  `json:"name"`
-	Unit             string  `json:"unit,omitempty"`
-	Currency         string  `json:"currency,omitempty"`
-	SupplierType     *string `json:"supplierType,omitempty"`
-	PlateNumber      string  `json:"plateNumber,omitempty"`
-	VehicleType      string  `json:"vehicleType,omitempty"`
-	PlatformObjectID string  `json:"platformObjectId,omitempty"`
+	Name              string         `json:"name"`
+	Unit              string         `json:"unit,omitempty"`
+	Currency          string         `json:"currency,omitempty"`
+	SupplierType      *string        `json:"supplierType,omitempty"`
+	CustomerType      *string        `json:"customerType,omitempty"`
+	PlateNumber       string         `json:"plateNumber,omitempty"`
+	VehicleType       string         `json:"vehicleType,omitempty"`
+	PlatformObjectID  string         `json:"platformObjectId,omitempty"`
+	TargetEntity      *string        `json:"targetEntity,omitempty"`
+	ShortName         OptionalString `json:"shortName,omitempty"`
+	CategoryID        OptionalString `json:"categoryId,omitempty"`
+	TaxNumber         OptionalString `json:"taxNumber,omitempty"`
+	ContactName       OptionalString `json:"contactName,omitempty"`
+	ContactPhone      OptionalString `json:"contactPhone,omitempty"`
+	Email             OptionalString `json:"email,omitempty"`
+	Address           OptionalString `json:"address,omitempty"`
+	Remark            OptionalString `json:"remark,omitempty"`
+	DepartmentID      OptionalString `json:"departmentId,omitempty"`
+	PositionID        OptionalString `json:"positionId,omitempty"`
+	Phone             OptionalString `json:"phone,omitempty"`
+	HireDate          OptionalString `json:"hireDate,omitempty"`
+	Specification     OptionalString `json:"specification,omitempty"`
+	Model             OptionalString `json:"model,omitempty"`
+	Barcode           OptionalString `json:"barcode,omitempty"`
+	Description       OptionalString `json:"description,omitempty"`
+	ManagerEmployeeID OptionalString `json:"managerEmployeeId,omitempty"`
+	VIN               OptionalString `json:"vin,omitempty"`
+	EngineNumber      OptionalString `json:"engineNumber,omitempty"`
+	LoadCapacityKG    OptionalString `json:"loadCapacityKg,omitempty"`
+	AccountName       OptionalString `json:"accountName,omitempty"`
+	BankName          OptionalString `json:"bankName,omitempty"`
+	BankBranch        OptionalString `json:"bankBranch,omitempty"`
+	AccountNumber     OptionalString `json:"accountNumber,omitempty"`
+	ParentID          OptionalString `json:"parentId,omitempty"`
 }
 
 type CreateDetailInput struct {
-	Code             string  `json:"code"`
-	Name             string  `json:"name"`
-	Unit             string  `json:"unit,omitempty"`
-	Currency         string  `json:"currency,omitempty"`
-	SupplierType     *string `json:"supplierType,omitempty"`
-	PlateNumber      string  `json:"plateNumber,omitempty"`
-	VehicleType      string  `json:"vehicleType,omitempty"`
-	PlatformObjectID string  `json:"platformObjectId,omitempty"`
+	Code              string  `json:"code"`
+	Name              string  `json:"name"`
+	Unit              string  `json:"unit,omitempty"`
+	Currency          string  `json:"currency,omitempty"`
+	SupplierType      *string `json:"supplierType,omitempty"`
+	CustomerType      *string `json:"customerType,omitempty"`
+	PlateNumber       string  `json:"plateNumber,omitempty"`
+	VehicleType       string  `json:"vehicleType,omitempty"`
+	PlatformObjectID  string  `json:"platformObjectId,omitempty"`
+	TargetEntity      string  `json:"targetEntity,omitempty"`
+	ShortName         string  `json:"shortName,omitempty"`
+	CategoryID        string  `json:"categoryId,omitempty"`
+	TaxNumber         string  `json:"taxNumber,omitempty"`
+	ContactName       string  `json:"contactName,omitempty"`
+	ContactPhone      string  `json:"contactPhone,omitempty"`
+	Email             string  `json:"email,omitempty"`
+	Address           string  `json:"address,omitempty"`
+	Remark            string  `json:"remark,omitempty"`
+	DepartmentID      string  `json:"departmentId,omitempty"`
+	PositionID        string  `json:"positionId,omitempty"`
+	Phone             string  `json:"phone,omitempty"`
+	HireDate          string  `json:"hireDate,omitempty"`
+	Specification     string  `json:"specification,omitempty"`
+	Model             string  `json:"model,omitempty"`
+	Barcode           string  `json:"barcode,omitempty"`
+	Description       string  `json:"description,omitempty"`
+	ManagerEmployeeID string  `json:"managerEmployeeId,omitempty"`
+	VIN               string  `json:"vin,omitempty"`
+	EngineNumber      string  `json:"engineNumber,omitempty"`
+	LoadCapacityKG    string  `json:"loadCapacityKg,omitempty"`
+	AccountName       string  `json:"accountName,omitempty"`
+	BankName          string  `json:"bankName,omitempty"`
+	BankBranch        string  `json:"bankBranch,omitempty"`
+	AccountNumber     string  `json:"accountNumber,omitempty"`
+	ParentID          string  `json:"parentId,omitempty"`
+}
+
+// OptionalString distinguishes an omitted field from an explicit null or
+// empty value. Save uses this to preserve fields unknown to older clients.
+type OptionalString struct {
+	Value string
+	Set   bool
+}
+
+func (value *OptionalString) UnmarshalJSON(data []byte) error {
+	value.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		value.Value = ""
+		return nil
+	}
+	if err := json.Unmarshal(data, &value.Value); err != nil {
+		return fmt.Errorf("optional string: %w", err)
+	}
+	return nil
+}
+
+func Optional(value string) OptionalString {
+	return OptionalString{Value: value, Set: true}
 }
 
 type CreateInput struct {
@@ -121,8 +209,44 @@ type GetInput struct {
 }
 
 type QueryFilters struct {
-	Keyword string   `json:"keyword,omitempty"`
-	Status  []string `json:"status,omitempty"`
+	Keyword      string   `json:"keyword,omitempty"`
+	Status       []string `json:"status,omitempty"`
+	CustomerType string   `json:"customerType,omitempty"`
+	SupplierType string   `json:"supplierType,omitempty"`
+	CategoryID   string   `json:"categoryId,omitempty"`
+	DepartmentID string   `json:"departmentId,omitempty"`
+	PositionID   string   `json:"positionId,omitempty"`
+	Currency     string   `json:"currency,omitempty"`
+	TargetEntity string   `json:"targetEntity,omitempty"`
+	ParentID     string   `json:"parentId,omitempty"`
+	RootOnly     bool     `json:"rootOnly,omitempty"`
+	provided     map[string]bool
+}
+
+func (filters *QueryFilters) UnmarshalJSON(data []byte) error {
+	type queryFiltersAlias QueryFilters
+	var decoded queryFiltersAlias
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&decoded); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("query filters: multiple JSON values")
+		}
+		return err
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*filters = QueryFilters(decoded)
+	filters.provided = make(map[string]bool, len(raw))
+	for field := range raw {
+		filters.provided[field] = true
+	}
+	return nil
 }
 
 type SortItem struct {
@@ -144,13 +268,40 @@ type HistoryInput struct {
 }
 
 type DetailView struct {
-	Name             string `json:"name"`
-	Unit             string `json:"unit,omitempty"`
-	Currency         string `json:"currency,omitempty"`
-	SupplierType     string `json:"supplierType,omitempty"`
-	PlateNumber      string `json:"plateNumber,omitempty"`
-	VehicleType      string `json:"vehicleType,omitempty"`
-	PlatformObjectID string `json:"platformObjectId,omitempty"`
+	Name              string `json:"name"`
+	Unit              string `json:"unit,omitempty"`
+	Currency          string `json:"currency,omitempty"`
+	SupplierType      string `json:"supplierType,omitempty"`
+	CustomerType      string `json:"customerType,omitempty"`
+	PlateNumber       string `json:"plateNumber,omitempty"`
+	VehicleType       string `json:"vehicleType,omitempty"`
+	PlatformObjectID  string `json:"platformObjectId,omitempty"`
+	TargetEntity      string `json:"targetEntity,omitempty"`
+	ShortName         string `json:"shortName,omitempty"`
+	CategoryID        string `json:"categoryId,omitempty"`
+	TaxNumber         string `json:"taxNumber,omitempty"`
+	ContactName       string `json:"contactName,omitempty"`
+	ContactPhone      string `json:"contactPhone,omitempty"`
+	Email             string `json:"email,omitempty"`
+	Address           string `json:"address,omitempty"`
+	Remark            string `json:"remark,omitempty"`
+	DepartmentID      string `json:"departmentId,omitempty"`
+	PositionID        string `json:"positionId,omitempty"`
+	Phone             string `json:"phone,omitempty"`
+	HireDate          string `json:"hireDate,omitempty"`
+	Specification     string `json:"specification,omitempty"`
+	Model             string `json:"model,omitempty"`
+	Barcode           string `json:"barcode,omitempty"`
+	Description       string `json:"description,omitempty"`
+	ManagerEmployeeID string `json:"managerEmployeeId,omitempty"`
+	VIN               string `json:"vin,omitempty"`
+	EngineNumber      string `json:"engineNumber,omitempty"`
+	LoadCapacityKG    string `json:"loadCapacityKg,omitempty"`
+	AccountName       string `json:"accountName,omitempty"`
+	BankName          string `json:"bankName,omitempty"`
+	BankBranch        string `json:"bankBranch,omitempty"`
+	AccountNumber     string `json:"accountNumber,omitempty"`
+	ParentID          string `json:"parentId,omitempty"`
 }
 
 type MutationResult struct {

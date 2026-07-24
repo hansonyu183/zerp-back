@@ -137,7 +137,7 @@ make bootstrap-admin
 unset APP_BOOTSTRAP_PASSWORD
 ```
 
-本地联调可执行 `make seed-bob`，为客户、供应商、员工、产品、服务、仓库、车辆和资金账户各写入两条演示数据，共 16 条，并覆盖 `EFFECTIVE`、`DRAFT`、`PENDING`、`REJECTED` 状态。供应商演示数据包含自营物流平台，车辆归属该平台。命令仅允许在 `development` 或 `test` 环境运行；重复执行会核验并跳过已有演示数据，不会覆盖同代码的其他内容。
+本地联调可执行 `make seed-bob`，为客户、供应商、员工、产品、服务、仓库、车辆、资金账户、分类、部门和岗位各写入两条演示数据，共 22 条，并覆盖 `EFFECTIVE`、`DRAFT`、`PENDING`、`REJECTED` 状态。演示数据先创建有效参考对象，再创建带分类、部门、岗位、负责人和物流平台引用的对象；供应商演示数据包含自营物流平台，车辆归属该平台。命令仅允许在 `development` 或 `test` 环境运行；重复执行会核验并跳过已有演示数据，不会覆盖同代码的其他内容。
 
 ## 目录结构
 
@@ -177,7 +177,7 @@ unset APP_BOOTSTRAP_PASSWORD
 | 领域 | 标识 | 范围 | 文档 |
 | --- | --- | --- | --- |
 | 应用访问与权限 | `app` | 用户认证、Cookie 会话、CSRF、角色与 API 权限 | [APP 后端业务域](docs/domains/app.md) |
-| 基础业务对象 | `bob` | 客户、供应商、物流平台、员工、产品、服务、仓库、车辆、资金账户及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
+| 基础业务对象 | `bob` | 客户、供应商、物流平台、员工、产品、服务、仓库、车辆、资金账户、分类、部门、岗位及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
 | 业务单据 | `vou` | 销售、采购、居间销售、收付款、费用报销、其它收入及附件与审计 | [VOU 后端单据域](docs/domains/vou.md) |
 
 Cloudflare Pages、本地 Vite、Cookie、CSRF 和请求封装见 [前端 API 配置说明](docs/frontend-api-configuration.md)。
@@ -356,7 +356,7 @@ POST /app/user/signout  # 注销并清理会话 Cookie
 首期实现已经完成领域定界的 APP、BOB 与 VOU：
 
 - APP 建立登录会话、恢复会话、退出登录、用户、角色和精确 API 路径权限能力；
-- BOB 建立客户、供应商、员工、产品、服务、仓库、车辆和资金账户的对象版本及审核能力；
+- BOB 建立客户、供应商、员工、产品、服务、仓库、车辆、资金账户、分类、部门和岗位的对象版本及审核能力；
 - VOU 建立七类单据、审核/批准/执行及反向流转、附件和审计能力，但不生成库存或资金流水；
 - 库存、核销、总账和报表领域在业务规则明确并形成独立领域文档后接入。
 

@@ -107,23 +107,71 @@ type BobAuditEvent struct {
 	Summary    []byte             `db:"summary" json:"summary"`
 }
 
+type BobCategoryVersion struct {
+	VersionID    string  `db:"version_id" json:"version_id"`
+	Entity       string  `db:"entity" json:"entity"`
+	Name         string  `db:"name" json:"name"`
+	TargetEntity string  `db:"target_entity" json:"target_entity"`
+	ParentID     *string `db:"parent_id" json:"parent_id"`
+	ParentEntity string  `db:"parent_entity" json:"parent_entity"`
+	Description  *string `db:"description" json:"description"`
+}
+
 type BobCustomerVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	CustomerType   string  `db:"customer_type" json:"customer_type"`
+	ShortName      *string `db:"short_name" json:"short_name"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	TaxNumber      *string `db:"tax_number" json:"tax_number"`
+	ContactName    *string `db:"contact_name" json:"contact_name"`
+	ContactPhone   *string `db:"contact_phone" json:"contact_phone"`
+	Email          *string `db:"email" json:"email"`
+	Address        *string `db:"address" json:"address"`
+	Remark         *string `db:"remark" json:"remark"`
+}
+
+type BobDepartmentVersion struct {
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	ParentID       *string `db:"parent_id" json:"parent_id"`
+	ParentEntity   string  `db:"parent_entity" json:"parent_entity"`
+	Description    *string `db:"description" json:"description"`
 }
 
 type BobEmployeeVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
+	VersionID        string      `db:"version_id" json:"version_id"`
+	Entity           string      `db:"entity" json:"entity"`
+	Name             string      `db:"name" json:"name"`
+	CategoryID       *string     `db:"category_id" json:"category_id"`
+	CategoryEntity   string      `db:"category_entity" json:"category_entity"`
+	DepartmentID     *string     `db:"department_id" json:"department_id"`
+	DepartmentEntity string      `db:"department_entity" json:"department_entity"`
+	PositionID       *string     `db:"position_id" json:"position_id"`
+	PositionEntity   string      `db:"position_entity" json:"position_entity"`
+	Phone            *string     `db:"phone" json:"phone"`
+	Email            *string     `db:"email" json:"email"`
+	HireDate         pgtype.Date `db:"hire_date" json:"hire_date"`
+	Remark           *string     `db:"remark" json:"remark"`
 }
 
 type BobFundAccountVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
-	Currency  string `db:"currency" json:"currency"`
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	Currency       string  `db:"currency" json:"currency"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	AccountName    *string `db:"account_name" json:"account_name"`
+	BankName       *string `db:"bank_name" json:"bank_name"`
+	BankBranch     *string `db:"bank_branch" json:"bank_branch"`
+	AccountNumber  *string `db:"account_number" json:"account_number"`
+	Remark         *string `db:"remark" json:"remark"`
 }
 
 type BobObject struct {
@@ -140,35 +188,69 @@ type BobObject struct {
 	UpdatedBy          string             `db:"updated_by" json:"updated_by"`
 }
 
+type BobPositionVersion struct {
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	Description    *string `db:"description" json:"description"`
+}
+
 type BobProductVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
-	Unit      string `db:"unit" json:"unit"`
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	Unit           string  `db:"unit" json:"unit"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	Specification  *string `db:"specification" json:"specification"`
+	Model          *string `db:"model" json:"model"`
+	Barcode        *string `db:"barcode" json:"barcode"`
+	Remark         *string `db:"remark" json:"remark"`
 }
 
 type BobServiceVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
-	Unit      string `db:"unit" json:"unit"`
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	Unit           string  `db:"unit" json:"unit"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	Description    *string `db:"description" json:"description"`
+	Remark         *string `db:"remark" json:"remark"`
 }
 
 type BobSupplierVersion struct {
-	VersionID    string `db:"version_id" json:"version_id"`
-	Entity       string `db:"entity" json:"entity"`
-	Name         string `db:"name" json:"name"`
-	SupplierType string `db:"supplier_type" json:"supplier_type"`
+	VersionID      string  `db:"version_id" json:"version_id"`
+	Entity         string  `db:"entity" json:"entity"`
+	Name           string  `db:"name" json:"name"`
+	SupplierType   string  `db:"supplier_type" json:"supplier_type"`
+	ShortName      *string `db:"short_name" json:"short_name"`
+	CategoryID     *string `db:"category_id" json:"category_id"`
+	CategoryEntity string  `db:"category_entity" json:"category_entity"`
+	TaxNumber      *string `db:"tax_number" json:"tax_number"`
+	ContactName    *string `db:"contact_name" json:"contact_name"`
+	ContactPhone   *string `db:"contact_phone" json:"contact_phone"`
+	Email          *string `db:"email" json:"email"`
+	Address        *string `db:"address" json:"address"`
+	Remark         *string `db:"remark" json:"remark"`
 }
 
 type BobVehicleVersion struct {
-	VersionID        string `db:"version_id" json:"version_id"`
-	Entity           string `db:"entity" json:"entity"`
-	Name             string `db:"name" json:"name"`
-	PlateNumber      string `db:"plate_number" json:"plate_number"`
-	VehicleType      string `db:"vehicle_type" json:"vehicle_type"`
-	PlatformObjectID string `db:"platform_object_id" json:"platform_object_id"`
-	PlatformEntity   string `db:"platform_entity" json:"platform_entity"`
+	VersionID        string         `db:"version_id" json:"version_id"`
+	Entity           string         `db:"entity" json:"entity"`
+	Name             string         `db:"name" json:"name"`
+	PlateNumber      string         `db:"plate_number" json:"plate_number"`
+	VehicleType      string         `db:"vehicle_type" json:"vehicle_type"`
+	PlatformObjectID string         `db:"platform_object_id" json:"platform_object_id"`
+	PlatformEntity   string         `db:"platform_entity" json:"platform_entity"`
+	CategoryID       *string        `db:"category_id" json:"category_id"`
+	CategoryEntity   string         `db:"category_entity" json:"category_entity"`
+	Vin              *string        `db:"vin" json:"vin"`
+	EngineNumber     *string        `db:"engine_number" json:"engine_number"`
+	LoadCapacityKg   pgtype.Numeric `db:"load_capacity_kg" json:"load_capacity_kg"`
+	Remark           *string        `db:"remark" json:"remark"`
 }
 
 type BobVersion struct {
@@ -217,12 +299,47 @@ type BobVersionView struct {
 	PlateNumber        *string            `db:"plate_number" json:"plate_number"`
 	VehicleType        *string            `db:"vehicle_type" json:"vehicle_type"`
 	PlatformObjectID   *string            `db:"platform_object_id" json:"platform_object_id"`
+	CustomerType       string             `db:"customer_type" json:"customer_type"`
+	ShortName          string             `db:"short_name" json:"short_name"`
+	CategoryID         string             `db:"category_id" json:"category_id"`
+	TaxNumber          string             `db:"tax_number" json:"tax_number"`
+	ContactName        string             `db:"contact_name" json:"contact_name"`
+	ContactPhone       string             `db:"contact_phone" json:"contact_phone"`
+	Email              string             `db:"email" json:"email"`
+	Address            string             `db:"address" json:"address"`
+	Remark             string             `db:"remark" json:"remark"`
+	DepartmentID       string             `db:"department_id" json:"department_id"`
+	PositionID         string             `db:"position_id" json:"position_id"`
+	Phone              string             `db:"phone" json:"phone"`
+	HireDate           string             `db:"hire_date" json:"hire_date"`
+	Specification      string             `db:"specification" json:"specification"`
+	Model              string             `db:"model" json:"model"`
+	Barcode            string             `db:"barcode" json:"barcode"`
+	Description        string             `db:"description" json:"description"`
+	ManagerEmployeeID  string             `db:"manager_employee_id" json:"manager_employee_id"`
+	Vin                string             `db:"vin" json:"vin"`
+	EngineNumber       string             `db:"engine_number" json:"engine_number"`
+	LoadCapacityKg     string             `db:"load_capacity_kg" json:"load_capacity_kg"`
+	AccountName        string             `db:"account_name" json:"account_name"`
+	BankName           string             `db:"bank_name" json:"bank_name"`
+	BankBranch         string             `db:"bank_branch" json:"bank_branch"`
+	AccountNumber      string             `db:"account_number" json:"account_number"`
+	TargetEntity       string             `db:"target_entity" json:"target_entity"`
+	ParentID           string             `db:"parent_id" json:"parent_id"`
 }
 
 type BobWarehouseVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
+	VersionID             string  `db:"version_id" json:"version_id"`
+	Entity                string  `db:"entity" json:"entity"`
+	Name                  string  `db:"name" json:"name"`
+	CategoryID            *string `db:"category_id" json:"category_id"`
+	CategoryEntity        string  `db:"category_entity" json:"category_entity"`
+	Address               *string `db:"address" json:"address"`
+	ContactName           *string `db:"contact_name" json:"contact_name"`
+	ContactPhone          *string `db:"contact_phone" json:"contact_phone"`
+	ManagerEmployeeID     *string `db:"manager_employee_id" json:"manager_employee_id"`
+	ManagerEmployeeEntity string  `db:"manager_employee_entity" json:"manager_employee_entity"`
+	Remark                *string `db:"remark" json:"remark"`
 }
 
 type VouAuditEvent struct {

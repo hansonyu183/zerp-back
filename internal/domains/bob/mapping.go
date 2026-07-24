@@ -29,26 +29,44 @@ func conflictData(object dbsqlc.LockBobObjectRow, version dbsqlc.LockBobVersionR
 }
 
 func detailFields(entity string) []string {
-	fields := []string{"name"}
-	if entity == EntityProduct || entity == EntityService {
-		fields = append(fields, "unit")
+	switch entity {
+	case EntityCustomer:
+		return []string{"name", "customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark"}
+	case EntitySupplier:
+		return []string{"name", "supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark"}
+	case EntityEmployee:
+		return []string{"name", "categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark"}
+	case EntityProduct:
+		return []string{"name", "unit", "categoryId", "specification", "model", "barcode", "remark"}
+	case EntityService:
+		return []string{"name", "unit", "categoryId", "description", "remark"}
+	case EntityWarehouse:
+		return []string{"name", "categoryId", "address", "contactName", "contactPhone", "managerEmployeeId", "remark"}
+	case EntityVehicle:
+		return []string{"name", "plateNumber", "vehicleType", "platformObjectId", "categoryId", "vin", "engineNumber", "loadCapacityKg", "remark"}
+	case EntityFundAccount:
+		return []string{"name", "currency", "categoryId", "accountName", "bankName", "bankBranch", "accountNumber", "remark"}
+	case EntityCategory:
+		return []string{"name", "targetEntity", "parentId", "description"}
+	case EntityDepartment:
+		return []string{"name", "categoryId", "parentId", "description"}
+	case EntityPosition:
+		return []string{"name", "categoryId", "description"}
+	default:
+		return []string{"name"}
 	}
-	if entity == EntityFundAccount {
-		fields = append(fields, "currency")
-	}
-	if entity == EntitySupplier {
-		fields = append(fields, "supplierType")
-	}
-	if entity == EntityVehicle {
-		fields = append(fields, "plateNumber", "vehicleType", "platformObjectId")
-	}
-	return fields
 }
 
 func queryItem(row dbsqlc.BobVersionView) QueryItem {
+	summary := detailView(row)
+	summary.AccountNumber = ""
 	return QueryItem{
 		ObjectID: row.ObjectID, Entity: row.Entity, Code: row.Code, ObjectRevision: row.ObjectRevision,
-		CurrentVersion: versionSummary(row), EffectiveVersionID: row.EffectiveVersionID, UpdatedAt: row.ObjectUpdatedAt.Time,
+		CurrentVersion: VersionSummary{
+			VersionID: row.VersionID, Version: row.VersionNo, Status: row.Status,
+			Revision: row.VersionRevision, Summary: summary,
+		},
+		EffectiveVersionID: row.EffectiveVersionID, UpdatedAt: row.ObjectUpdatedAt.Time,
 	}
 }
 
@@ -88,6 +106,16 @@ func detailView(row dbsqlc.BobVersionView) DetailView {
 		Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
 		SupplierType: deref(row.SupplierType), PlateNumber: deref(row.PlateNumber),
 		VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
+		CustomerType: row.CustomerType, ShortName: row.ShortName, CategoryID: row.CategoryID,
+		TaxNumber: row.TaxNumber, ContactName: row.ContactName, ContactPhone: row.ContactPhone,
+		Email: row.Email, Address: row.Address, Remark: row.Remark,
+		DepartmentID: row.DepartmentID, PositionID: row.PositionID, Phone: row.Phone,
+		HireDate: row.HireDate, Specification: row.Specification, Model: row.Model,
+		Barcode: row.Barcode, Description: row.Description,
+		ManagerEmployeeID: row.ManagerEmployeeID, VIN: row.Vin, EngineNumber: row.EngineNumber,
+		LoadCapacityKG: row.LoadCapacityKg, AccountName: row.AccountName, BankName: row.BankName,
+		BankBranch: row.BankBranch, AccountNumber: row.AccountNumber,
+		TargetEntity: row.TargetEntity, ParentID: row.ParentID,
 	}
 }
 

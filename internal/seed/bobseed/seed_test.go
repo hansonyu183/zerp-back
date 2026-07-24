@@ -25,6 +25,9 @@ func TestSamplesCoverEveryEntityAndLifecycleState(t *testing.T) {
 		bob.EntityWarehouse,
 		bob.EntityVehicle,
 		bob.EntityFundAccount,
+		bob.EntityCategory,
+		bob.EntityDepartment,
+		bob.EntityPosition,
 	} {
 		if entityCounts[entity] != 2 {
 			t.Errorf("%s sample count = %d, want 2", entity, entityCounts[entity])
@@ -48,7 +51,7 @@ func TestSeedCreatesLifecycleDataAndIsIdempotent(t *testing.T) {
 	if first != (Result{Created: len(samples)}) {
 		t.Fatalf("first result = %+v", first)
 	}
-	if store.createCalls != 16 || store.submitCalls != 12 || store.approveCalls != 8 || store.rejectCalls != 2 {
+	if store.createCalls != 22 || store.submitCalls != 17 || store.approveCalls != 12 || store.rejectCalls != 2 {
 		t.Fatalf(
 			"calls create=%d submit=%d approve=%d reject=%d",
 			store.createCalls,
@@ -65,7 +68,7 @@ func TestSeedCreatesLifecycleDataAndIsIdempotent(t *testing.T) {
 	if second != (Result{Skipped: len(samples)}) {
 		t.Fatalf("second result = %+v", second)
 	}
-	if store.createCalls != 16 || store.submitCalls != 12 || store.approveCalls != 8 || store.rejectCalls != 2 {
+	if store.createCalls != 22 || store.submitCalls != 17 || store.approveCalls != 12 || store.rejectCalls != 2 {
 		t.Fatal("idempotent seed performed extra lifecycle mutations")
 	}
 }
@@ -183,6 +186,10 @@ func (s *fakeStore) Create(_ context.Context, entity string, input bob.CreateInp
 	if entity == bob.EntitySupplier && supplierType == "" {
 		supplierType = bob.SupplierTypeGeneral
 	}
+	customerType := deref(input.Data.CustomerType)
+	if entity == bob.EntityCustomer && customerType == "" {
+		customerType = bob.CustomerTypeEndUser
+	}
 	view := bob.ObjectView{
 		ObjectID:       objectID,
 		Entity:         entity,
@@ -197,13 +204,40 @@ func (s *fakeStore) Create(_ context.Context, entity string, input bob.CreateInp
 			UpdatedAt: time.Now(),
 		},
 		Data: bob.DetailView{
-			Name:             input.Data.Name,
-			Unit:             input.Data.Unit,
-			Currency:         input.Data.Currency,
-			SupplierType:     supplierType,
-			PlateNumber:      input.Data.PlateNumber,
-			VehicleType:      input.Data.VehicleType,
-			PlatformObjectID: input.Data.PlatformObjectID,
+			Name:              input.Data.Name,
+			Unit:              input.Data.Unit,
+			Currency:          input.Data.Currency,
+			SupplierType:      supplierType,
+			CustomerType:      customerType,
+			PlateNumber:       input.Data.PlateNumber,
+			VehicleType:       input.Data.VehicleType,
+			PlatformObjectID:  input.Data.PlatformObjectID,
+			TargetEntity:      input.Data.TargetEntity,
+			ShortName:         input.Data.ShortName,
+			CategoryID:        input.Data.CategoryID,
+			TaxNumber:         input.Data.TaxNumber,
+			ContactName:       input.Data.ContactName,
+			ContactPhone:      input.Data.ContactPhone,
+			Email:             input.Data.Email,
+			Address:           input.Data.Address,
+			Remark:            input.Data.Remark,
+			DepartmentID:      input.Data.DepartmentID,
+			PositionID:        input.Data.PositionID,
+			Phone:             input.Data.Phone,
+			HireDate:          input.Data.HireDate,
+			Specification:     input.Data.Specification,
+			Model:             input.Data.Model,
+			Barcode:           input.Data.Barcode,
+			Description:       input.Data.Description,
+			ManagerEmployeeID: input.Data.ManagerEmployeeID,
+			VIN:               input.Data.VIN,
+			EngineNumber:      input.Data.EngineNumber,
+			LoadCapacityKG:    input.Data.LoadCapacityKG,
+			AccountName:       input.Data.AccountName,
+			BankName:          input.Data.BankName,
+			BankBranch:        input.Data.BankBranch,
+			AccountNumber:     input.Data.AccountNumber,
+			ParentID:          input.Data.ParentID,
 		},
 	}
 	recordKey := key(entity, input.Data.Code)
@@ -247,11 +281,48 @@ func (s *fakeStore) Save(_ context.Context, _ string, input bob.SaveInput, _, _ 
 	if input.Data.SupplierType != nil {
 		supplierType = *input.Data.SupplierType
 	}
-	view.Data = bob.DetailView{
-		Name: input.Data.Name, Unit: input.Data.Unit, Currency: input.Data.Currency,
-		SupplierType: supplierType, PlateNumber: input.Data.PlateNumber,
-		VehicleType: input.Data.VehicleType, PlatformObjectID: input.Data.PlatformObjectID,
+	customerType := view.Data.CustomerType
+	if input.Data.CustomerType != nil {
+		customerType = *input.Data.CustomerType
 	}
+	targetEntity := view.Data.TargetEntity
+	if input.Data.TargetEntity != nil {
+		targetEntity = *input.Data.TargetEntity
+	}
+	view.Data.Name, view.Data.Unit, view.Data.Currency = input.Data.Name, input.Data.Unit, input.Data.Currency
+	view.Data.SupplierType, view.Data.CustomerType = supplierType, customerType
+	view.Data.PlateNumber, view.Data.VehicleType = input.Data.PlateNumber, input.Data.VehicleType
+	view.Data.PlatformObjectID, view.Data.TargetEntity = input.Data.PlatformObjectID, targetEntity
+	applyOptional := func(value bob.OptionalString, target *string) {
+		if value.Set {
+			*target = value.Value
+		}
+	}
+	applyOptional(input.Data.ShortName, &view.Data.ShortName)
+	applyOptional(input.Data.CategoryID, &view.Data.CategoryID)
+	applyOptional(input.Data.TaxNumber, &view.Data.TaxNumber)
+	applyOptional(input.Data.ContactName, &view.Data.ContactName)
+	applyOptional(input.Data.ContactPhone, &view.Data.ContactPhone)
+	applyOptional(input.Data.Email, &view.Data.Email)
+	applyOptional(input.Data.Address, &view.Data.Address)
+	applyOptional(input.Data.Remark, &view.Data.Remark)
+	applyOptional(input.Data.DepartmentID, &view.Data.DepartmentID)
+	applyOptional(input.Data.PositionID, &view.Data.PositionID)
+	applyOptional(input.Data.Phone, &view.Data.Phone)
+	applyOptional(input.Data.HireDate, &view.Data.HireDate)
+	applyOptional(input.Data.Specification, &view.Data.Specification)
+	applyOptional(input.Data.Model, &view.Data.Model)
+	applyOptional(input.Data.Barcode, &view.Data.Barcode)
+	applyOptional(input.Data.Description, &view.Data.Description)
+	applyOptional(input.Data.ManagerEmployeeID, &view.Data.ManagerEmployeeID)
+	applyOptional(input.Data.VIN, &view.Data.VIN)
+	applyOptional(input.Data.EngineNumber, &view.Data.EngineNumber)
+	applyOptional(input.Data.LoadCapacityKG, &view.Data.LoadCapacityKG)
+	applyOptional(input.Data.AccountName, &view.Data.AccountName)
+	applyOptional(input.Data.BankName, &view.Data.BankName)
+	applyOptional(input.Data.BankBranch, &view.Data.BankBranch)
+	applyOptional(input.Data.AccountNumber, &view.Data.AccountNumber)
+	applyOptional(input.Data.ParentID, &view.Data.ParentID)
 	view.Version.Revision++
 	s.byKey[recordKey] = view
 	return mutation(view), nil

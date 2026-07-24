@@ -13,96 +13,259 @@ INSERT INTO bob_versions (
 );
 
 -- name: InsertBobCustomerDetail :exec
-INSERT INTO bob_customer_versions (version_id, name) VALUES (sqlc.arg(version_id), sqlc.arg(name));
+INSERT INTO bob_customer_versions (
+    version_id, name, customer_type, short_name, category_id, tax_number,
+    contact_name, contact_phone, email, address, remark
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(customer_type),
+    sqlc.narg(short_name), sqlc.narg(category_id), sqlc.narg(tax_number),
+    sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(email),
+    sqlc.narg(address), sqlc.narg(remark)
+);
 
 -- name: InsertBobSupplierDetail :exec
-INSERT INTO bob_supplier_versions (version_id, name, supplier_type)
-VALUES (sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(supplier_type));
+INSERT INTO bob_supplier_versions (
+    version_id, name, supplier_type, short_name, category_id, tax_number,
+    contact_name, contact_phone, email, address, remark
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(supplier_type),
+    sqlc.narg(short_name), sqlc.narg(category_id), sqlc.narg(tax_number),
+    sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(email),
+    sqlc.narg(address), sqlc.narg(remark)
+);
 
 -- name: InsertBobEmployeeDetail :exec
-INSERT INTO bob_employee_versions (version_id, name) VALUES (sqlc.arg(version_id), sqlc.arg(name));
+INSERT INTO bob_employee_versions (
+    version_id, name, category_id, department_id, position_id, phone, email, hire_date, remark
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.narg(category_id), sqlc.narg(department_id),
+    sqlc.narg(position_id), sqlc.narg(phone), sqlc.narg(email),
+    NULLIF(sqlc.arg(hire_date)::text, '')::date, sqlc.narg(remark)
+);
 
 -- name: InsertBobProductDetail :exec
-INSERT INTO bob_product_versions (version_id, name, unit) VALUES (sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(unit));
+INSERT INTO bob_product_versions (
+    version_id, name, unit, category_id, specification, model, barcode, remark
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(unit), sqlc.narg(category_id),
+    sqlc.narg(specification), sqlc.narg(model), sqlc.narg(barcode), sqlc.narg(remark)
+);
 
 -- name: InsertBobServiceDetail :exec
-INSERT INTO bob_service_versions (version_id, name, unit) VALUES (sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(unit));
+INSERT INTO bob_service_versions (version_id, name, unit, category_id, description, remark)
+VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(unit), sqlc.narg(category_id),
+    sqlc.narg(description), sqlc.narg(remark)
+);
 
 -- name: InsertBobWarehouseDetail :exec
-INSERT INTO bob_warehouse_versions (version_id, name) VALUES (sqlc.arg(version_id), sqlc.arg(name));
+INSERT INTO bob_warehouse_versions (
+    version_id, name, category_id, address, contact_name, contact_phone, manager_employee_id, remark
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.narg(category_id), sqlc.narg(address),
+    sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(manager_employee_id), sqlc.narg(remark)
+);
 
 -- name: InsertBobVehicleDetail :exec
-INSERT INTO bob_vehicle_versions (version_id, name, plate_number, vehicle_type, platform_object_id)
+INSERT INTO bob_vehicle_versions (
+    version_id, name, plate_number, vehicle_type, platform_object_id,
+    category_id, vin, engine_number, load_capacity_kg, remark
+)
 VALUES (
     sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(plate_number),
-    sqlc.arg(vehicle_type), sqlc.arg(platform_object_id)
+    sqlc.arg(vehicle_type), sqlc.arg(platform_object_id), sqlc.narg(category_id),
+    sqlc.narg(vin), sqlc.narg(engine_number),
+    NULLIF(sqlc.arg(load_capacity_kg)::text, '')::numeric(12,3), sqlc.narg(remark)
 );
 
 -- name: InsertBobFundAccountDetail :exec
-INSERT INTO bob_fund_account_versions (version_id, name, currency) VALUES (sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(currency));
+INSERT INTO bob_fund_account_versions (
+    version_id, name, currency, category_id, account_name, bank_name, bank_branch, account_number, remark
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(currency), sqlc.narg(category_id),
+    sqlc.narg(account_name), sqlc.narg(bank_name), sqlc.narg(bank_branch),
+    sqlc.narg(account_number), sqlc.narg(remark)
+);
+
+-- name: InsertBobCategoryDetail :exec
+INSERT INTO bob_category_versions (version_id, name, target_entity, parent_id, description)
+VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(target_entity),
+    sqlc.narg(parent_id), sqlc.narg(description)
+);
+
+-- name: InsertBobDepartmentDetail :exec
+INSERT INTO bob_department_versions (version_id, name, category_id, parent_id, description)
+VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.narg(category_id),
+    sqlc.narg(parent_id), sqlc.narg(description)
+);
+
+-- name: InsertBobPositionDetail :exec
+INSERT INTO bob_position_versions (version_id, name, category_id, description)
+VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.narg(category_id), sqlc.narg(description)
+);
 
 -- name: CopyBobCustomerDetail :exec
-INSERT INTO bob_customer_versions (version_id, name)
-SELECT sqlc.arg(new_version_id), d.name FROM bob_customer_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+INSERT INTO bob_customer_versions (
+    version_id, name, customer_type, short_name, category_id, tax_number,
+    contact_name, contact_phone, email, address, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.customer_type, d.short_name, d.category_id,
+       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark
+FROM bob_customer_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobSupplierDetail :exec
-INSERT INTO bob_supplier_versions (version_id, name, supplier_type)
-SELECT sqlc.arg(new_version_id), d.name, d.supplier_type
+INSERT INTO bob_supplier_versions (
+    version_id, name, supplier_type, short_name, category_id, tax_number,
+    contact_name, contact_phone, email, address, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.supplier_type, d.short_name, d.category_id,
+       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark
 FROM bob_supplier_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobEmployeeDetail :exec
-INSERT INTO bob_employee_versions (version_id, name)
-SELECT sqlc.arg(new_version_id), d.name FROM bob_employee_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+INSERT INTO bob_employee_versions (
+    version_id, name, category_id, department_id, position_id, phone, email, hire_date, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.category_id, d.department_id, d.position_id,
+       d.phone, d.email, d.hire_date, d.remark
+FROM bob_employee_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobProductDetail :exec
-INSERT INTO bob_product_versions (version_id, name, unit)
-SELECT sqlc.arg(new_version_id), d.name, d.unit FROM bob_product_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+INSERT INTO bob_product_versions (
+    version_id, name, unit, category_id, specification, model, barcode, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.unit, d.category_id, d.specification,
+       d.model, d.barcode, d.remark
+FROM bob_product_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobServiceDetail :exec
-INSERT INTO bob_service_versions (version_id, name, unit)
-SELECT sqlc.arg(new_version_id), d.name, d.unit FROM bob_service_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+INSERT INTO bob_service_versions (version_id, name, unit, category_id, description, remark)
+SELECT sqlc.arg(new_version_id), d.name, d.unit, d.category_id, d.description, d.remark
+FROM bob_service_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobWarehouseDetail :exec
-INSERT INTO bob_warehouse_versions (version_id, name)
-SELECT sqlc.arg(new_version_id), d.name FROM bob_warehouse_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+INSERT INTO bob_warehouse_versions (
+    version_id, name, category_id, address, contact_name, contact_phone, manager_employee_id, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.category_id, d.address, d.contact_name,
+       d.contact_phone, d.manager_employee_id, d.remark
+FROM bob_warehouse_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobVehicleDetail :exec
-INSERT INTO bob_vehicle_versions (version_id, name, plate_number, vehicle_type, platform_object_id)
-SELECT sqlc.arg(new_version_id), d.name, d.plate_number, d.vehicle_type, d.platform_object_id
+INSERT INTO bob_vehicle_versions (
+    version_id, name, plate_number, vehicle_type, platform_object_id,
+    category_id, vin, engine_number, load_capacity_kg, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.plate_number, d.vehicle_type, d.platform_object_id,
+       d.category_id, d.vin, d.engine_number, d.load_capacity_kg, d.remark
 FROM bob_vehicle_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobFundAccountDetail :exec
-INSERT INTO bob_fund_account_versions (version_id, name, currency)
-SELECT sqlc.arg(new_version_id), d.name, d.currency FROM bob_fund_account_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+INSERT INTO bob_fund_account_versions (
+    version_id, name, currency, category_id, account_name, bank_name, bank_branch, account_number, remark
+)
+SELECT sqlc.arg(new_version_id), d.name, d.currency, d.category_id, d.account_name,
+       d.bank_name, d.bank_branch, d.account_number, d.remark
+FROM bob_fund_account_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+
+-- name: CopyBobCategoryDetail :exec
+INSERT INTO bob_category_versions (version_id, name, target_entity, parent_id, description)
+SELECT sqlc.arg(new_version_id), d.name, d.target_entity, d.parent_id, d.description
+FROM bob_category_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+
+-- name: CopyBobDepartmentDetail :exec
+INSERT INTO bob_department_versions (version_id, name, category_id, parent_id, description)
+SELECT sqlc.arg(new_version_id), d.name, d.category_id, d.parent_id, d.description
+FROM bob_department_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+
+-- name: CopyBobPositionDetail :exec
+INSERT INTO bob_position_versions (version_id, name, category_id, description)
+SELECT sqlc.arg(new_version_id), d.name, d.category_id, d.description
+FROM bob_position_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: UpdateBobCustomerDetail :execrows
-UPDATE bob_customer_versions SET name = sqlc.arg(name) WHERE version_id = sqlc.arg(version_id);
+UPDATE bob_customer_versions
+SET name = sqlc.arg(name), customer_type = sqlc.arg(customer_type),
+    short_name = sqlc.narg(short_name), category_id = sqlc.narg(category_id),
+    tax_number = sqlc.narg(tax_number), contact_name = sqlc.narg(contact_name),
+    contact_phone = sqlc.narg(contact_phone), email = sqlc.narg(email),
+    address = sqlc.narg(address), remark = sqlc.narg(remark)
+WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobSupplierDetail :execrows
 UPDATE bob_supplier_versions
-SET name = sqlc.arg(name), supplier_type = sqlc.arg(supplier_type)
+SET name = sqlc.arg(name), supplier_type = sqlc.arg(supplier_type),
+    short_name = sqlc.narg(short_name), category_id = sqlc.narg(category_id),
+    tax_number = sqlc.narg(tax_number), contact_name = sqlc.narg(contact_name),
+    contact_phone = sqlc.narg(contact_phone), email = sqlc.narg(email),
+    address = sqlc.narg(address), remark = sqlc.narg(remark)
 WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobEmployeeDetail :execrows
-UPDATE bob_employee_versions SET name = sqlc.arg(name) WHERE version_id = sqlc.arg(version_id);
+UPDATE bob_employee_versions
+SET name = sqlc.arg(name), category_id = sqlc.narg(category_id),
+    department_id = sqlc.narg(department_id), position_id = sqlc.narg(position_id),
+    phone = sqlc.narg(phone), email = sqlc.narg(email),
+    hire_date = NULLIF(sqlc.arg(hire_date)::text, '')::date, remark = sqlc.narg(remark)
+WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobProductDetail :execrows
-UPDATE bob_product_versions SET name = sqlc.arg(name), unit = sqlc.arg(unit) WHERE version_id = sqlc.arg(version_id);
+UPDATE bob_product_versions
+SET name = sqlc.arg(name), unit = sqlc.arg(unit), category_id = sqlc.narg(category_id),
+    specification = sqlc.narg(specification), model = sqlc.narg(model),
+    barcode = sqlc.narg(barcode), remark = sqlc.narg(remark)
+WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobServiceDetail :execrows
-UPDATE bob_service_versions SET name = sqlc.arg(name), unit = sqlc.arg(unit) WHERE version_id = sqlc.arg(version_id);
+UPDATE bob_service_versions
+SET name = sqlc.arg(name), unit = sqlc.arg(unit), category_id = sqlc.narg(category_id),
+    description = sqlc.narg(description), remark = sqlc.narg(remark)
+WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobWarehouseDetail :execrows
-UPDATE bob_warehouse_versions SET name = sqlc.arg(name) WHERE version_id = sqlc.arg(version_id);
+UPDATE bob_warehouse_versions
+SET name = sqlc.arg(name), category_id = sqlc.narg(category_id), address = sqlc.narg(address),
+    contact_name = sqlc.narg(contact_name), contact_phone = sqlc.narg(contact_phone),
+    manager_employee_id = sqlc.narg(manager_employee_id), remark = sqlc.narg(remark)
+WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobVehicleDetail :execrows
 UPDATE bob_vehicle_versions
 SET name = sqlc.arg(name), plate_number = sqlc.arg(plate_number),
-    vehicle_type = sqlc.arg(vehicle_type), platform_object_id = sqlc.arg(platform_object_id)
+    vehicle_type = sqlc.arg(vehicle_type), platform_object_id = sqlc.arg(platform_object_id),
+    category_id = sqlc.narg(category_id), vin = sqlc.narg(vin),
+    engine_number = sqlc.narg(engine_number),
+    load_capacity_kg = NULLIF(sqlc.arg(load_capacity_kg)::text, '')::numeric(12,3),
+    remark = sqlc.narg(remark)
 WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobFundAccountDetail :execrows
-UPDATE bob_fund_account_versions SET name = sqlc.arg(name), currency = sqlc.arg(currency) WHERE version_id = sqlc.arg(version_id);
+UPDATE bob_fund_account_versions
+SET name = sqlc.arg(name), currency = sqlc.arg(currency), category_id = sqlc.narg(category_id),
+    account_name = sqlc.narg(account_name), bank_name = sqlc.narg(bank_name),
+    bank_branch = sqlc.narg(bank_branch), account_number = sqlc.narg(account_number),
+    remark = sqlc.narg(remark)
+WHERE version_id = sqlc.arg(version_id);
+
+-- name: UpdateBobCategoryDetail :execrows
+UPDATE bob_category_versions
+SET name = sqlc.arg(name), target_entity = sqlc.arg(target_entity),
+    parent_id = sqlc.narg(parent_id), description = sqlc.narg(description)
+WHERE version_id = sqlc.arg(version_id);
+
+-- name: UpdateBobDepartmentDetail :execrows
+UPDATE bob_department_versions
+SET name = sqlc.arg(name), category_id = sqlc.narg(category_id),
+    parent_id = sqlc.narg(parent_id), description = sqlc.narg(description)
+WHERE version_id = sqlc.arg(version_id);
+
+-- name: UpdateBobPositionDetail :execrows
+UPDATE bob_position_versions
+SET name = sqlc.arg(name), category_id = sqlc.narg(category_id), description = sqlc.narg(description)
+WHERE version_id = sqlc.arg(version_id);
 
 -- name: LockBobObject :one
 SELECT id, entity, code, current_version_id, effective_version_id, next_version_no, revision, updated_at
@@ -137,6 +300,61 @@ SELECT EXISTS (
     SELECT 1
     FROM bob_vehicle_versions vehicle
     WHERE vehicle.platform_object_id = sqlc.arg(target_object_id)
+       OR vehicle.category_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_customer_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_supplier_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_employee_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+       OR department_id = sqlc.arg(target_object_id)
+       OR position_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_product_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_service_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_warehouse_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+       OR manager_employee_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_fund_account_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_category_versions
+    WHERE parent_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_department_versions
+    WHERE category_id = sqlc.arg(target_object_id)
+       OR parent_id = sqlc.arg(target_object_id)
+
+    UNION ALL
+
+    SELECT 1 FROM bob_position_versions
+    WHERE category_id = sqlc.arg(target_object_id)
 
     UNION ALL
 
@@ -244,6 +462,15 @@ DELETE FROM bob_vehicle_versions WHERE version_id = sqlc.arg(version_id);
 -- name: DeleteBobFundAccountDetail :execrows
 DELETE FROM bob_fund_account_versions WHERE version_id = sqlc.arg(version_id);
 
+-- name: DeleteBobCategoryDetail :execrows
+DELETE FROM bob_category_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobDepartmentDetail :execrows
+DELETE FROM bob_department_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobPositionDetail :execrows
+DELETE FROM bob_position_versions WHERE version_id = sqlc.arg(version_id);
+
 -- name: DeleteBobFirstVersion :execrows
 DELETE FROM bob_versions
 WHERE id = sqlc.arg(version_id)
@@ -279,6 +506,33 @@ WHERE o.id = sqlc.arg(platform_object_id)
   AND o.current_version_id = o.effective_version_id
   AND v.status = 'EFFECTIVE'
   AND s.supplier_type = 'LOGISTICS_PLATFORM'
+FOR SHARE OF o;
+
+-- name: LockEffectiveBobReference :one
+SELECT o.id
+FROM bob_objects o
+JOIN bob_versions v
+  ON v.id = o.effective_version_id
+ AND v.object_id = o.id
+ AND v.entity = o.entity
+WHERE o.id = sqlc.arg(object_id)
+  AND o.entity = sqlc.arg(entity)
+  AND o.current_version_id = o.effective_version_id
+  AND v.status = 'EFFECTIVE'
+FOR SHARE OF o;
+
+-- name: LockEffectiveCategoryReference :one
+SELECT detail.target_entity
+FROM bob_objects o
+JOIN bob_versions v
+  ON v.id = o.effective_version_id
+ AND v.object_id = o.id
+ AND v.entity = o.entity
+JOIN bob_category_versions detail ON detail.version_id = v.id
+WHERE o.id = sqlc.arg(target_category_id)
+  AND o.entity = 'category'
+  AND o.current_version_id = o.effective_version_id
+  AND v.status = 'EFFECTIVE'
 FOR SHARE OF o;
 
 -- name: MarkBobVersionSaved :execrows
@@ -349,11 +603,35 @@ SELECT count(*)
 FROM bob_version_views
 WHERE entity = sqlc.arg(entity) AND version_id = current_version_id
   AND (cardinality(sqlc.arg(statuses)::text[]) = 0 OR status = ANY(sqlc.arg(statuses)::text[]))
+  AND (sqlc.arg(customer_type)::text = '' OR customer_type = sqlc.arg(customer_type))
+  AND (sqlc.arg(supplier_type)::text = '' OR supplier_type = sqlc.arg(supplier_type))
+  AND (sqlc.arg(category_id)::text = '' OR category_id = sqlc.arg(category_id))
+  AND (sqlc.arg(department_id)::text = '' OR department_id = sqlc.arg(department_id))
+  AND (sqlc.arg(position_id)::text = '' OR position_id = sqlc.arg(position_id))
+  AND (sqlc.arg(currency)::text = '' OR currency = sqlc.arg(currency))
+  AND (sqlc.arg(target_entity)::text = '' OR target_entity = sqlc.arg(target_entity))
+  AND (sqlc.arg(parent_id)::text = '' OR parent_id = sqlc.arg(parent_id))
+  AND (NOT sqlc.arg(root_only)::boolean OR parent_id = '')
   AND (
       sqlc.arg(keyword)::text = ''
       OR code ILIKE '%' || sqlc.arg(keyword) || '%'
       OR name ILIKE '%' || sqlc.arg(keyword) || '%'
       OR (entity = 'vehicle' AND plate_number ILIKE '%' || sqlc.arg(keyword) || '%')
+      OR short_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR tax_number ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR contact_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR contact_phone ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR email ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR address ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR phone ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR specification ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR model ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR barcode ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR vin ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR engine_number ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR account_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR bank_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR bank_branch ILIKE '%' || sqlc.arg(keyword) || '%'
   );
 
 -- name: ListBobObjects :many
@@ -361,11 +639,35 @@ SELECT *
 FROM bob_version_views
 WHERE entity = sqlc.arg(entity) AND version_id = current_version_id
   AND (cardinality(sqlc.arg(statuses)::text[]) = 0 OR status = ANY(sqlc.arg(statuses)::text[]))
+  AND (sqlc.arg(customer_type)::text = '' OR customer_type = sqlc.arg(customer_type))
+  AND (sqlc.arg(supplier_type)::text = '' OR supplier_type = sqlc.arg(supplier_type))
+  AND (sqlc.arg(category_id)::text = '' OR category_id = sqlc.arg(category_id))
+  AND (sqlc.arg(department_id)::text = '' OR department_id = sqlc.arg(department_id))
+  AND (sqlc.arg(position_id)::text = '' OR position_id = sqlc.arg(position_id))
+  AND (sqlc.arg(currency)::text = '' OR currency = sqlc.arg(currency))
+  AND (sqlc.arg(target_entity)::text = '' OR target_entity = sqlc.arg(target_entity))
+  AND (sqlc.arg(parent_id)::text = '' OR parent_id = sqlc.arg(parent_id))
+  AND (NOT sqlc.arg(root_only)::boolean OR parent_id = '')
   AND (
       sqlc.arg(keyword)::text = ''
       OR code ILIKE '%' || sqlc.arg(keyword) || '%'
       OR name ILIKE '%' || sqlc.arg(keyword) || '%'
       OR (entity = 'vehicle' AND plate_number ILIKE '%' || sqlc.arg(keyword) || '%')
+      OR short_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR tax_number ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR contact_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR contact_phone ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR email ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR address ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR phone ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR specification ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR model ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR barcode ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR vin ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR engine_number ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR account_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR bank_name ILIKE '%' || sqlc.arg(keyword) || '%'
+      OR bank_branch ILIKE '%' || sqlc.arg(keyword) || '%'
   )
 ORDER BY
   CASE WHEN sqlc.arg(sort_field)::text = 'updatedAt' AND sqlc.arg(sort_order)::text = 'asc' THEN object_updated_at END ASC,
@@ -402,20 +704,11 @@ ORDER BY occurred_at DESC, id DESC
 LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(page_offset);
 
 -- name: ResolveBobEffectiveReference :one
-SELECT o.id AS object_id, o.entity, o.code, v.id AS version_id,
-       COALESCE(c.name, s.name, e.name, p.name, sv.name, w.name, vh.name, f.name) AS name,
-       COALESCE(p.unit, sv.unit, '') AS unit, f.currency, s.supplier_type,
-       vh.plate_number, vh.vehicle_type, vh.platform_object_id
-FROM bob_objects o
-JOIN bob_versions v ON v.object_id = o.id AND v.entity = o.entity
-LEFT JOIN bob_customer_versions c ON c.version_id = v.id
-LEFT JOIN bob_supplier_versions s ON s.version_id = v.id
-LEFT JOIN bob_employee_versions e ON e.version_id = v.id
-LEFT JOIN bob_product_versions p ON p.version_id = v.id
-LEFT JOIN bob_service_versions sv ON sv.version_id = v.id
-LEFT JOIN bob_warehouse_versions w ON w.version_id = v.id
-LEFT JOIN bob_vehicle_versions vh ON vh.version_id = v.id
-LEFT JOIN bob_fund_account_versions f ON f.version_id = v.id
-WHERE o.id = sqlc.arg(object_id) AND o.entity = sqlc.arg(entity)
-  AND v.id = sqlc.arg(version_id) AND o.effective_version_id = v.id AND v.status = 'EFFECTIVE'
+SELECT view.*
+FROM bob_version_views view
+JOIN bob_objects o ON o.id = view.object_id AND o.entity = view.entity
+WHERE view.object_id = sqlc.arg(object_id) AND view.entity = sqlc.arg(entity)
+  AND view.version_id = sqlc.arg(version_id)
+  AND view.effective_version_id = view.version_id
+  AND view.status = 'EFFECTIVE'
 FOR SHARE OF o;

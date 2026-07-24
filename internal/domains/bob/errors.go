@@ -19,7 +19,7 @@ func (s *Service) writeError(operation string, err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
-		case "23505", "23P01", "40001", "40P01":
+		case "23505", "23514", "23P01", "40001", "40P01":
 			return domainError(ErrorConflict, "data conflict", nil, err)
 		}
 	}

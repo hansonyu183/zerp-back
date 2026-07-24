@@ -65,9 +65,9 @@ func TestSeedDemoDataIntegration(t *testing.T) {
 		counts[status]++
 	}
 	expected := map[string]int{
-		bob.StatusEffective: 8,
-		bob.StatusDraft:     4,
-		bob.StatusPending:   2,
+		bob.StatusEffective: 12,
+		bob.StatusDraft:     5,
+		bob.StatusPending:   3,
 		bob.StatusRejected:  2,
 	}
 	if len(counts) != len(expected) {

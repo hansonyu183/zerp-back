@@ -1,95 +1,483 @@
 package bob
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
+	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/oklog/ulid/v2"
 )
 
-var codePattern = regexp.MustCompile(`^[A-Z0-9][A-Z0-9._-]*$`)
-var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
+var (
+	codePattern          = regexp.MustCompile(`^[A-Z0-9][A-Z0-9._-]*$`)
+	currencyPattern      = regexp.MustCompile(`^[A-Z]{3}$`)
+	phonePattern         = regexp.MustCompile(`^[+0-9() -]+$`)
+	taxNumberPattern     = regexp.MustCompile(`^[A-Z0-9-]+$`)
+	barcodePattern       = regexp.MustCompile(`^[A-Z0-9._-]+$`)
+	vinPattern           = regexp.MustCompile(`^[A-HJ-NPR-Z0-9]{17}$`)
+	accountNumberPattern = regexp.MustCompile(`^[A-Z0-9]{1,64}$`)
+	loadCapacityPattern  = regexp.MustCompile(`^([0-9]{1,9})(?:\.([0-9]{1,3}))?$`)
+)
 
-func validateCreate(entity string, input CreateDetailInput) (DetailInput, string, error) {
+func validateCreate(entity string, input CreateDetailInput) (DetailView, string, error) {
 	code := strings.ToUpper(strings.TrimSpace(input.Code))
 	if len(code) < 1 || len(code) > 64 || !codePattern.MatchString(code) {
-		return DetailInput{}, "", domainError(ErrorValidation, "invalid code", nil, nil)
+		return DetailView{}, "", domainError(ErrorValidation, "invalid code", nil, nil)
 	}
 	supplierType := input.SupplierType
 	if entity == EntitySupplier && supplierType == nil {
-		defaultType := SupplierTypeGeneral
-		supplierType = &defaultType
+		value := SupplierTypeGeneral
+		supplierType = &value
 	}
-	data, err := validateDetail(entity, DetailInput{
-		Name:             input.Name,
-		Unit:             input.Unit,
-		Currency:         input.Currency,
-		SupplierType:     supplierType,
-		PlateNumber:      input.PlateNumber,
-		VehicleType:      input.VehicleType,
-		PlatformObjectID: input.PlatformObjectID,
-	})
+	customerType := input.CustomerType
+	if entity == EntityCustomer && customerType == nil {
+		value := CustomerTypeEndUser
+		customerType = &value
+	}
+	data := DetailView{
+		Name: input.Name, Unit: input.Unit, Currency: input.Currency,
+		SupplierType: deref(supplierType), CustomerType: deref(customerType),
+		PlateNumber: input.PlateNumber, VehicleType: input.VehicleType,
+		PlatformObjectID: input.PlatformObjectID, TargetEntity: input.TargetEntity,
+		ShortName: input.ShortName, CategoryID: input.CategoryID, TaxNumber: input.TaxNumber,
+		ContactName: input.ContactName, ContactPhone: input.ContactPhone, Email: input.Email,
+		Address: input.Address, Remark: input.Remark, DepartmentID: input.DepartmentID,
+		PositionID: input.PositionID, Phone: input.Phone, HireDate: input.HireDate,
+		Specification: input.Specification, Model: input.Model, Barcode: input.Barcode,
+		Description: input.Description, ManagerEmployeeID: input.ManagerEmployeeID,
+		VIN: input.VIN, EngineNumber: input.EngineNumber, LoadCapacityKG: input.LoadCapacityKG,
+		AccountName: input.AccountName, BankName: input.BankName, BankBranch: input.BankBranch,
+		AccountNumber: input.AccountNumber, ParentID: input.ParentID,
+	}
+	data, err := validateDetailData(entity, data)
 	return data, code, err
 }
 
-func validateDetail(entity string, input DetailInput) (DetailInput, error) {
-	if !validEntity(entity) {
-		return DetailInput{}, domainError(ErrorValidation, "invalid entity", nil, nil)
-	}
-	input.Name = strings.TrimSpace(input.Name)
-	input.Unit = strings.TrimSpace(input.Unit)
-	input.Currency = strings.ToUpper(strings.TrimSpace(input.Currency))
-	input.PlateNumber = strings.ToUpper(strings.TrimSpace(input.PlateNumber))
-	input.VehicleType = strings.TrimSpace(input.VehicleType)
-	input.PlatformObjectID = strings.TrimSpace(input.PlatformObjectID)
+func mergeDetailInput(current DetailView, input DetailInput) DetailView {
+	result := current
+	result.Name = input.Name
+	result.Unit = input.Unit
+	result.Currency = input.Currency
+	result.PlateNumber = input.PlateNumber
+	result.VehicleType = input.VehicleType
+	result.PlatformObjectID = input.PlatformObjectID
 	if input.SupplierType != nil {
-		normalized := strings.ToUpper(strings.TrimSpace(*input.SupplierType))
-		input.SupplierType = &normalized
+		result.SupplierType = *input.SupplierType
 	}
-	if !runeLengthBetween(input.Name, 1, 200) {
-		return DetailInput{}, domainError(ErrorValidation, "invalid name", nil, nil)
+	if input.CustomerType != nil {
+		result.CustomerType = *input.CustomerType
+	}
+	if input.TargetEntity != nil {
+		result.TargetEntity = *input.TargetEntity
+	}
+	mergeOptional := func(optional OptionalString, target *string) {
+		if optional.Set {
+			*target = optional.Value
+		}
+	}
+	mergeOptional(input.ShortName, &result.ShortName)
+	mergeOptional(input.CategoryID, &result.CategoryID)
+	mergeOptional(input.TaxNumber, &result.TaxNumber)
+	mergeOptional(input.ContactName, &result.ContactName)
+	mergeOptional(input.ContactPhone, &result.ContactPhone)
+	mergeOptional(input.Email, &result.Email)
+	mergeOptional(input.Address, &result.Address)
+	mergeOptional(input.Remark, &result.Remark)
+	mergeOptional(input.DepartmentID, &result.DepartmentID)
+	mergeOptional(input.PositionID, &result.PositionID)
+	mergeOptional(input.Phone, &result.Phone)
+	mergeOptional(input.HireDate, &result.HireDate)
+	mergeOptional(input.Specification, &result.Specification)
+	mergeOptional(input.Model, &result.Model)
+	mergeOptional(input.Barcode, &result.Barcode)
+	mergeOptional(input.Description, &result.Description)
+	mergeOptional(input.ManagerEmployeeID, &result.ManagerEmployeeID)
+	mergeOptional(input.VIN, &result.VIN)
+	mergeOptional(input.EngineNumber, &result.EngineNumber)
+	mergeOptional(input.LoadCapacityKG, &result.LoadCapacityKG)
+	mergeOptional(input.AccountName, &result.AccountName)
+	mergeOptional(input.BankName, &result.BankName)
+	mergeOptional(input.BankBranch, &result.BankBranch)
+	mergeOptional(input.AccountNumber, &result.AccountNumber)
+	mergeOptional(input.ParentID, &result.ParentID)
+	return result
+}
+
+// validateDetail remains the focused validation entry point used by unit tests
+// and callers that do not need save-time merge semantics.
+func validateDetail(entity string, input DetailInput) (DetailView, error) {
+	if err := validateDetailInputFields(entity, input); err != nil {
+		return DetailView{}, err
+	}
+	current := DetailView{}
+	if entity == EntitySupplier {
+		current.SupplierType = SupplierTypeGeneral
+	}
+	if entity == EntityCustomer {
+		current.CustomerType = CustomerTypeEndUser
+	}
+	return validateDetailData(entity, mergeDetailInput(current, input))
+}
+
+func validateDetailInputFields(entity string, input DetailInput) error {
+	allowed := map[string]bool{}
+	allow := func(fields ...string) {
+		for _, field := range fields {
+			allowed[field] = true
+		}
 	}
 	switch entity {
-	case EntityProduct, EntityService:
-		if !runeLengthBetween(input.Unit, 1, 32) || hasLogisticsFields(input) || input.Currency != "" {
-			return DetailInput{}, domainError(ErrorValidation, "invalid unit or unexpected fields", nil, nil)
-		}
-	case EntityFundAccount:
-		if input.Unit != "" || !currencyPattern.MatchString(input.Currency) || hasLogisticsFields(input) {
-			return DetailInput{}, domainError(ErrorValidation, "invalid currency or unexpected fields", nil, nil)
-		}
+	case EntityCustomer:
+		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
 	case EntitySupplier:
-		if input.Unit != "" || input.Currency != "" || input.PlateNumber != "" ||
-			input.VehicleType != "" || input.PlatformObjectID != "" ||
-			(input.SupplierType != nil && !validSupplierType(*input.SupplierType)) {
-			return DetailInput{}, domainError(ErrorValidation, "invalid supplier type or unexpected fields", nil, nil)
-		}
+		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+	case EntityEmployee:
+		allow("categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark")
+	case EntityProduct:
+		allow("categoryId", "specification", "model", "barcode", "remark")
+	case EntityService:
+		allow("categoryId", "description", "remark")
+	case EntityWarehouse:
+		allow("categoryId", "address", "contactName", "contactPhone", "managerEmployeeId", "remark")
 	case EntityVehicle:
-		if input.Unit != "" || input.Currency != "" || input.SupplierType != nil ||
-			!runeLengthBetween(input.PlateNumber, 1, 32) ||
-			!runeLengthBetween(input.VehicleType, 1, 64) ||
-			!validID(input.PlatformObjectID) {
-			return DetailInput{}, domainError(ErrorValidation, "invalid vehicle fields", nil, nil)
-		}
-	case EntityCustomer, EntityEmployee, EntityWarehouse:
-		if input.Unit != "" || input.Currency != "" || hasLogisticsFields(input) {
-			return DetailInput{}, domainError(ErrorValidation, "unexpected entity fields", nil, nil)
-		}
+		allow("categoryId", "vin", "engineNumber", "loadCapacityKg", "remark")
+	case EntityFundAccount:
+		allow("categoryId", "accountName", "bankName", "bankBranch", "accountNumber", "remark")
+	case EntityCategory:
+		allow("parentId", "description")
+	case EntityDepartment:
+		allow("categoryId", "parentId", "description")
+	case EntityPosition:
+		allow("categoryId", "description")
 	default:
-		return DetailInput{}, domainError(ErrorValidation, "invalid entity", nil, nil)
+		return domainError(ErrorValidation, "invalid entity", nil, nil)
+	}
+	provided := map[string]bool{
+		"shortName": input.ShortName.Set, "categoryId": input.CategoryID.Set,
+		"taxNumber": input.TaxNumber.Set, "contactName": input.ContactName.Set,
+		"contactPhone": input.ContactPhone.Set, "email": input.Email.Set,
+		"address": input.Address.Set, "remark": input.Remark.Set,
+		"departmentId": input.DepartmentID.Set, "positionId": input.PositionID.Set,
+		"phone": input.Phone.Set, "hireDate": input.HireDate.Set,
+		"specification": input.Specification.Set, "model": input.Model.Set,
+		"barcode": input.Barcode.Set, "description": input.Description.Set,
+		"managerEmployeeId": input.ManagerEmployeeID.Set, "vin": input.VIN.Set,
+		"engineNumber": input.EngineNumber.Set, "loadCapacityKg": input.LoadCapacityKG.Set,
+		"accountName": input.AccountName.Set, "bankName": input.BankName.Set,
+		"bankBranch": input.BankBranch.Set, "accountNumber": input.AccountNumber.Set,
+		"parentId": input.ParentID.Set,
+	}
+	for field, present := range provided {
+		if present && !allowed[field] {
+			return domainError(ErrorValidation, fmt.Sprintf("unexpected field %s", field), nil, nil)
+		}
+	}
+	return nil
+}
+
+func validateDetailData(entity string, input DetailView) (DetailView, error) {
+	if !validEntity(entity) {
+		return DetailView{}, domainError(ErrorValidation, "invalid entity", nil, nil)
+	}
+	normalizeDetail(&input)
+	if !runeLengthBetween(input.Name, 1, 200) {
+		return DetailView{}, domainError(ErrorValidation, "invalid name", nil, nil)
+	}
+	if err := validateLengthsAndFormats(input); err != nil {
+		return DetailView{}, err
+	}
+	if err := validateEntityFields(entity, input); err != nil {
+		return DetailView{}, err
 	}
 	return input, nil
 }
 
-func hasLogisticsFields(input DetailInput) bool {
-	return input.SupplierType != nil || input.PlateNumber != "" ||
-		input.VehicleType != "" || input.PlatformObjectID != ""
+func normalizeDetail(input *DetailView) {
+	trim := func(value *string) { *value = strings.TrimSpace(*value) }
+	for _, value := range []*string{
+		&input.Name, &input.Unit, &input.ShortName, &input.ContactName, &input.ContactPhone,
+		&input.Email, &input.Address, &input.Remark, &input.Phone, &input.HireDate,
+		&input.Specification, &input.Model, &input.Description, &input.EngineNumber,
+		&input.LoadCapacityKG, &input.AccountName, &input.BankName, &input.BankBranch,
+		&input.VehicleType,
+	} {
+		trim(value)
+	}
+	for _, value := range []*string{
+		&input.Currency, &input.SupplierType, &input.CustomerType, &input.PlateNumber,
+		&input.TaxNumber, &input.Barcode, &input.VIN,
+	} {
+		*value = strings.ToUpper(strings.TrimSpace(*value))
+	}
+	for _, value := range []*string{
+		&input.PlatformObjectID, &input.CategoryID, &input.DepartmentID, &input.PositionID,
+		&input.ManagerEmployeeID, &input.ParentID,
+	} {
+		trim(value)
+	}
+	input.Email = strings.ToLower(input.Email)
+	input.TargetEntity = strings.ToLower(strings.TrimSpace(input.TargetEntity))
+	input.AccountNumber = normalizeAccountNumber(input.AccountNumber)
+	if input.LoadCapacityKG != "" {
+		input.LoadCapacityKG = normalizeLoadCapacity(input.LoadCapacityKG)
+	}
+}
+
+func validateLengthsAndFormats(input DetailView) error {
+	checks := []struct {
+		value string
+		max   int
+	}{
+		{input.Unit, 32}, {input.ShortName, 100}, {input.ContactName, 100},
+		{input.ContactPhone, 32}, {input.Email, 254}, {input.Address, 500},
+		{input.Remark, 1000}, {input.Phone, 32}, {input.Specification, 200},
+		{input.Model, 200}, {input.Description, 1000}, {input.EngineNumber, 64},
+		{input.AccountName, 200}, {input.BankName, 200}, {input.BankBranch, 200},
+		{input.VehicleType, 64},
+	}
+	for _, check := range checks {
+		if check.value != "" && !runeLengthBetween(check.value, 1, check.max) {
+			return domainError(ErrorValidation, "field is too long", nil, nil)
+		}
+	}
+	if input.ContactPhone != "" && !phonePattern.MatchString(input.ContactPhone) {
+		return domainError(ErrorValidation, "invalid contact phone", nil, nil)
+	}
+	if input.Phone != "" && !phonePattern.MatchString(input.Phone) {
+		return domainError(ErrorValidation, "invalid phone", nil, nil)
+	}
+	if input.Email != "" && (!strings.Contains(input.Email, "@") || strings.HasPrefix(input.Email, "@") ||
+		strings.HasSuffix(input.Email, "@") || strings.Count(input.Email, "@") != 1) {
+		return domainError(ErrorValidation, "invalid email", nil, nil)
+	}
+	if input.TaxNumber != "" && (len(input.TaxNumber) > 50 || !taxNumberPattern.MatchString(input.TaxNumber)) {
+		return domainError(ErrorValidation, "invalid tax number", nil, nil)
+	}
+	if input.Barcode != "" && (len(input.Barcode) > 64 || !barcodePattern.MatchString(input.Barcode)) {
+		return domainError(ErrorValidation, "invalid barcode", nil, nil)
+	}
+	if input.VIN != "" && !vinPattern.MatchString(input.VIN) {
+		return domainError(ErrorValidation, "invalid vin", nil, nil)
+	}
+	if input.AccountNumber != "" && !accountNumberPattern.MatchString(input.AccountNumber) {
+		return domainError(ErrorValidation, "invalid account number", nil, nil)
+	}
+	if input.HireDate != "" {
+		parsed, err := time.Parse("2006-01-02", input.HireDate)
+		if err != nil || parsed.Format("2006-01-02") != input.HireDate {
+			return domainError(ErrorValidation, "invalid hire date", nil, nil)
+		}
+	}
+	if input.LoadCapacityKG != "" &&
+		(!loadCapacityPattern.MatchString(input.LoadCapacityKG) || input.LoadCapacityKG == "0.000") {
+		return domainError(ErrorValidation, "invalid load capacity", nil, nil)
+	}
+	return nil
+}
+
+func validateEntityFields(entity string, input DetailView) error {
+	allowed := map[string]bool{"name": true}
+	allow := func(fields ...string) {
+		for _, field := range fields {
+			allowed[field] = true
+		}
+	}
+	switch entity {
+	case EntityCustomer:
+		allow("customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+		if !validCustomerType(input.CustomerType) {
+			return domainError(ErrorValidation, "invalid customer type", nil, nil)
+		}
+	case EntitySupplier:
+		allow("supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+		if !validSupplierType(input.SupplierType) {
+			return domainError(ErrorValidation, "invalid supplier type", nil, nil)
+		}
+	case EntityEmployee:
+		allow("categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark")
+	case EntityProduct:
+		allow("unit", "categoryId", "specification", "model", "barcode", "remark")
+		if !runeLengthBetween(input.Unit, 1, 32) {
+			return domainError(ErrorValidation, "invalid unit", nil, nil)
+		}
+	case EntityService:
+		allow("unit", "categoryId", "description", "remark")
+		if !runeLengthBetween(input.Unit, 1, 32) {
+			return domainError(ErrorValidation, "invalid unit", nil, nil)
+		}
+	case EntityWarehouse:
+		allow("categoryId", "address", "contactName", "contactPhone", "managerEmployeeId", "remark")
+	case EntityVehicle:
+		allow("categoryId", "plateNumber", "vehicleType", "platformObjectId", "vin", "engineNumber", "loadCapacityKg", "remark")
+		if !runeLengthBetween(input.PlateNumber, 1, 32) ||
+			!runeLengthBetween(input.VehicleType, 1, 64) ||
+			!validID(input.PlatformObjectID) {
+			return domainError(ErrorValidation, "invalid vehicle fields", nil, nil)
+		}
+	case EntityFundAccount:
+		allow("categoryId", "currency", "accountName", "bankName", "bankBranch", "accountNumber", "remark")
+		if !currencyPattern.MatchString(input.Currency) {
+			return domainError(ErrorValidation, "invalid currency", nil, nil)
+		}
+	case EntityCategory:
+		allow("targetEntity", "parentId", "description")
+		if !validCategoryTarget(input.TargetEntity) {
+			return domainError(ErrorValidation, "invalid category target", nil, nil)
+		}
+	case EntityDepartment:
+		allow("categoryId", "parentId", "description")
+	case EntityPosition:
+		allow("categoryId", "description")
+	default:
+		return domainError(ErrorValidation, "invalid entity", nil, nil)
+	}
+	values := detailFieldValues(input)
+	for field, value := range values {
+		if value != "" && !allowed[field] {
+			return domainError(ErrorValidation, fmt.Sprintf("unexpected field %s", field), nil, nil)
+		}
+	}
+	for _, id := range []string{
+		input.CategoryID, input.DepartmentID, input.PositionID, input.ManagerEmployeeID, input.ParentID,
+	} {
+		if id != "" && !validID(id) {
+			return domainError(ErrorValidation, "invalid reference id", nil, nil)
+		}
+	}
+	return nil
+}
+
+func detailFieldValues(input DetailView) map[string]string {
+	return map[string]string{
+		"unit": input.Unit, "currency": input.Currency, "supplierType": input.SupplierType,
+		"customerType": input.CustomerType, "plateNumber": input.PlateNumber,
+		"vehicleType": input.VehicleType, "platformObjectId": input.PlatformObjectID,
+		"targetEntity": input.TargetEntity, "shortName": input.ShortName, "categoryId": input.CategoryID,
+		"taxNumber": input.TaxNumber, "contactName": input.ContactName, "contactPhone": input.ContactPhone,
+		"email": input.Email, "address": input.Address, "remark": input.Remark,
+		"departmentId": input.DepartmentID, "positionId": input.PositionID, "phone": input.Phone,
+		"hireDate": input.HireDate, "specification": input.Specification, "model": input.Model,
+		"barcode": input.Barcode, "description": input.Description,
+		"managerEmployeeId": input.ManagerEmployeeID, "vin": input.VIN,
+		"engineNumber": input.EngineNumber, "loadCapacityKg": input.LoadCapacityKG,
+		"accountName": input.AccountName, "bankName": input.BankName, "bankBranch": input.BankBranch,
+		"accountNumber": input.AccountNumber, "parentId": input.ParentID,
+	}
+}
+
+func normalizeAccountNumber(value string) string {
+	return strings.ToUpper(strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || r == '-' {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(value)))
+}
+
+func normalizeLoadCapacity(value string) string {
+	value = strings.TrimSpace(value)
+	match := loadCapacityPattern.FindStringSubmatch(value)
+	if match == nil {
+		return value
+	}
+	integer := strings.TrimLeft(match[1], "0")
+	if integer == "" {
+		integer = "0"
+	}
+	fraction := match[2]
+	for len(fraction) < 3 {
+		fraction += "0"
+	}
+	return integer + "." + fraction
 }
 
 func validSupplierType(value string) bool {
 	return slices.Contains([]string{SupplierTypeGeneral, SupplierTypeLogisticsPlatform}, value)
+}
+
+func validCustomerType(value string) bool {
+	return slices.Contains([]string{CustomerTypeEndUser, CustomerTypeDealer}, value)
+}
+
+func validCategoryTarget(value string) bool {
+	return value != EntityCategory && slices.Contains(entities[:], value)
+}
+
+func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, error) {
+	input.Keyword = strings.TrimSpace(input.Keyword)
+	input.CustomerType = strings.ToUpper(strings.TrimSpace(input.CustomerType))
+	input.SupplierType = strings.ToUpper(strings.TrimSpace(input.SupplierType))
+	input.Currency = strings.ToUpper(strings.TrimSpace(input.Currency))
+	input.TargetEntity = strings.ToLower(strings.TrimSpace(input.TargetEntity))
+	input.CategoryID = strings.TrimSpace(input.CategoryID)
+	input.DepartmentID = strings.TrimSpace(input.DepartmentID)
+	input.PositionID = strings.TrimSpace(input.PositionID)
+	input.ParentID = strings.TrimSpace(input.ParentID)
+	if utf8.RuneCountInString(input.Keyword) > 128 || len(input.Status) > 5 ||
+		(input.CustomerType != "" && !validCustomerType(input.CustomerType)) ||
+		(input.SupplierType != "" && !validSupplierType(input.SupplierType)) ||
+		(input.Currency != "" && !currencyPattern.MatchString(input.Currency)) ||
+		(input.TargetEntity != "" && !validCategoryTarget(input.TargetEntity)) ||
+		(input.ParentID != "" && input.RootOnly) {
+		return QueryFilters{}, domainError(ErrorValidation, "invalid query filters", nil, nil)
+	}
+	for _, id := range []string{input.CategoryID, input.DepartmentID, input.PositionID, input.ParentID} {
+		if id != "" && !validID(id) {
+			return QueryFilters{}, domainError(ErrorValidation, "invalid query reference filter", nil, nil)
+		}
+	}
+	hasUnexpected := func(allowed ...string) bool {
+		accepted := make(map[string]bool, len(allowed))
+		for _, field := range allowed {
+			accepted[field] = true
+		}
+		values := map[string]bool{
+			"customerType": input.CustomerType != "" || input.provided["customerType"],
+			"supplierType": input.SupplierType != "" || input.provided["supplierType"],
+			"categoryId":   input.CategoryID != "" || input.provided["categoryId"],
+			"departmentId": input.DepartmentID != "" || input.provided["departmentId"],
+			"positionId":   input.PositionID != "" || input.provided["positionId"],
+			"currency":     input.Currency != "" || input.provided["currency"],
+			"targetEntity": input.TargetEntity != "" || input.provided["targetEntity"],
+			"parentId":     input.ParentID != "" || input.provided["parentId"],
+			"rootOnly":     input.RootOnly || input.provided["rootOnly"],
+		}
+		for field, present := range values {
+			if present && !accepted[field] {
+				return true
+			}
+		}
+		return false
+	}
+	var unexpected bool
+	switch entity {
+	case EntityCustomer:
+		unexpected = hasUnexpected("customerType", "categoryId")
+	case EntitySupplier:
+		unexpected = hasUnexpected("supplierType", "categoryId")
+	case EntityEmployee:
+		unexpected = hasUnexpected("categoryId", "departmentId", "positionId")
+	case EntityProduct, EntityService, EntityWarehouse, EntityVehicle:
+		unexpected = hasUnexpected("categoryId")
+	case EntityFundAccount:
+		unexpected = hasUnexpected("categoryId", "currency")
+	case EntityCategory:
+		unexpected = hasUnexpected("targetEntity", "parentId", "rootOnly")
+	case EntityDepartment:
+		unexpected = hasUnexpected("categoryId", "parentId", "rootOnly")
+	case EntityPosition:
+		unexpected = hasUnexpected("categoryId")
+	default:
+		unexpected = true
+	}
+	if unexpected {
+		return QueryFilters{}, domainError(ErrorValidation, "query filters do not match entity", nil, nil)
+	}
+	return input, nil
 }
 
 func validWriteInput(entity, objectID, versionID string, revision int64, actorID, requestID string) bool {
@@ -179,7 +567,7 @@ func requiredComment(value *string) (*string, error) {
 		return nil, err
 	}
 	if comment == nil {
-		return nil, domainError(ErrorValidation, "rejection comment is required", nil, nil)
+		return nil, domainError(ErrorValidation, "comment is required", nil, nil)
 	}
 	return comment, nil
 }

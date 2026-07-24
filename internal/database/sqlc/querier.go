@@ -20,9 +20,12 @@ type Querier interface {
 	ClearVouPurchaseOrderExecution(ctx context.Context, documentID string) (int64, error)
 	ClearVouSaleOrderExecution(ctx context.Context, documentID string) (int64, error)
 	ConsumeVouDownloadToken(ctx context.Context, tokenHash string) (ConsumeVouDownloadTokenRow, error)
+	CopyBobCategoryDetail(ctx context.Context, arg CopyBobCategoryDetailParams) error
 	CopyBobCustomerDetail(ctx context.Context, arg CopyBobCustomerDetailParams) error
+	CopyBobDepartmentDetail(ctx context.Context, arg CopyBobDepartmentDetailParams) error
 	CopyBobEmployeeDetail(ctx context.Context, arg CopyBobEmployeeDetailParams) error
 	CopyBobFundAccountDetail(ctx context.Context, arg CopyBobFundAccountDetailParams) error
+	CopyBobPositionDetail(ctx context.Context, arg CopyBobPositionDetailParams) error
 	CopyBobProductDetail(ctx context.Context, arg CopyBobProductDetailParams) error
 	CopyBobServiceDetail(ctx context.Context, arg CopyBobServiceDetailParams) error
 	CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplierDetailParams) error
@@ -51,11 +54,14 @@ type Querier interface {
 	DeleteAppRolePermissions(ctx context.Context, roleID string) error
 	DeleteAppUserRoles(ctx context.Context, userID string) error
 	DeleteBobAuditEventsForDraft(ctx context.Context, arg DeleteBobAuditEventsForDraftParams) (int64, error)
+	DeleteBobCategoryDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobCustomerDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobDepartmentDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobEmployeeDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobFirstVersion(ctx context.Context, arg DeleteBobFirstVersionParams) (int64, error)
 	DeleteBobFundAccountDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobObject(ctx context.Context, arg DeleteBobObjectParams) (int64, error)
+	DeleteBobPositionDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobProductDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobServiceDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobSupplierDetail(ctx context.Context, versionID string) (int64, error)
@@ -93,10 +99,13 @@ type Querier interface {
 	InsertAppUser(ctx context.Context, arg InsertAppUserParams) error
 	InsertAppUserRole(ctx context.Context, arg InsertAppUserRoleParams) error
 	InsertBobAuditEvent(ctx context.Context, arg InsertBobAuditEventParams) error
+	InsertBobCategoryDetail(ctx context.Context, arg InsertBobCategoryDetailParams) error
 	InsertBobCustomerDetail(ctx context.Context, arg InsertBobCustomerDetailParams) error
+	InsertBobDepartmentDetail(ctx context.Context, arg InsertBobDepartmentDetailParams) error
 	InsertBobEmployeeDetail(ctx context.Context, arg InsertBobEmployeeDetailParams) error
 	InsertBobFundAccountDetail(ctx context.Context, arg InsertBobFundAccountDetailParams) error
 	InsertBobObject(ctx context.Context, arg InsertBobObjectParams) error
+	InsertBobPositionDetail(ctx context.Context, arg InsertBobPositionDetailParams) error
 	InsertBobProductDetail(ctx context.Context, arg InsertBobProductDetailParams) error
 	InsertBobServiceDetail(ctx context.Context, arg InsertBobServiceDetailParams) error
 	InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error
@@ -135,6 +144,8 @@ type Querier interface {
 	ListVouProductLines(ctx context.Context, documentID string) ([]VouProductLine, error)
 	LockBobObject(ctx context.Context, arg LockBobObjectParams) (LockBobObjectRow, error)
 	LockBobVersion(ctx context.Context, arg LockBobVersionParams) (LockBobVersionRow, error)
+	LockEffectiveBobReference(ctx context.Context, arg LockEffectiveBobReferenceParams) (string, error)
+	LockEffectiveCategoryReference(ctx context.Context, targetCategoryID string) (string, error)
 	LockEffectiveLogisticsPlatform(ctx context.Context, platformObjectID string) (string, error)
 	LockExpiredPendingVouFile(ctx context.Context, id string) (string, error)
 	LockPendingVouUpload(ctx context.Context, uploadTokenHash string) (LockPendingVouUploadRow, error)
@@ -147,7 +158,7 @@ type Querier interface {
 	RecordSigninFailure(ctx context.Context, arg RecordSigninFailureParams) (AppUser, error)
 	RejectBobVersion(ctx context.Context, arg RejectBobVersionParams) (int64, error)
 	ResetSigninFailures(ctx context.Context, id string) error
-	ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (ResolveBobEffectiveReferenceRow, error)
+	ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (BobVersionView, error)
 	ReviewVouDocument(ctx context.Context, arg ReviewVouDocumentParams) (int64, error)
 	RevokeAppSession(ctx context.Context, arg RevokeAppSessionParams) error
 	RevokeAppUserSessions(ctx context.Context, arg RevokeAppUserSessionsParams) error
@@ -170,9 +181,12 @@ type Querier interface {
 	UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (int64, error)
 	UpdateAppUser(ctx context.Context, arg UpdateAppUserParams) (int64, error)
 	UpdateAppUserPassword(ctx context.Context, arg UpdateAppUserPasswordParams) (int64, error)
+	UpdateBobCategoryDetail(ctx context.Context, arg UpdateBobCategoryDetailParams) (int64, error)
 	UpdateBobCustomerDetail(ctx context.Context, arg UpdateBobCustomerDetailParams) (int64, error)
+	UpdateBobDepartmentDetail(ctx context.Context, arg UpdateBobDepartmentDetailParams) (int64, error)
 	UpdateBobEmployeeDetail(ctx context.Context, arg UpdateBobEmployeeDetailParams) (int64, error)
 	UpdateBobFundAccountDetail(ctx context.Context, arg UpdateBobFundAccountDetailParams) (int64, error)
+	UpdateBobPositionDetail(ctx context.Context, arg UpdateBobPositionDetailParams) (int64, error)
 	UpdateBobProductDetail(ctx context.Context, arg UpdateBobProductDetailParams) (int64, error)
 	UpdateBobServiceDetail(ctx context.Context, arg UpdateBobServiceDetailParams) (int64, error)
 	UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error)

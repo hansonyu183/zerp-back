@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	dbsqlc "github.com/hansonyu183/zerp-back/internal/database/sqlc"
 	"github.com/jackc/pgx/v5"
@@ -27,11 +26,11 @@ func (s *Service) Query(ctx context.Context, entity string, input QueryInput) (P
 	if !validEntity(entity) || !validPage {
 		return Page[QueryItem]{}, domainError(ErrorValidation, "invalid query", nil, nil)
 	}
-	input.Filters.Keyword = strings.TrimSpace(input.Filters.Keyword)
-	if utf8.RuneCountInString(input.Filters.Keyword) > 128 || len(input.Filters.Status) > 5 {
-		return Page[QueryItem]{}, domainError(ErrorValidation, "invalid query filters", nil, nil)
+	filters, err := validateQueryFilters(entity, input.Filters)
+	if err != nil {
+		return Page[QueryItem]{}, err
 	}
-	statuses := uniqueStrings(input.Filters.Status)
+	statuses := uniqueStrings(filters.Status)
 	for _, status := range statuses {
 		if !validStatus(status) {
 			return Page[QueryItem]{}, domainError(ErrorValidation, "invalid status filter", nil, nil)
@@ -51,13 +50,23 @@ func (s *Service) Query(ctx context.Context, entity string, input QueryInput) (P
 	if statuses == nil {
 		statuses = []string{}
 	}
-	countParams := dbsqlc.CountBobObjectsParams{Entity: entity, Statuses: statuses, Keyword: input.Filters.Keyword}
+	countParams := dbsqlc.CountBobObjectsParams{
+		Entity: entity, Statuses: statuses, Keyword: filters.Keyword,
+		CustomerType: filters.CustomerType, SupplierType: filters.SupplierType,
+		CategoryID: filters.CategoryID, DepartmentID: filters.DepartmentID,
+		PositionID: filters.PositionID, Currency: filters.Currency,
+		TargetEntity: filters.TargetEntity, ParentID: filters.ParentID, RootOnly: filters.RootOnly,
+	}
 	total, err := s.queries.CountBobObjects(ctx, countParams)
 	if err != nil {
 		return Page[QueryItem]{}, s.internal("count objects", err)
 	}
 	rows, err := s.queries.ListBobObjects(ctx, dbsqlc.ListBobObjectsParams{
-		Entity: entity, Statuses: statuses, Keyword: input.Filters.Keyword, SortField: sortField, SortOrder: sortOrder,
+		Entity: entity, Statuses: statuses, Keyword: filters.Keyword, SortField: sortField, SortOrder: sortOrder,
+		CustomerType: filters.CustomerType, SupplierType: filters.SupplierType,
+		CategoryID: filters.CategoryID, DepartmentID: filters.DepartmentID,
+		PositionID: filters.PositionID, Currency: filters.Currency,
+		TargetEntity: filters.TargetEntity, ParentID: filters.ParentID, RootOnly: filters.RootOnly,
 		PageOffset: offset, PageSize: int32(input.PageSize),
 	})
 	if err != nil {
@@ -98,10 +107,8 @@ func (s *Service) Create(ctx context.Context, entity string, input CreateInput, 
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 	qtx := s.queries.WithTx(tx)
-	if entity == EntityVehicle {
-		if err = s.validatePlatformReference(ctx, qtx, data.PlatformObjectID); err != nil {
-			return MutationResult{}, err
-		}
+	if err = s.validateDetailReferences(ctx, qtx, entity, objectID, data); err != nil {
+		return MutationResult{}, err
 	}
 	if err = qtx.InsertBobObject(ctx, dbsqlc.InsertBobObjectParams{
 		ID: objectID, Entity: entity, Code: code, CurrentVersionID: versionID, ActorID: actorID,
@@ -129,8 +136,10 @@ func (s *Service) Create(ctx context.Context, entity string, input CreateInput, 
 }
 
 func (s *Service) Save(ctx context.Context, entity string, input SaveInput, actorID, requestID string) (MutationResult, error) {
-	data, err := validateDetail(entity, input.Data)
-	if err != nil || !validWriteInput(entity, input.ObjectID, input.VersionID, input.Revision, actorID, requestID) {
+	if !validWriteInput(entity, input.ObjectID, input.VersionID, input.Revision, actorID, requestID) {
+		return MutationResult{}, domainError(ErrorValidation, "invalid save request", nil, nil)
+	}
+	if err := validateDetailInputFields(entity, input.Data); err != nil {
 		return MutationResult{}, domainError(ErrorValidation, "invalid save request", nil, err)
 	}
 	tx, qtx, object, version, err := s.lockTarget(ctx, entity, input.ObjectID, input.VersionID)
@@ -142,20 +151,30 @@ func (s *Service) Save(ctx context.Context, entity string, input SaveInput, acto
 		!slices.Contains([]string{StatusDraft, StatusRejected}, version.Status) {
 		return MutationResult{}, conflict(object, version, "version changed before save")
 	}
-	if entity == EntitySupplier && data.SupplierType == nil {
-		row, readErr := qtx.GetBobVersionView(ctx, dbsqlc.GetBobVersionViewParams{
-			ObjectID: input.ObjectID, Entity: entity, VersionID: input.VersionID,
-		})
-		if readErr != nil {
-			return MutationResult{}, s.internal("read supplier type", readErr)
-		}
-		currentType := deref(row.SupplierType)
-		data.SupplierType = &currentType
+	row, readErr := qtx.GetBobVersionView(ctx, dbsqlc.GetBobVersionViewParams{
+		ObjectID: input.ObjectID, Entity: entity, VersionID: input.VersionID,
+	})
+	if readErr != nil {
+		return MutationResult{}, s.internal("read current detail", readErr)
 	}
-	if entity == EntityVehicle {
-		if err = s.validatePlatformReference(ctx, qtx, data.PlatformObjectID); err != nil {
-			return MutationResult{}, err
+	current := detailView(row)
+	data, err := validateDetailData(entity, mergeDetailInput(current, input.Data))
+	if err != nil {
+		return MutationResult{}, domainError(ErrorValidation, "invalid save request", nil, err)
+	}
+	if entity == EntityCategory && data.TargetEntity != current.TargetEntity {
+		referenced, referenceErr := qtx.BobObjectHasExternalReferences(ctx, dbsqlc.BobObjectHasExternalReferencesParams{
+			TargetObjectID: input.ObjectID, TargetVersionID: input.VersionID,
+		})
+		if referenceErr != nil {
+			return MutationResult{}, s.internal("check category target references", referenceErr)
 		}
+		if referenced {
+			return MutationResult{}, domainError(ErrorConflict, "referenced category target cannot change", nil, nil)
+		}
+	}
+	if err = s.validateDetailReferences(ctx, qtx, entity, input.ObjectID, data); err != nil {
+		return MutationResult{}, err
 	}
 	if err = updateDetail(ctx, qtx, entity, input.VersionID, data); err != nil {
 		return MutationResult{}, s.writeError("update detail", err)
@@ -580,11 +599,7 @@ func (s *Service) ResolveEffectiveReference(ctx context.Context, tx pgx.Tx, enti
 	}
 	return EffectiveReference{
 		ObjectID: row.ObjectID, Entity: row.Entity, Code: row.Code, VersionID: row.VersionID,
-		Data: DetailView{
-			Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
-			SupplierType: deref(row.SupplierType), PlateNumber: deref(row.PlateNumber),
-			VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
-		},
+		Data: effectiveReferenceDetail(row),
 	}, nil
 }
 
@@ -622,16 +637,91 @@ func (s *Service) validateStoredDetail(ctx context.Context, q *dbsqlc.Queries, e
 	if err != nil {
 		return s.internal("read stored detail", err)
 	}
-	_, err = validateDetail(entity, DetailInput{
-		Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
-		SupplierType: row.SupplierType, PlateNumber: deref(row.PlateNumber),
-		VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
-	})
+	data, err := validateDetailData(entity, detailView(row))
 	if err != nil {
 		return err
 	}
+	return s.validateDetailReferences(ctx, q, entity, objectID, data)
+}
+
+func effectiveReferenceDetail(row dbsqlc.BobVersionView) DetailView {
+	data := detailView(row)
+	data.AccountNumber = ""
+	return data
+}
+
+func (s *Service) validateDetailReferences(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	entity string,
+	objectID string,
+	data DetailView,
+) error {
 	if entity == EntityVehicle {
-		return s.validatePlatformReference(ctx, q, deref(row.PlatformObjectID))
+		if err := s.validatePlatformReference(ctx, q, data.PlatformObjectID); err != nil {
+			return err
+		}
+	}
+	if data.CategoryID != "" {
+		target, err := q.LockEffectiveCategoryReference(ctx, data.CategoryID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domainError(ErrorConflict, "category is not currently effective", nil, nil)
+		}
+		if err != nil {
+			return s.internal("lock category reference", err)
+		}
+		if target != entity {
+			return domainError(ErrorConflict, "category does not match entity", nil, nil)
+		}
+	}
+	type reference struct {
+		entity string
+		id     string
+	}
+	references := make([]reference, 0, 4)
+	add := func(targetEntity, id string) {
+		if id != "" {
+			references = append(references, reference{entity: targetEntity, id: id})
+		}
+	}
+	add(EntityDepartment, data.DepartmentID)
+	add(EntityPosition, data.PositionID)
+	add(EntityEmployee, data.ManagerEmployeeID)
+	if entity == EntityDepartment {
+		add(EntityDepartment, data.ParentID)
+	}
+	slices.SortFunc(references, func(left, right reference) int {
+		if compared := strings.Compare(left.id, right.id); compared != 0 {
+			return compared
+		}
+		return strings.Compare(left.entity, right.entity)
+	})
+	for _, target := range references {
+		if target.id == objectID {
+			return domainError(ErrorValidation, "object cannot reference itself", nil, nil)
+		}
+		if _, err := q.LockEffectiveBobReference(ctx, dbsqlc.LockEffectiveBobReferenceParams{
+			ObjectID: target.id, Entity: target.entity,
+		}); errors.Is(err, pgx.ErrNoRows) {
+			return domainError(ErrorConflict, target.entity+" reference is not currently effective", nil, nil)
+		} else if err != nil {
+			return s.internal("lock "+target.entity+" reference", err)
+		}
+	}
+	if entity == EntityCategory && data.ParentID != "" {
+		if data.ParentID == objectID {
+			return domainError(ErrorValidation, "category cannot reference itself", nil, nil)
+		}
+		target, err := q.LockEffectiveCategoryReference(ctx, data.ParentID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domainError(ErrorConflict, "category parent is not currently effective", nil, nil)
+		}
+		if err != nil {
+			return s.internal("lock category parent", err)
+		}
+		if target != data.TargetEntity {
+			return domainError(ErrorConflict, "category parent target does not match", nil, nil)
+		}
 	}
 	return nil
 }

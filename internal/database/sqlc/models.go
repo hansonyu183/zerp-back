@@ -224,3 +224,219 @@ type BobWarehouseVersion struct {
 	Entity    string `db:"entity" json:"entity"`
 	Name      string `db:"name" json:"name"`
 }
+
+type VouAuditEvent struct {
+	ID         string             `db:"id" json:"id"`
+	DocumentID string             `db:"document_id" json:"document_id"`
+	Entity     string             `db:"entity" json:"entity"`
+	EventType  string             `db:"event_type" json:"event_type"`
+	FromStatus *string            `db:"from_status" json:"from_status"`
+	ToStatus   string             `db:"to_status" json:"to_status"`
+	ActorID    string             `db:"actor_id" json:"actor_id"`
+	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	Reason     *string            `db:"reason" json:"reason"`
+	RequestID  string             `db:"request_id" json:"request_id"`
+	Summary    []byte             `db:"summary" json:"summary"`
+}
+
+type VouDocument struct {
+	ID               string             `db:"id" json:"id"`
+	Entity           string             `db:"entity" json:"entity"`
+	DocumentNo       string             `db:"document_no" json:"document_no"`
+	Status           string             `db:"status" json:"status"`
+	Revision         int64              `db:"revision" json:"revision"`
+	BusinessDate     pgtype.Date        `db:"business_date" json:"business_date"`
+	Currency         string             `db:"currency" json:"currency"`
+	TotalAmountCents int64              `db:"total_amount_cents" json:"total_amount_cents"`
+	Remark           *string            `db:"remark" json:"remark"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy        string             `db:"created_by" json:"created_by"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy        string             `db:"updated_by" json:"updated_by"`
+	ReviewedAt       pgtype.Timestamptz `db:"reviewed_at" json:"reviewed_at"`
+	ReviewedBy       *string            `db:"reviewed_by" json:"reviewed_by"`
+	ApprovedAt       pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ApprovedBy       *string            `db:"approved_by" json:"approved_by"`
+	ExecutedAt       pgtype.Timestamptz `db:"executed_at" json:"executed_at"`
+	ExecutedBy       *string            `db:"executed_by" json:"executed_by"`
+}
+
+type VouDocumentAttachment struct {
+	DocumentID string             `db:"document_id" json:"document_id"`
+	FileID     string             `db:"file_id" json:"file_id"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy  string             `db:"created_by" json:"created_by"`
+}
+
+type VouDownloadToken struct {
+	TokenHash string             `db:"token_hash" json:"token_hash"`
+	FileID    string             `db:"file_id" json:"file_id"`
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy string             `db:"created_by" json:"created_by"`
+}
+
+type VouExpenseLine struct {
+	ID             string `db:"id" json:"id"`
+	DocumentID     string `db:"document_id" json:"document_id"`
+	DocumentEntity string `db:"document_entity" json:"document_entity"`
+	LineNo         int32  `db:"line_no" json:"line_no"`
+	Category       string `db:"category" json:"category"`
+	Description    string `db:"description" json:"description"`
+	AmountCents    int64  `db:"amount_cents" json:"amount_cents"`
+}
+
+type VouExpenseReimbursementDetail struct {
+	DocumentID           string `db:"document_id" json:"document_id"`
+	Entity               string `db:"entity" json:"entity"`
+	EmployeeObjectID     string `db:"employee_object_id" json:"employee_object_id"`
+	EmployeeVersionID    string `db:"employee_version_id" json:"employee_version_id"`
+	EmployeeCode         string `db:"employee_code" json:"employee_code"`
+	EmployeeName         string `db:"employee_name" json:"employee_name"`
+	FundAccountObjectID  string `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID string `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode      string `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName      string `db:"fund_account_name" json:"fund_account_name"`
+}
+
+type VouFile struct {
+	ID              string             `db:"id" json:"id"`
+	StorageKey      string             `db:"storage_key" json:"storage_key"`
+	OriginalName    string             `db:"original_name" json:"original_name"`
+	ContentType     string             `db:"content_type" json:"content_type"`
+	DeclaredSize    int64              `db:"declared_size" json:"declared_size"`
+	Sha256Hex       string             `db:"sha256_hex" json:"sha256_hex"`
+	Status          string             `db:"status" json:"status"`
+	UploadTokenHash string             `db:"upload_token_hash" json:"upload_token_hash"`
+	UploadExpiresAt pgtype.Timestamptz `db:"upload_expires_at" json:"upload_expires_at"`
+	StoredAt        pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CreatedBy       string             `db:"created_by" json:"created_by"`
+}
+
+type VouIntermediarySaleOrderDetail struct {
+	DocumentID         string      `db:"document_id" json:"document_id"`
+	Entity             string      `db:"entity" json:"entity"`
+	CustomerObjectID   string      `db:"customer_object_id" json:"customer_object_id"`
+	CustomerVersionID  string      `db:"customer_version_id" json:"customer_version_id"`
+	CustomerCode       string      `db:"customer_code" json:"customer_code"`
+	CustomerName       string      `db:"customer_name" json:"customer_name"`
+	SupplierObjectID   string      `db:"supplier_object_id" json:"supplier_object_id"`
+	SupplierVersionID  string      `db:"supplier_version_id" json:"supplier_version_id"`
+	SupplierCode       string      `db:"supplier_code" json:"supplier_code"`
+	SupplierName       string      `db:"supplier_name" json:"supplier_name"`
+	OutboundDate       pgtype.Date `db:"outbound_date" json:"outbound_date"`
+	SignoffDate        pgtype.Date `db:"signoff_date" json:"signoff_date"`
+	PlatformObjectID   *string     `db:"platform_object_id" json:"platform_object_id"`
+	PlatformVersionID  *string     `db:"platform_version_id" json:"platform_version_id"`
+	PlatformCode       *string     `db:"platform_code" json:"platform_code"`
+	PlatformName       *string     `db:"platform_name" json:"platform_name"`
+	VehicleObjectID    *string     `db:"vehicle_object_id" json:"vehicle_object_id"`
+	VehicleVersionID   *string     `db:"vehicle_version_id" json:"vehicle_version_id"`
+	VehicleCode        *string     `db:"vehicle_code" json:"vehicle_code"`
+	VehicleName        *string     `db:"vehicle_name" json:"vehicle_name"`
+	VehiclePlateNumber *string     `db:"vehicle_plate_number" json:"vehicle_plate_number"`
+	DifferenceReason   *string     `db:"difference_reason" json:"difference_reason"`
+}
+
+type VouNumberCounter struct {
+	Entity       string      `db:"entity" json:"entity"`
+	BusinessDate pgtype.Date `db:"business_date" json:"business_date"`
+	LastValue    int32       `db:"last_value" json:"last_value"`
+}
+
+type VouOtherIncomeDetail struct {
+	DocumentID            string  `db:"document_id" json:"document_id"`
+	Entity                string  `db:"entity" json:"entity"`
+	SourceName            string  `db:"source_name" json:"source_name"`
+	CounterpartyEntity    *string `db:"counterparty_entity" json:"counterparty_entity"`
+	CounterpartyObjectID  *string `db:"counterparty_object_id" json:"counterparty_object_id"`
+	CounterpartyVersionID *string `db:"counterparty_version_id" json:"counterparty_version_id"`
+	CounterpartyCode      *string `db:"counterparty_code" json:"counterparty_code"`
+	CounterpartyName      *string `db:"counterparty_name" json:"counterparty_name"`
+	FundAccountObjectID   string  `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID  string  `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode       string  `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName       string  `db:"fund_account_name" json:"fund_account_name"`
+}
+
+type VouPaymentDetail struct {
+	DocumentID            string `db:"document_id" json:"document_id"`
+	Entity                string `db:"entity" json:"entity"`
+	CounterpartyEntity    string `db:"counterparty_entity" json:"counterparty_entity"`
+	CounterpartyObjectID  string `db:"counterparty_object_id" json:"counterparty_object_id"`
+	CounterpartyVersionID string `db:"counterparty_version_id" json:"counterparty_version_id"`
+	CounterpartyCode      string `db:"counterparty_code" json:"counterparty_code"`
+	CounterpartyName      string `db:"counterparty_name" json:"counterparty_name"`
+	FundAccountObjectID   string `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID  string `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode       string `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName       string `db:"fund_account_name" json:"fund_account_name"`
+}
+
+type VouProductLine struct {
+	ID                string `db:"id" json:"id"`
+	DocumentID        string `db:"document_id" json:"document_id"`
+	DocumentEntity    string `db:"document_entity" json:"document_entity"`
+	LineNo            int32  `db:"line_no" json:"line_no"`
+	ProductObjectID   string `db:"product_object_id" json:"product_object_id"`
+	ProductVersionID  string `db:"product_version_id" json:"product_version_id"`
+	ProductCode       string `db:"product_code" json:"product_code"`
+	ProductName       string `db:"product_name" json:"product_name"`
+	ProductUnit       string `db:"product_unit" json:"product_unit"`
+	OrderedQtyMicros  int64  `db:"ordered_qty_micros" json:"ordered_qty_micros"`
+	UnitPriceCents    int64  `db:"unit_price_cents" json:"unit_price_cents"`
+	LineAmountCents   int64  `db:"line_amount_cents" json:"line_amount_cents"`
+	OutboundQtyMicros *int64 `db:"outbound_qty_micros" json:"outbound_qty_micros"`
+	SignedQtyMicros   *int64 `db:"signed_qty_micros" json:"signed_qty_micros"`
+	RejectedQtyMicros *int64 `db:"rejected_qty_micros" json:"rejected_qty_micros"`
+	LossQtyMicros     *int64 `db:"loss_qty_micros" json:"loss_qty_micros"`
+	InboundQtyMicros  *int64 `db:"inbound_qty_micros" json:"inbound_qty_micros"`
+}
+
+type VouPurchaseOrderDetail struct {
+	DocumentID        string      `db:"document_id" json:"document_id"`
+	Entity            string      `db:"entity" json:"entity"`
+	SupplierObjectID  string      `db:"supplier_object_id" json:"supplier_object_id"`
+	SupplierVersionID string      `db:"supplier_version_id" json:"supplier_version_id"`
+	SupplierCode      string      `db:"supplier_code" json:"supplier_code"`
+	SupplierName      string      `db:"supplier_name" json:"supplier_name"`
+	InboundDate       pgtype.Date `db:"inbound_date" json:"inbound_date"`
+	DifferenceReason  *string     `db:"difference_reason" json:"difference_reason"`
+}
+
+type VouReceiptDetail struct {
+	DocumentID            string `db:"document_id" json:"document_id"`
+	Entity                string `db:"entity" json:"entity"`
+	CounterpartyEntity    string `db:"counterparty_entity" json:"counterparty_entity"`
+	CounterpartyObjectID  string `db:"counterparty_object_id" json:"counterparty_object_id"`
+	CounterpartyVersionID string `db:"counterparty_version_id" json:"counterparty_version_id"`
+	CounterpartyCode      string `db:"counterparty_code" json:"counterparty_code"`
+	CounterpartyName      string `db:"counterparty_name" json:"counterparty_name"`
+	FundAccountObjectID   string `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID  string `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode       string `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName       string `db:"fund_account_name" json:"fund_account_name"`
+}
+
+type VouSaleOrderDetail struct {
+	DocumentID         string      `db:"document_id" json:"document_id"`
+	Entity             string      `db:"entity" json:"entity"`
+	CustomerObjectID   string      `db:"customer_object_id" json:"customer_object_id"`
+	CustomerVersionID  string      `db:"customer_version_id" json:"customer_version_id"`
+	CustomerCode       string      `db:"customer_code" json:"customer_code"`
+	CustomerName       string      `db:"customer_name" json:"customer_name"`
+	OutboundDate       pgtype.Date `db:"outbound_date" json:"outbound_date"`
+	SignoffDate        pgtype.Date `db:"signoff_date" json:"signoff_date"`
+	PlatformObjectID   *string     `db:"platform_object_id" json:"platform_object_id"`
+	PlatformVersionID  *string     `db:"platform_version_id" json:"platform_version_id"`
+	PlatformCode       *string     `db:"platform_code" json:"platform_code"`
+	PlatformName       *string     `db:"platform_name" json:"platform_name"`
+	VehicleObjectID    *string     `db:"vehicle_object_id" json:"vehicle_object_id"`
+	VehicleVersionID   *string     `db:"vehicle_version_id" json:"vehicle_version_id"`
+	VehicleCode        *string     `db:"vehicle_code" json:"vehicle_code"`
+	VehicleName        *string     `db:"vehicle_name" json:"vehicle_name"`
+	VehiclePlateNumber *string     `db:"vehicle_plate_number" json:"vehicle_plate_number"`
+	DifferenceReason   *string     `db:"difference_reason" json:"difference_reason"`
+}

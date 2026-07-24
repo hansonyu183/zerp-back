@@ -30,9 +30,31 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.DatabaseConnectTimeout != 5*time.Second {
 		t.Fatalf("DatabaseConnectTimeout = %s, want 5s", cfg.DatabaseConnectTimeout)
 	}
+	if cfg.AttachmentStorageRoot != "./var/attachments" ||
+		cfg.AttachmentUploadTTL != 15*time.Minute || cfg.AttachmentDownloadTTL != 5*time.Minute {
+		t.Fatalf("attachment defaults = root:%q upload:%s download:%s",
+			cfg.AttachmentStorageRoot, cfg.AttachmentUploadTTL, cfg.AttachmentDownloadTTL)
+	}
 	wantOrigins := []string{"https://erp.example.com", "https://preview.example.com"}
 	if !reflect.DeepEqual(cfg.CORSAllowedOrigins, wantOrigins) {
 		t.Fatalf("CORSAllowedOrigins = %#v, want %#v", cfg.CORSAllowedOrigins, wantOrigins)
+	}
+}
+
+func TestLoadRequiresAbsoluteAttachmentRootInProduction(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("APP_ENV", EnvironmentProduction)
+	t.Setenv("ATTACHMENT_STORAGE_ROOT", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted missing production attachment root")
+	}
+	t.Setenv("ATTACHMENT_STORAGE_ROOT", "relative/attachments")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted relative production attachment root")
+	}
+	t.Setenv("ATTACHMENT_STORAGE_ROOT", "/var/lib/zerp/attachments")
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() rejected absolute production attachment root: %v", err)
 	}
 }
 
@@ -64,6 +86,7 @@ func TestLoadRejectsUnsafeCookieName(t *testing.T) {
 
 func TestLoadValidatesCookieSameSite(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("APP_ENV", EnvironmentDevelopment)
 	t.Setenv("APP_SESSION_COOKIE_SAME_SITE", "none")
 	t.Setenv("APP_SESSION_COOKIE_SECURE", "false")
 	if _, err := Load(); err == nil {

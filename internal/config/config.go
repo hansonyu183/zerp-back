@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -31,6 +32,9 @@ type Config struct {
 	SigninLockThreshold    int
 	SigninLockDuration     time.Duration
 	PasswordMinLength      int
+	AttachmentStorageRoot  string
+	AttachmentUploadTTL    time.Duration
+	AttachmentDownloadTTL  time.Duration
 }
 
 func Load() (Config, error) {
@@ -41,6 +45,7 @@ func Load() (Config, error) {
 		CORSAllowedOrigins:    splitAndTrim(os.Getenv("CORS_ALLOWED_ORIGINS")),
 		SessionCookieName:     valueOrDefault("APP_SESSION_COOKIE_NAME", "zerp_session"),
 		SessionCookieSameSite: strings.ToLower(valueOrDefault("APP_SESSION_COOKIE_SAME_SITE", "lax")),
+		AttachmentStorageRoot: strings.TrimSpace(os.Getenv("ATTACHMENT_STORAGE_ROOT")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -52,6 +57,15 @@ func Load() (Config, error) {
 
 	if cfg.Environment != EnvironmentDevelopment && cfg.Environment != EnvironmentTest && cfg.Environment != EnvironmentProduction {
 		return Config{}, fmt.Errorf("APP_ENV must be one of %q, %q, or %q", EnvironmentDevelopment, EnvironmentTest, EnvironmentProduction)
+	}
+	if cfg.AttachmentStorageRoot == "" {
+		if cfg.Environment == EnvironmentProduction {
+			return Config{}, errors.New("ATTACHMENT_STORAGE_ROOT is required in production")
+		}
+		cfg.AttachmentStorageRoot = "./var/attachments"
+	}
+	if cfg.Environment == EnvironmentProduction && !filepath.IsAbs(cfg.AttachmentStorageRoot) {
+		return Config{}, errors.New("ATTACHMENT_STORAGE_ROOT must be absolute in production")
 	}
 
 	var err error
@@ -92,6 +106,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.PasswordMinLength, err = intOrDefault("APP_PASSWORD_MIN_LENGTH", 12, 8, 128); err != nil {
+		return Config{}, err
+	}
+	if cfg.AttachmentUploadTTL, err = durationOrDefault("ATTACHMENT_UPLOAD_TOKEN_TTL", 15*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.AttachmentDownloadTTL, err = durationOrDefault("ATTACHMENT_DOWNLOAD_TOKEN_TTL", 5*time.Minute); err != nil {
 		return Config{}, err
 	}
 

@@ -1,0 +1,96 @@
+package vou
+
+import (
+	"strings"
+	"testing"
+)
+
+const (
+	testObjectID  = "01J00000000000000000000001"
+	testVersionID = "01J00000000000000000000002"
+)
+
+func refInput() *ReferenceInput {
+	return &ReferenceInput{ObjectID: testObjectID, VersionID: testVersionID}
+}
+
+func TestValidateDraftByEntity(t *testing.T) {
+	t.Parallel()
+	product := *refInput()
+	sale, err := validateDraft(EntitySaleOrder, DraftInput{
+		BusinessDate: "2026-07-24", Currency: "cny", Customer: refInput(),
+		ProductLines: []ProductLineInput{{Product: product, OrderedQuantity: "2.5", UnitPrice: "10.00"}},
+	})
+	if err != nil {
+		t.Fatalf("validate sale: %v", err)
+	}
+	if sale.TotalAmount != 2500 || sale.Currency != "CNY" {
+		t.Fatalf("sale = %+v", sale)
+	}
+	expense, err := validateDraft(EntityExpenseReimbursement, DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Employee: refInput(), FundAccount: refInput(),
+		ExpenseLines: []ExpenseLineInput{
+			{Category: "交通", Description: "出租车", Amount: "12.30"},
+			{Category: "住宿", Description: "酒店", Amount: "100.00"},
+		},
+	})
+	if err != nil || expense.TotalAmount != 11230 {
+		t.Fatalf("expense = %+v, err=%v", expense, err)
+	}
+}
+
+func TestValidateDraftRejectsCrossEntityAndDuplicateProduct(t *testing.T) {
+	t.Parallel()
+	product := *refInput()
+	_, err := validateDraft(EntitySaleOrder, DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Customer: refInput(), FundAccount: refInput(),
+		ProductLines: []ProductLineInput{{Product: product, OrderedQuantity: "1", UnitPrice: "1.00"}},
+	})
+	if err == nil {
+		t.Fatal("sale accepted fund account")
+	}
+	_, err = validateDraft(EntityPurchaseOrder, DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Supplier: refInput(),
+		ProductLines: []ProductLineInput{
+			{Product: product, OrderedQuantity: "1", UnitPrice: "1.00"},
+			{Product: product, OrderedQuantity: "2", UnitPrice: "1.00"},
+		},
+	})
+	if err == nil {
+		t.Fatal("purchase accepted duplicate product")
+	}
+}
+
+func TestValidateSaleExecutionReconcilesQuantities(t *testing.T) {
+	t.Parallel()
+	valid := ExecuteInput{
+		DocumentID: testObjectID, Revision: 3, OutboundDate: "2026-07-25", SignoffDate: "2026-07-26",
+		Platform: refInput(), Vehicle: refInput(),
+		SaleLines: []SaleExecutionLineInput{{
+			LineID: testVersionID, OutboundQuantity: "10", SignedQuantity: "8",
+			RejectedQuantity: "1", LossQuantity: "1",
+		}},
+	}
+	if _, err := validateSaleExecution(valid); err != nil {
+		t.Fatalf("valid execution rejected: %v", err)
+	}
+	valid.SaleLines[0].LossQuantity = "0"
+	if _, err := validateSaleExecution(valid); err == nil {
+		t.Fatal("unbalanced sale quantities accepted")
+	}
+}
+
+func TestValidateAttachmentInitiate(t *testing.T) {
+	t.Parallel()
+	input := AttachmentInitiateInput{
+		DocumentID: testObjectID, Revision: 1, FileName: "invoice.pdf",
+		ContentType: "application/pdf", Size: 12, SHA256: strings.Repeat("a", 64),
+	}
+	if _, err := validateAttachmentInitiate(input); err != nil {
+		t.Fatalf("valid attachment rejected: %v", err)
+	}
+	input.FileName = "../../secret.pdf"
+	if _, err := validateAttachmentInitiate(input); err == nil {
+		t.Fatal("path traversal filename accepted")
+	}
+}

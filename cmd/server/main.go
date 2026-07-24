@@ -30,9 +30,15 @@ func main() {
 	}
 	defer db.Close()
 
+	router, err := httpserver.New(cfg, db, logger)
+	if err != nil {
+		logger.Error("initialize HTTP server", "error", err)
+		os.Exit(1)
+	}
+
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddress,
-		Handler:           httpserver.New(cfg, db, logger),
+		Handler:           router,
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 	}
 

@@ -12,6 +12,12 @@ type Querier interface {
 	AcquireAppAuthorizationLock(ctx context.Context) error
 	AdvanceBobObjectForEdit(ctx context.Context, arg AdvanceBobObjectForEditParams) (int64, error)
 	ApproveBobVersion(ctx context.Context, arg ApproveBobVersionParams) (int64, error)
+	ApproveVouDocument(ctx context.Context, arg ApproveVouDocumentParams) (int64, error)
+	ClearVouIntermediarySaleOrderExecution(ctx context.Context, documentID string) (int64, error)
+	ClearVouProductLineExecution(ctx context.Context, documentID string) error
+	ClearVouPurchaseOrderExecution(ctx context.Context, documentID string) (int64, error)
+	ClearVouSaleOrderExecution(ctx context.Context, documentID string) (int64, error)
+	ConsumeVouDownloadToken(ctx context.Context, tokenHash string) (ConsumeVouDownloadTokenRow, error)
 	CopyBobCustomerDetail(ctx context.Context, arg CopyBobCustomerDetailParams) error
 	CopyBobEmployeeDetail(ctx context.Context, arg CopyBobEmployeeDetailParams) error
 	CopyBobFundAccountDetail(ctx context.Context, arg CopyBobFundAccountDetailParams) error
@@ -34,10 +40,21 @@ type Querier interface {
 	CountEnabledUsersWithPermission(ctx context.Context, path string) (int64, error)
 	CountEnabledUsersWithPermissionExcludingRole(ctx context.Context, arg CountEnabledUsersWithPermissionExcludingRoleParams) (int64, error)
 	CountOtherEnabledUsersWithPermission(ctx context.Context, arg CountOtherEnabledUsersWithPermissionParams) (int64, error)
+	CountPendingVouAttachments(ctx context.Context, documentID string) (int64, error)
+	CountVouAttachments(ctx context.Context, documentID string) (int64, error)
+	CountVouAuditEvents(ctx context.Context, arg CountVouAuditEventsParams) (int64, error)
+	CountVouDocuments(ctx context.Context, arg CountVouDocumentsParams) (int64, error)
 	CreateAppAuditEvent(ctx context.Context, arg CreateAppAuditEventParams) error
 	CreateAppSession(ctx context.Context, arg CreateAppSessionParams) error
 	DeleteAppRolePermissions(ctx context.Context, roleID string) error
 	DeleteAppUserRoles(ctx context.Context, userID string) error
+	DeleteExpiredVouDownloadTokens(ctx context.Context) error
+	DeleteVouAttachmentByFileID(ctx context.Context, fileID string) (int64, error)
+	DeleteVouDocumentAttachment(ctx context.Context, arg DeleteVouDocumentAttachmentParams) (int64, error)
+	DeleteVouExpenseLines(ctx context.Context, documentID string) error
+	DeleteVouFile(ctx context.Context, id string) (int64, error)
+	DeleteVouProductLines(ctx context.Context, documentID string) error
+	ExecuteVouDocument(ctx context.Context, arg ExecuteVouDocumentParams) (int64, error)
 	FindBobObjectIDByCode(ctx context.Context, arg FindBobObjectIDByCodeParams) (string, error)
 	GetAppPermissionByID(ctx context.Context, id string) (AppPermission, error)
 	GetAppRoleByID(ctx context.Context, id string) (AppRole, error)
@@ -49,6 +66,15 @@ type Querier interface {
 	GetAppUserPermissions(ctx context.Context, userID string) ([]string, error)
 	GetAppUserRoleIDs(ctx context.Context, userID string) ([]string, error)
 	GetBobVersionView(ctx context.Context, arg GetBobVersionViewParams) (BobVersionView, error)
+	GetReadyVouAttachment(ctx context.Context, arg GetReadyVouAttachmentParams) (GetReadyVouAttachmentRow, error)
+	GetVouDocument(ctx context.Context, arg GetVouDocumentParams) (VouDocument, error)
+	GetVouExpenseReimbursementDetail(ctx context.Context, documentID string) (VouExpenseReimbursementDetail, error)
+	GetVouIntermediarySaleOrderDetail(ctx context.Context, documentID string) (VouIntermediarySaleOrderDetail, error)
+	GetVouOtherIncomeDetail(ctx context.Context, documentID string) (VouOtherIncomeDetail, error)
+	GetVouPaymentDetail(ctx context.Context, documentID string) (VouPaymentDetail, error)
+	GetVouPurchaseOrderDetail(ctx context.Context, documentID string) (VouPurchaseOrderDetail, error)
+	GetVouReceiptDetail(ctx context.Context, documentID string) (VouReceiptDetail, error)
+	GetVouSaleOrderDetail(ctx context.Context, documentID string) (VouSaleOrderDetail, error)
 	InsertAppRole(ctx context.Context, arg InsertAppRoleParams) error
 	InsertAppRolePermission(ctx context.Context, arg InsertAppRolePermissionParams) error
 	InsertAppUser(ctx context.Context, arg InsertAppUserParams) error
@@ -64,8 +90,23 @@ type Querier interface {
 	InsertBobVehicleDetail(ctx context.Context, arg InsertBobVehicleDetailParams) error
 	InsertBobVersion(ctx context.Context, arg InsertBobVersionParams) error
 	InsertBobWarehouseDetail(ctx context.Context, arg InsertBobWarehouseDetailParams) error
+	InsertVouAuditEvent(ctx context.Context, arg InsertVouAuditEventParams) error
+	InsertVouDocument(ctx context.Context, arg InsertVouDocumentParams) error
+	InsertVouDocumentAttachment(ctx context.Context, arg InsertVouDocumentAttachmentParams) error
+	InsertVouDownloadToken(ctx context.Context, arg InsertVouDownloadTokenParams) error
+	InsertVouExpenseLine(ctx context.Context, arg InsertVouExpenseLineParams) error
+	InsertVouExpenseReimbursementDetail(ctx context.Context, arg InsertVouExpenseReimbursementDetailParams) error
+	InsertVouFile(ctx context.Context, arg InsertVouFileParams) error
+	InsertVouIntermediarySaleOrderDetail(ctx context.Context, arg InsertVouIntermediarySaleOrderDetailParams) error
+	InsertVouOtherIncomeDetail(ctx context.Context, arg InsertVouOtherIncomeDetailParams) error
+	InsertVouPaymentDetail(ctx context.Context, arg InsertVouPaymentDetailParams) error
+	InsertVouProductLine(ctx context.Context, arg InsertVouProductLineParams) error
+	InsertVouPurchaseOrderDetail(ctx context.Context, arg InsertVouPurchaseOrderDetailParams) error
+	InsertVouReceiptDetail(ctx context.Context, arg InsertVouReceiptDetailParams) error
+	InsertVouSaleOrderDetail(ctx context.Context, arg InsertVouSaleOrderDetailParams) error
 	InvalidateBobVersion(ctx context.Context, arg InvalidateBobVersionParams) (int64, error)
 	ListAllEnabledAppPermissionIDs(ctx context.Context) ([]string, error)
+	ListAllVouStorageKeys(ctx context.Context) ([]string, error)
 	ListAppPermissionPathsByIDs(ctx context.Context, ids []string) ([]string, error)
 	ListAppPermissions(ctx context.Context, arg ListAppPermissionsParams) ([]AppPermission, error)
 	ListAppRoles(ctx context.Context, arg ListAppRolesParams) ([]AppRole, error)
@@ -73,24 +114,46 @@ type Querier interface {
 	ListBobAuditEvents(ctx context.Context, arg ListBobAuditEventsParams) ([]BobAuditEvent, error)
 	ListBobObjects(ctx context.Context, arg ListBobObjectsParams) ([]BobVersionView, error)
 	ListBobVersions(ctx context.Context, arg ListBobVersionsParams) ([]BobVersionView, error)
+	ListExpiredPendingVouFiles(ctx context.Context, batchSize int32) ([]ListExpiredPendingVouFilesRow, error)
+	ListVouAttachments(ctx context.Context, documentID string) ([]ListVouAttachmentsRow, error)
+	ListVouAuditEvents(ctx context.Context, arg ListVouAuditEventsParams) ([]VouAuditEvent, error)
+	ListVouDocuments(ctx context.Context, arg ListVouDocumentsParams) ([]ListVouDocumentsRow, error)
+	ListVouExpenseLines(ctx context.Context, documentID string) ([]VouExpenseLine, error)
+	ListVouProductLines(ctx context.Context, documentID string) ([]VouProductLine, error)
 	LockBobObject(ctx context.Context, arg LockBobObjectParams) (LockBobObjectRow, error)
 	LockBobVersion(ctx context.Context, arg LockBobVersionParams) (LockBobVersionRow, error)
 	LockEffectiveLogisticsPlatform(ctx context.Context, platformObjectID string) (string, error)
+	LockExpiredPendingVouFile(ctx context.Context, id string) (string, error)
+	LockPendingVouUpload(ctx context.Context, uploadTokenHash string) (LockPendingVouUploadRow, error)
+	LockVouAttachmentForRemoval(ctx context.Context, arg LockVouAttachmentForRemovalParams) (LockVouAttachmentForRemovalRow, error)
+	LockVouDocument(ctx context.Context, arg LockVouDocumentParams) (VouDocument, error)
 	MarkBobVersionSaved(ctx context.Context, arg MarkBobVersionSavedParams) (int64, error)
+	MarkVouFileReady(ctx context.Context, id string) (int64, error)
+	NextVouNumberCounter(ctx context.Context, arg NextVouNumberCounterParams) (int32, error)
 	Ping(ctx context.Context) (int32, error)
 	RecordSigninFailure(ctx context.Context, arg RecordSigninFailureParams) (AppUser, error)
 	RejectBobVersion(ctx context.Context, arg RejectBobVersionParams) (int64, error)
 	ResetSigninFailures(ctx context.Context, id string) error
 	ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (ResolveBobEffectiveReferenceRow, error)
+	ReviewVouDocument(ctx context.Context, arg ReviewVouDocumentParams) (int64, error)
 	RevokeAppSession(ctx context.Context, arg RevokeAppSessionParams) error
 	RevokeAppUserSessions(ctx context.Context, arg RevokeAppUserSessionsParams) error
 	RotateAppSessionCSRF(ctx context.Context, arg RotateAppSessionCSRFParams) (int64, error)
 	SetAppRoleStatus(ctx context.Context, arg SetAppRoleStatusParams) (int64, error)
 	SetAppUserStatus(ctx context.Context, arg SetAppUserStatusParams) (int64, error)
 	SetBobObjectEffective(ctx context.Context, arg SetBobObjectEffectiveParams) (int64, error)
+	SetVouIntermediarySaleOrderExecution(ctx context.Context, arg SetVouIntermediarySaleOrderExecutionParams) (int64, error)
+	SetVouPurchaseLineExecution(ctx context.Context, arg SetVouPurchaseLineExecutionParams) (int64, error)
+	SetVouPurchaseOrderExecution(ctx context.Context, arg SetVouPurchaseOrderExecutionParams) (int64, error)
+	SetVouSaleLineExecution(ctx context.Context, arg SetVouSaleLineExecutionParams) (int64, error)
+	SetVouSaleOrderExecution(ctx context.Context, arg SetVouSaleOrderExecutionParams) (int64, error)
 	SubmitBobVersion(ctx context.Context, arg SubmitBobVersionParams) (int64, error)
 	TouchAppSession(ctx context.Context, arg TouchAppSessionParams) error
 	TouchBobObject(ctx context.Context, arg TouchBobObjectParams) error
+	TouchVouDraftAttachment(ctx context.Context, arg TouchVouDraftAttachmentParams) (int64, error)
+	UnapproveVouDocument(ctx context.Context, arg UnapproveVouDocumentParams) (int64, error)
+	UnexecuteVouDocument(ctx context.Context, arg UnexecuteVouDocumentParams) (int64, error)
+	UnreviewVouDocument(ctx context.Context, arg UnreviewVouDocumentParams) (int64, error)
 	UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (int64, error)
 	UpdateAppUser(ctx context.Context, arg UpdateAppUserParams) (int64, error)
 	UpdateAppUserPassword(ctx context.Context, arg UpdateAppUserPasswordParams) (int64, error)
@@ -102,6 +165,14 @@ type Querier interface {
 	UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error)
 	UpdateBobVehicleDetail(ctx context.Context, arg UpdateBobVehicleDetailParams) (int64, error)
 	UpdateBobWarehouseDetail(ctx context.Context, arg UpdateBobWarehouseDetailParams) (int64, error)
+	UpdateVouDraft(ctx context.Context, arg UpdateVouDraftParams) (int64, error)
+	UpdateVouExpenseReimbursementDetail(ctx context.Context, arg UpdateVouExpenseReimbursementDetailParams) (int64, error)
+	UpdateVouIntermediarySaleOrderDetail(ctx context.Context, arg UpdateVouIntermediarySaleOrderDetailParams) (int64, error)
+	UpdateVouOtherIncomeDetail(ctx context.Context, arg UpdateVouOtherIncomeDetailParams) (int64, error)
+	UpdateVouPaymentDetail(ctx context.Context, arg UpdateVouPaymentDetailParams) (int64, error)
+	UpdateVouPurchaseOrderDetail(ctx context.Context, arg UpdateVouPurchaseOrderDetailParams) (int64, error)
+	UpdateVouReceiptDetail(ctx context.Context, arg UpdateVouReceiptDetailParams) (int64, error)
+	UpdateVouSaleOrderDetail(ctx context.Context, arg UpdateVouSaleOrderDetailParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -10,6 +10,7 @@ import (
 	"github.com/hansonyu183/zerp-back/internal/config"
 	appdomain "github.com/hansonyu183/zerp-back/internal/domains/app"
 	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
+	voudomain "github.com/hansonyu183/zerp-back/internal/domains/vou"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,12 +18,21 @@ type databasePinger interface {
 	Ping(context.Context) error
 }
 
-func New(cfg config.Config, db *pgxpool.Pool, logger *slog.Logger) *gin.Engine {
+func New(cfg config.Config, db *pgxpool.Pool, logger *slog.Logger) (*gin.Engine, error) {
 	appService := appdomain.NewService(db, cfg, logger)
+	bobService := bobdomain.NewService(db)
+	vouService, err := voudomain.NewService(db, bobService, voudomain.AttachmentOptions{
+		Root: cfg.AttachmentStorageRoot, UploadTTL: cfg.AttachmentUploadTTL, DownloadTTL: cfg.AttachmentDownloadTTL,
+	}, logger)
+	if err != nil {
+		return nil, err
+	}
 	return newRouter(cfg, db, logger, func(router *gin.Engine) {
 		appdomain.NewHandler(appService, cfg, logger).Register(router)
-		bobdomain.NewHandler(bobdomain.NewService(db), appAuthorizer{service: appService, cfg: cfg}, logger).Register(router)
-	})
+		authorizer := appAuthorizer{service: appService, cfg: cfg}
+		bobdomain.NewHandler(bobService, authorizer, logger).Register(router)
+		voudomain.NewHandler(vouService, authorizer, logger).Register(router)
+	}), nil
 }
 
 func newRouter(

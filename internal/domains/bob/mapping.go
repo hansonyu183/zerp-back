@@ -31,9 +31,9 @@ func conflictData(object dbsqlc.LockBobObjectRow, version dbsqlc.LockBobVersionR
 func detailFields(entity string) []string {
 	switch entity {
 	case EntityCustomer:
-		return []string{"name", "customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonId"}
+		return []string{"name", "customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonEmployeeId"}
 	case EntitySupplier:
-		return []string{"name", "supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId"}
+		return []string{"name", "supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonEmployeeId"}
 	case EntityEmployee:
 		return []string{"name", "categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark"}
 	case EntityProduct:
@@ -119,7 +119,7 @@ func detailView(row dbsqlc.BobVersionView) DetailView {
 		BankBranch: row.BankBranch, AccountNumber: row.AccountNumber,
 		TargetEntity: row.TargetEntity, ParentID: row.ParentID,
 		SettlementMethodID:        row.SettlementMethodID,
-		SalespersonID:             row.SalespersonID,
+		SalespersonEmployeeID:     row.SalespersonEmployeeID,
 		SettlementMethodVersionID: row.SettlementMethodVersionID,
 		RuleType:                  row.SettlementRuleType,
 		MonthOffset:               row.SettlementMonthOffset, DayOffset: row.SettlementDayOffset,

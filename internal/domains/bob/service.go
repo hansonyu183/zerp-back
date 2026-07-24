@@ -54,7 +54,8 @@ func (s *Service) Query(ctx context.Context, entity string, input QueryInput) (P
 		Entity: entity, Statuses: statuses, Keyword: filters.Keyword,
 		CustomerType: filters.CustomerType, SupplierType: filters.SupplierType,
 		CategoryID: filters.CategoryID, DepartmentID: filters.DepartmentID,
-		PositionID: filters.PositionID, Currency: filters.Currency,
+		PositionID: filters.PositionID, SalespersonEmployeeID: filters.SalespersonEmployeeID,
+		Currency:     filters.Currency,
 		TargetEntity: filters.TargetEntity, ParentID: filters.ParentID, RootOnly: filters.RootOnly,
 	}
 	total, err := s.queries.CountBobObjects(ctx, countParams)
@@ -65,7 +66,8 @@ func (s *Service) Query(ctx context.Context, entity string, input QueryInput) (P
 		Entity: entity, Statuses: statuses, Keyword: filters.Keyword, SortField: sortField, SortOrder: sortOrder,
 		CustomerType: filters.CustomerType, SupplierType: filters.SupplierType,
 		CategoryID: filters.CategoryID, DepartmentID: filters.DepartmentID,
-		PositionID: filters.PositionID, Currency: filters.Currency,
+		PositionID: filters.PositionID, SalespersonEmployeeID: filters.SalespersonEmployeeID,
+		Currency:     filters.Currency,
 		TargetEntity: filters.TargetEntity, ParentID: filters.ParentID, RootOnly: filters.RootOnly,
 		PageOffset: offset, PageSize: int32(input.PageSize),
 	})
@@ -603,6 +605,35 @@ func (s *Service) ResolveEffectiveReference(ctx context.Context, tx pgx.Tx, enti
 	}, nil
 }
 
+// ResolveCurrentEffectiveReference resolves an object's current effective
+// version without requiring callers to already know its version ID.
+func (s *Service) ResolveCurrentEffectiveReference(
+	ctx context.Context, tx pgx.Tx, entity, objectID string,
+) (EffectiveReference, error) {
+	if !validEntity(entity) || !validID(objectID) {
+		return EffectiveReference{}, domainError(ErrorValidation, "invalid current effective reference", nil, nil)
+	}
+	row, err := s.queries.WithTx(tx).ResolveCurrentBobEffectiveReference(
+		ctx,
+		dbsqlc.ResolveCurrentBobEffectiveReferenceParams{ObjectID: objectID, Entity: entity},
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return EffectiveReference{}, domainError(ErrorConflict, "object is not currently effective", nil, nil)
+	}
+	if err != nil {
+		return EffectiveReference{}, s.internal("resolve current effective reference", err)
+	}
+	if entity == EntityVehicle {
+		if err = s.validatePlatformReference(ctx, s.queries.WithTx(tx), deref(row.PlatformObjectID)); err != nil {
+			return EffectiveReference{}, err
+		}
+	}
+	return EffectiveReference{
+		ObjectID: row.ObjectID, Entity: row.Entity, Code: row.Code, VersionID: row.VersionID,
+		Data: effectiveReferenceDetail(row),
+	}, nil
+}
+
 func (s *Service) lockTarget(ctx context.Context, entity, objectID, versionID string) (
 	pgx.Tx, *dbsqlc.Queries, dbsqlc.LockBobObjectRow, dbsqlc.LockBobVersionRow, error,
 ) {
@@ -688,7 +719,7 @@ func (s *Service) validateDetailReferences(
 	add(EntityPosition, data.PositionID)
 	add(EntityEmployee, data.ManagerEmployeeID)
 	add(EntitySettlementMethod, data.SettlementMethodID)
-	add(EntityEmployee, data.SalespersonID)
+	add(EntityEmployee, data.SalespersonEmployeeID)
 	if entity == EntityDepartment {
 		add(EntityDepartment, data.ParentID)
 	}

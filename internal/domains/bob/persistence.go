@@ -17,8 +17,8 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			TaxNumber: nilIfEmpty(data.TaxNumber), ContactName: nilIfEmpty(data.ContactName),
 			ContactPhone: nilIfEmpty(data.ContactPhone), Email: nilIfEmpty(data.Email),
 			Address: nilIfEmpty(data.Address), Remark: nilIfEmpty(data.Remark),
-			SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
-			SalespersonID:      nilIfEmpty(data.SalespersonID),
+			SettlementMethodID:    nilIfEmpty(data.SettlementMethodID),
+			SalespersonEmployeeID: data.SalespersonEmployeeID,
 		})
 	case EntitySupplier:
 		return q.InsertBobSupplierDetail(ctx, dbsqlc.InsertBobSupplierDetailParams{
@@ -27,7 +27,8 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			TaxNumber: nilIfEmpty(data.TaxNumber), ContactName: nilIfEmpty(data.ContactName),
 			ContactPhone: nilIfEmpty(data.ContactPhone), Email: nilIfEmpty(data.Email),
 			Address: nilIfEmpty(data.Address), Remark: nilIfEmpty(data.Remark),
-			SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
+			SettlementMethodID:    nilIfEmpty(data.SettlementMethodID),
+			SalespersonEmployeeID: data.SalespersonEmployeeID,
 		})
 	case EntityEmployee:
 		return q.InsertBobEmployeeDetail(ctx, dbsqlc.InsertBobEmployeeDetailParams{
@@ -106,8 +107,8 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
 			Email: nilIfEmpty(data.Email), Address: nilIfEmpty(data.Address),
 			Remark: nilIfEmpty(data.Remark), SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
-			SalespersonID: nilIfEmpty(data.SalespersonID),
-			VersionID:     versionID,
+			SalespersonEmployeeID: data.SalespersonEmployeeID,
+			VersionID:             versionID,
 		})
 	case EntitySupplier:
 		rows, err = q.UpdateBobSupplierDetail(ctx, dbsqlc.UpdateBobSupplierDetailParams{
@@ -116,7 +117,8 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
 			Email: nilIfEmpty(data.Email), Address: nilIfEmpty(data.Address),
 			Remark: nilIfEmpty(data.Remark), SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
-			VersionID: versionID,
+			SalespersonEmployeeID: data.SalespersonEmployeeID,
+			VersionID:             versionID,
 		})
 	case EntityEmployee:
 		rows, err = q.UpdateBobEmployeeDetail(ctx, dbsqlc.UpdateBobEmployeeDetailParams{

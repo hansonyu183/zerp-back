@@ -75,90 +75,90 @@ func domainError(kind ErrorKind, message string, data any, cause error) error {
 }
 
 type DetailInput struct {
-	Name               string         `json:"name"`
-	Unit               string         `json:"unit,omitempty"`
-	Currency           string         `json:"currency,omitempty"`
-	SupplierType       *string        `json:"supplierType,omitempty"`
-	CustomerType       *string        `json:"customerType,omitempty"`
-	PlateNumber        string         `json:"plateNumber,omitempty"`
-	VehicleType        string         `json:"vehicleType,omitempty"`
-	PlatformObjectID   string         `json:"platformObjectId,omitempty"`
-	TargetEntity       *string        `json:"targetEntity,omitempty"`
-	ShortName          OptionalString `json:"shortName,omitempty"`
-	CategoryID         OptionalString `json:"categoryId,omitempty"`
-	TaxNumber          OptionalString `json:"taxNumber,omitempty"`
-	ContactName        OptionalString `json:"contactName,omitempty"`
-	ContactPhone       OptionalString `json:"contactPhone,omitempty"`
-	Email              OptionalString `json:"email,omitempty"`
-	Address            OptionalString `json:"address,omitempty"`
-	Remark             OptionalString `json:"remark,omitempty"`
-	DepartmentID       OptionalString `json:"departmentId,omitempty"`
-	PositionID         OptionalString `json:"positionId,omitempty"`
-	Phone              OptionalString `json:"phone,omitempty"`
-	HireDate           OptionalString `json:"hireDate,omitempty"`
-	Specification      OptionalString `json:"specification,omitempty"`
-	Model              OptionalString `json:"model,omitempty"`
-	Barcode            OptionalString `json:"barcode,omitempty"`
-	Description        OptionalString `json:"description,omitempty"`
-	ManagerEmployeeID  OptionalString `json:"managerEmployeeId,omitempty"`
-	VIN                OptionalString `json:"vin,omitempty"`
-	EngineNumber       OptionalString `json:"engineNumber,omitempty"`
-	LoadCapacityKG     OptionalString `json:"loadCapacityKg,omitempty"`
-	AccountName        OptionalString `json:"accountName,omitempty"`
-	BankName           OptionalString `json:"bankName,omitempty"`
-	BankBranch         OptionalString `json:"bankBranch,omitempty"`
-	AccountNumber      OptionalString `json:"accountNumber,omitempty"`
-	ParentID           OptionalString `json:"parentId,omitempty"`
-	SettlementMethodID OptionalString `json:"settlementMethodId,omitempty"`
-	SalespersonID      OptionalString `json:"salespersonId,omitempty"`
-	RuleType           string         `json:"ruleType,omitempty"`
-	MonthOffset        int32          `json:"monthOffset,omitempty"`
-	DayOfMonth         *int32         `json:"dayOfMonth,omitempty"`
-	DayOffset          int32          `json:"dayOffset,omitempty"`
+	Name                  string         `json:"name"`
+	Unit                  string         `json:"unit,omitempty"`
+	Currency              string         `json:"currency,omitempty"`
+	SupplierType          *string        `json:"supplierType,omitempty"`
+	CustomerType          *string        `json:"customerType,omitempty"`
+	PlateNumber           string         `json:"plateNumber,omitempty"`
+	VehicleType           string         `json:"vehicleType,omitempty"`
+	PlatformObjectID      string         `json:"platformObjectId,omitempty"`
+	TargetEntity          *string        `json:"targetEntity,omitempty"`
+	ShortName             OptionalString `json:"shortName,omitempty"`
+	CategoryID            OptionalString `json:"categoryId,omitempty"`
+	TaxNumber             OptionalString `json:"taxNumber,omitempty"`
+	ContactName           OptionalString `json:"contactName,omitempty"`
+	ContactPhone          OptionalString `json:"contactPhone,omitempty"`
+	Email                 OptionalString `json:"email,omitempty"`
+	Address               OptionalString `json:"address,omitempty"`
+	Remark                OptionalString `json:"remark,omitempty"`
+	DepartmentID          OptionalString `json:"departmentId,omitempty"`
+	PositionID            OptionalString `json:"positionId,omitempty"`
+	Phone                 OptionalString `json:"phone,omitempty"`
+	HireDate              OptionalString `json:"hireDate,omitempty"`
+	Specification         OptionalString `json:"specification,omitempty"`
+	Model                 OptionalString `json:"model,omitempty"`
+	Barcode               OptionalString `json:"barcode,omitempty"`
+	Description           OptionalString `json:"description,omitempty"`
+	ManagerEmployeeID     OptionalString `json:"managerEmployeeId,omitempty"`
+	VIN                   OptionalString `json:"vin,omitempty"`
+	EngineNumber          OptionalString `json:"engineNumber,omitempty"`
+	LoadCapacityKG        OptionalString `json:"loadCapacityKg,omitempty"`
+	AccountName           OptionalString `json:"accountName,omitempty"`
+	BankName              OptionalString `json:"bankName,omitempty"`
+	BankBranch            OptionalString `json:"bankBranch,omitempty"`
+	AccountNumber         OptionalString `json:"accountNumber,omitempty"`
+	ParentID              OptionalString `json:"parentId,omitempty"`
+	SettlementMethodID    OptionalString `json:"settlementMethodId,omitempty"`
+	SalespersonEmployeeID OptionalString `json:"salespersonEmployeeId,omitempty"`
+	RuleType              string         `json:"ruleType,omitempty"`
+	MonthOffset           int32          `json:"monthOffset,omitempty"`
+	DayOfMonth            *int32         `json:"dayOfMonth,omitempty"`
+	DayOffset             int32          `json:"dayOffset,omitempty"`
 }
 
 type CreateDetailInput struct {
-	Code               string  `json:"code"`
-	Name               string  `json:"name"`
-	Unit               string  `json:"unit,omitempty"`
-	Currency           string  `json:"currency,omitempty"`
-	SupplierType       *string `json:"supplierType,omitempty"`
-	CustomerType       *string `json:"customerType,omitempty"`
-	PlateNumber        string  `json:"plateNumber,omitempty"`
-	VehicleType        string  `json:"vehicleType,omitempty"`
-	PlatformObjectID   string  `json:"platformObjectId,omitempty"`
-	TargetEntity       string  `json:"targetEntity,omitempty"`
-	ShortName          string  `json:"shortName,omitempty"`
-	CategoryID         string  `json:"categoryId,omitempty"`
-	TaxNumber          string  `json:"taxNumber,omitempty"`
-	ContactName        string  `json:"contactName,omitempty"`
-	ContactPhone       string  `json:"contactPhone,omitempty"`
-	Email              string  `json:"email,omitempty"`
-	Address            string  `json:"address,omitempty"`
-	Remark             string  `json:"remark,omitempty"`
-	DepartmentID       string  `json:"departmentId,omitempty"`
-	PositionID         string  `json:"positionId,omitempty"`
-	Phone              string  `json:"phone,omitempty"`
-	HireDate           string  `json:"hireDate,omitempty"`
-	Specification      string  `json:"specification,omitempty"`
-	Model              string  `json:"model,omitempty"`
-	Barcode            string  `json:"barcode,omitempty"`
-	Description        string  `json:"description,omitempty"`
-	ManagerEmployeeID  string  `json:"managerEmployeeId,omitempty"`
-	VIN                string  `json:"vin,omitempty"`
-	EngineNumber       string  `json:"engineNumber,omitempty"`
-	LoadCapacityKG     string  `json:"loadCapacityKg,omitempty"`
-	AccountName        string  `json:"accountName,omitempty"`
-	BankName           string  `json:"bankName,omitempty"`
-	BankBranch         string  `json:"bankBranch,omitempty"`
-	AccountNumber      string  `json:"accountNumber,omitempty"`
-	ParentID           string  `json:"parentId,omitempty"`
-	SettlementMethodID string  `json:"settlementMethodId,omitempty"`
-	SalespersonID      string  `json:"salespersonId,omitempty"`
-	RuleType           string  `json:"ruleType,omitempty"`
-	MonthOffset        int32   `json:"monthOffset,omitempty"`
-	DayOfMonth         *int32  `json:"dayOfMonth,omitempty"`
-	DayOffset          int32   `json:"dayOffset,omitempty"`
+	Code                  string  `json:"code"`
+	Name                  string  `json:"name"`
+	Unit                  string  `json:"unit,omitempty"`
+	Currency              string  `json:"currency,omitempty"`
+	SupplierType          *string `json:"supplierType,omitempty"`
+	CustomerType          *string `json:"customerType,omitempty"`
+	PlateNumber           string  `json:"plateNumber,omitempty"`
+	VehicleType           string  `json:"vehicleType,omitempty"`
+	PlatformObjectID      string  `json:"platformObjectId,omitempty"`
+	TargetEntity          string  `json:"targetEntity,omitempty"`
+	ShortName             string  `json:"shortName,omitempty"`
+	CategoryID            string  `json:"categoryId,omitempty"`
+	TaxNumber             string  `json:"taxNumber,omitempty"`
+	ContactName           string  `json:"contactName,omitempty"`
+	ContactPhone          string  `json:"contactPhone,omitempty"`
+	Email                 string  `json:"email,omitempty"`
+	Address               string  `json:"address,omitempty"`
+	Remark                string  `json:"remark,omitempty"`
+	DepartmentID          string  `json:"departmentId,omitempty"`
+	PositionID            string  `json:"positionId,omitempty"`
+	Phone                 string  `json:"phone,omitempty"`
+	HireDate              string  `json:"hireDate,omitempty"`
+	Specification         string  `json:"specification,omitempty"`
+	Model                 string  `json:"model,omitempty"`
+	Barcode               string  `json:"barcode,omitempty"`
+	Description           string  `json:"description,omitempty"`
+	ManagerEmployeeID     string  `json:"managerEmployeeId,omitempty"`
+	VIN                   string  `json:"vin,omitempty"`
+	EngineNumber          string  `json:"engineNumber,omitempty"`
+	LoadCapacityKG        string  `json:"loadCapacityKg,omitempty"`
+	AccountName           string  `json:"accountName,omitempty"`
+	BankName              string  `json:"bankName,omitempty"`
+	BankBranch            string  `json:"bankBranch,omitempty"`
+	AccountNumber         string  `json:"accountNumber,omitempty"`
+	ParentID              string  `json:"parentId,omitempty"`
+	SettlementMethodID    string  `json:"settlementMethodId,omitempty"`
+	SalespersonEmployeeID string  `json:"salespersonEmployeeId,omitempty"`
+	RuleType              string  `json:"ruleType,omitempty"`
+	MonthOffset           int32   `json:"monthOffset,omitempty"`
+	DayOfMonth            *int32  `json:"dayOfMonth,omitempty"`
+	DayOffset             int32   `json:"dayOffset,omitempty"`
 }
 
 // OptionalString distinguishes an omitted field from an explicit null or
@@ -226,18 +226,19 @@ type GetInput struct {
 }
 
 type QueryFilters struct {
-	Keyword      string   `json:"keyword,omitempty"`
-	Status       []string `json:"status,omitempty"`
-	CustomerType string   `json:"customerType,omitempty"`
-	SupplierType string   `json:"supplierType,omitempty"`
-	CategoryID   string   `json:"categoryId,omitempty"`
-	DepartmentID string   `json:"departmentId,omitempty"`
-	PositionID   string   `json:"positionId,omitempty"`
-	Currency     string   `json:"currency,omitempty"`
-	TargetEntity string   `json:"targetEntity,omitempty"`
-	ParentID     string   `json:"parentId,omitempty"`
-	RootOnly     bool     `json:"rootOnly,omitempty"`
-	provided     map[string]bool
+	Keyword               string   `json:"keyword,omitempty"`
+	Status                []string `json:"status,omitempty"`
+	CustomerType          string   `json:"customerType,omitempty"`
+	SupplierType          string   `json:"supplierType,omitempty"`
+	CategoryID            string   `json:"categoryId,omitempty"`
+	DepartmentID          string   `json:"departmentId,omitempty"`
+	PositionID            string   `json:"positionId,omitempty"`
+	SalespersonEmployeeID string   `json:"salespersonEmployeeId,omitempty"`
+	Currency              string   `json:"currency,omitempty"`
+	TargetEntity          string   `json:"targetEntity,omitempty"`
+	ParentID              string   `json:"parentId,omitempty"`
+	RootOnly              bool     `json:"rootOnly,omitempty"`
+	provided              map[string]bool
 }
 
 func (filters *QueryFilters) UnmarshalJSON(data []byte) error {
@@ -320,7 +321,7 @@ type DetailView struct {
 	AccountNumber             string `json:"accountNumber,omitempty"`
 	ParentID                  string `json:"parentId,omitempty"`
 	SettlementMethodID        string `json:"settlementMethodId,omitempty"`
-	SalespersonID             string `json:"salespersonId,omitempty"`
+	SalespersonEmployeeID     string `json:"salespersonEmployeeId,omitempty"`
 	SettlementMethodVersionID string `json:"-"`
 	RuleType                  string `json:"ruleType,omitempty"`
 	MonthOffset               int32  `json:"monthOffset,omitempty"`

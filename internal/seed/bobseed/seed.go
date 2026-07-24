@@ -64,15 +64,16 @@ func New(pool *pgxpool.Pool) *Seeder {
 }
 
 type sample struct {
-	entity              string
-	data                bob.CreateDetailInput
-	status              string
-	platformCode        string
-	categoryCode        string
-	departmentCode      string
-	positionCode        string
-	parentCode          string
-	managerEmployeeCode string
+	entity                  string
+	data                    bob.CreateDetailInput
+	status                  string
+	platformCode            string
+	categoryCode            string
+	departmentCode          string
+	positionCode            string
+	parentCode              string
+	managerEmployeeCode     string
+	salespersonEmployeeCode string
 }
 
 var samples = [...]sample{
@@ -94,25 +95,6 @@ var samples = [...]sample{
 	{entity: bob.EntityPosition, data: bob.CreateDetailInput{
 		Code: "DEMO-POS-002", Name: "仓储主管", Description: "演示待审核岗位",
 	}, status: bob.StatusPending},
-	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{
-		Code: "DEMO-CUST-001", Name: "星河零售有限公司", CustomerType: stringPointer(bob.CustomerTypeDealer),
-		ShortName: "星河零售", TaxNumber: "91310000DEMO000001", ContactName: "王经理",
-		ContactPhone: "+86 13800000001", Email: "sales@example.com",
-		Address: "上海市浦东新区示例路1号", Remark: "演示经销商客户",
-	}, status: bob.StatusEffective},
-	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{
-		Code: "DEMO-CUST-002", Name: "新客户（草稿）", CustomerType: stringPointer(bob.CustomerTypeEndUser),
-		ContactName: "陈先生", ContactPhone: "13800000002",
-	}, status: bob.StatusDraft},
-	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{
-		Code: "DEMO-SUP-001", Name: "自营物流平台", SupplierType: stringPointer(bob.SupplierTypeLogisticsPlatform),
-		ShortName: "自营物流", ContactName: "调度中心", ContactPhone: "021-60000001",
-		Address: "上海市闵行区物流路1号", Remark: "演示物流平台供应商",
-	}, status: bob.StatusEffective},
-	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{
-		Code: "DEMO-SUP-002", Name: "待审核供应商", TaxNumber: "91310000DEMO000002",
-		ContactName: "赵经理", ContactPhone: "13800000003",
-	}, status: bob.StatusPending},
 	{entity: bob.EntityEmployee, data: bob.CreateDetailInput{
 		Code: "DEMO-EMP-001", Name: "张伟", Phone: "13800000004",
 		Email: "zhangwei@example.com", HireDate: "2024-01-15", Remark: "演示在岗员工",
@@ -120,6 +102,25 @@ var samples = [...]sample{
 	{entity: bob.EntityEmployee, data: bob.CreateDetailInput{
 		Code: "DEMO-EMP-002", Name: "李娜（已驳回）", Phone: "13800000005",
 	}, status: bob.StatusRejected, departmentCode: "DEMO-DEPT-001", positionCode: "DEMO-POS-001"},
+	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{
+		Code: "DEMO-CUST-001", Name: "星河零售有限公司", CustomerType: stringPointer(bob.CustomerTypeDealer),
+		ShortName: "星河零售", TaxNumber: "91310000DEMO000001", ContactName: "王经理",
+		ContactPhone: "+86 13800000001", Email: "sales@example.com",
+		Address: "上海市浦东新区示例路1号", Remark: "演示经销商客户",
+	}, status: bob.StatusEffective, salespersonEmployeeCode: "DEMO-EMP-001"},
+	{entity: bob.EntityCustomer, data: bob.CreateDetailInput{
+		Code: "DEMO-CUST-002", Name: "新客户（草稿）", CustomerType: stringPointer(bob.CustomerTypeEndUser),
+		ContactName: "陈先生", ContactPhone: "13800000002",
+	}, status: bob.StatusDraft, salespersonEmployeeCode: "DEMO-EMP-001"},
+	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{
+		Code: "DEMO-SUP-001", Name: "自营物流平台", SupplierType: stringPointer(bob.SupplierTypeLogisticsPlatform),
+		ShortName: "自营物流", ContactName: "调度中心", ContactPhone: "021-60000001",
+		Address: "上海市闵行区物流路1号", Remark: "演示物流平台供应商",
+	}, status: bob.StatusEffective, salespersonEmployeeCode: "DEMO-EMP-001"},
+	{entity: bob.EntitySupplier, data: bob.CreateDetailInput{
+		Code: "DEMO-SUP-002", Name: "待审核供应商", TaxNumber: "91310000DEMO000002",
+		ContactName: "赵经理", ContactPhone: "13800000003",
+	}, status: bob.StatusPending, salespersonEmployeeCode: "DEMO-EMP-001"},
 	{entity: bob.EntityProduct, data: bob.CreateDetailInput{
 		Code: "DEMO-PROD-001", Name: "标准零件 A", Unit: "件",
 		Specification: "M20", Model: "A-20", Barcode: "DEMO-BARCODE-001", Remark: "演示标准产品",
@@ -218,6 +219,11 @@ func (s *Seeder) seedOne(ctx context.Context, item sample) (seedOutcome, error) 
 		return 0, err
 	}
 	if item.data.ManagerEmployeeID, err = resolve(bob.EntityEmployee, item.managerEmployeeCode, "manager employee"); err != nil {
+		return 0, err
+	}
+	if item.data.SalespersonEmployeeID, err = resolve(
+		bob.EntityEmployee, item.salespersonEmployeeCode, "salesperson employee",
+	); err != nil {
 		return 0, err
 	}
 	if item.parentCode != "" {
@@ -357,7 +363,8 @@ func matches(item sample, view bob.ObjectView) bool {
 		view.Data.BankName == item.data.BankName &&
 		view.Data.BankBranch == item.data.BankBranch &&
 		view.Data.AccountNumber == item.data.AccountNumber &&
-		view.Data.ParentID == item.data.ParentID
+		view.Data.ParentID == item.data.ParentID &&
+		view.Data.SalespersonEmployeeID == item.data.SalespersonEmployeeID
 }
 
 func matchesLegacyShape(item sample, view bob.ObjectView) bool {
@@ -444,7 +451,8 @@ func detailInput(input bob.CreateDetailInput) bob.DetailInput {
 		EngineNumber: bob.Optional(input.EngineNumber), LoadCapacityKG: bob.Optional(input.LoadCapacityKG),
 		AccountName: bob.Optional(input.AccountName), BankName: bob.Optional(input.BankName),
 		BankBranch: bob.Optional(input.BankBranch), AccountNumber: bob.Optional(input.AccountNumber),
-		ParentID: bob.Optional(input.ParentID),
+		ParentID:              bob.Optional(input.ParentID),
+		SalespersonEmployeeID: bob.Optional(input.SalespersonEmployeeID),
 	}
 }
 

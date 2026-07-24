@@ -106,23 +106,27 @@ func prepareReferences(t *testing.T, pool *pgxpool.Pool) integrationReferences {
 		MonthOffset: 1, DayOfMonth: int32IntegrationPointer(15), DayOffset: 0,
 		Description: "按自然日计算",
 	})
+	employee := createApprovedBOB(t, service, bobdomain.EntityEmployee, bobdomain.CreateDetailInput{
+		Code: "VE" + suffix, Name: "VOU 员工",
+	})
 	platform := createApprovedBOB(t, service, bobdomain.EntitySupplier, bobdomain.CreateDetailInput{
 		Code: "VLP" + suffix, Name: "VOU 物流平台", SupplierType: &logistics,
+		SalespersonEmployeeID: employee.ObjectID,
 	})
 	return integrationReferences{
 		customer: createApprovedBOB(t, service, bobdomain.EntityCustomer, bobdomain.CreateDetailInput{
 			Code: "VC" + suffix, Name: "VOU 客户", ContactName: "客户联系人",
 			ContactPhone: "13800000000", Address: "深圳市测试路 1 号",
-			SettlementMethodID: settlement.ObjectID,
+			SettlementMethodID:    settlement.ObjectID,
+			SalespersonEmployeeID: employee.ObjectID,
 		}),
 		supplier: createApprovedBOB(t, service, bobdomain.EntitySupplier, bobdomain.CreateDetailInput{
 			Code: "VS" + suffix, Name: "VOU 供应商", SupplierType: &general,
 			ContactName: "供应商联系人", ContactPhone: "13900000000",
-			SettlementMethodID: settlement.ObjectID,
+			SettlementMethodID:    settlement.ObjectID,
+			SalespersonEmployeeID: employee.ObjectID,
 		}),
-		employee: createApprovedBOB(t, service, bobdomain.EntityEmployee, bobdomain.CreateDetailInput{
-			Code: "VE" + suffix, Name: "VOU 员工",
-		}),
+		employee: employee,
 		product: createApprovedBOB(t, service, bobdomain.EntityProduct, bobdomain.CreateDetailInput{
 			Code: "VP" + suffix, Name: "VOU 产品", Unit: "吨",
 		}),
@@ -166,16 +170,15 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 	}{
 		{EntitySaleOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer, ProductLines: productLine,
-			Salesperson: &refs.employee, Warehouse: &refs.warehouse,
+			Warehouse: &refs.warehouse,
 		}},
 		{EntityPurchaseOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Supplier: &refs.supplier, ProductLines: productLine,
-			Purchaser: &refs.employee, Warehouse: &refs.warehouse,
+			Warehouse: &refs.warehouse,
 		}},
 		{EntityIntermediarySaleOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer,
 			Supplier: &refs.supplier, ProductLines: productLine,
-			Salesperson: &refs.employee, Purchaser: &refs.employee,
 		}},
 		{EntityReceipt, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",
@@ -267,6 +270,7 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 			switch test.entity {
 			case EntitySaleOrder:
 				if view.Data.Salesperson == nil || view.Data.Warehouse == nil ||
+					view.Data.Salesperson.ObjectID != refs.employee.ObjectID ||
 					view.Data.ContactName != "客户联系人" ||
 					view.Data.ContactPhone != "13800000000" ||
 					view.Data.DeliveryAddress != "深圳市测试路 1 号" ||
@@ -279,6 +283,7 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 				}
 			case EntityPurchaseOrder:
 				if view.Data.Purchaser == nil || view.Data.Warehouse == nil ||
+					view.Data.Purchaser.ObjectID != refs.employee.ObjectID ||
 					view.Data.ContactName != "供应商联系人" ||
 					view.Data.ContactPhone != "13900000000" ||
 					view.Data.SettlementMethod == nil ||
@@ -287,6 +292,8 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 				}
 			case EntityIntermediarySaleOrder:
 				if view.Data.Salesperson == nil || view.Data.Purchaser == nil ||
+					view.Data.Salesperson.ObjectID != refs.employee.ObjectID ||
+					view.Data.Purchaser.ObjectID != refs.employee.ObjectID ||
 					view.Data.Warehouse != nil ||
 					view.Data.CustomerSettlementMethod == nil ||
 					view.Data.SupplierSettlementMethod == nil ||
@@ -468,7 +475,10 @@ func TestVOUIntegrationSnapshotsSettlementGapsAndLegacyRows(t *testing.T) {
 	}
 
 	withoutSettlement := createApprovedBOB(t, bobService, bobdomain.EntityCustomer,
-		bobdomain.CreateDetailInput{Code: "NS" + newID(), Name: "未配置结算客户"})
+		bobdomain.CreateDetailInput{
+			Code: "NS" + newID(), Name: "未配置结算客户",
+			SalespersonEmployeeID: refs.employee.ObjectID,
+		})
 	missingSettlementDraft := saleDraft
 	missingSettlementDraft.Customer = &withoutSettlement
 	if _, err = service.Create(t.Context(), EntitySaleOrder,
@@ -514,6 +524,56 @@ func TestVOUIntegrationSnapshotsSettlementGapsAndLegacyRows(t *testing.T) {
 		DocumentID: receipt.DocumentID, Revision: saved.Revision,
 	}, integrationActorOne, "legacy-receipt-reviewed"); err != nil {
 		t.Fatalf("review completed legacy receipt: %v", err)
+	}
+}
+
+func TestVOUIntegrationPersonnelDefaultsOverridesAndSavePreservesSnapshot(t *testing.T) {
+	pool := vouIntegrationPool(t)
+	truncateVOU(t, pool)
+	t.Cleanup(func() { truncateVOU(t, pool) })
+	refs := prepareReferences(t, pool)
+	bobService := bobdomain.NewService(pool)
+	override := createApprovedBOB(t, bobService, bobdomain.EntityEmployee, bobdomain.CreateDetailInput{
+		Code: "VOE" + newID(), Name: "显式覆盖员工",
+	})
+	service := newIntegrationService(t, pool)
+	draft := DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer,
+		Warehouse: &refs.warehouse,
+		ProductLines: []ProductLineInput{{
+			Product: refs.product, OrderedQuantity: "1", UnitPrice: "10.00",
+		}},
+	}
+	created, err := service.Create(t.Context(), EntitySaleOrder, CreateInput{Data: draft},
+		integrationActorOne, "personnel-default-create")
+	if err != nil {
+		t.Fatalf("create with default salesperson: %v", err)
+	}
+	view, err := service.Get(t.Context(), EntitySaleOrder, GetInput{DocumentID: created.DocumentID})
+	if err != nil || view.Data.Salesperson == nil ||
+		view.Data.Salesperson.ObjectID != refs.employee.ObjectID {
+		t.Fatalf("default salesperson view=%+v err=%v", view.Data.Salesperson, err)
+	}
+
+	draft.Salesperson = &override
+	saved, err := service.Save(t.Context(), EntitySaleOrder, SaveInput{
+		DocumentID: created.DocumentID, Revision: created.Revision, Data: draft,
+	}, integrationActorOne, "personnel-override-save")
+	if err != nil {
+		t.Fatalf("save explicit salesperson override: %v", err)
+	}
+	draft.Salesperson = nil
+	saved, err = service.Save(t.Context(), EntitySaleOrder, SaveInput{
+		DocumentID: created.DocumentID, Revision: saved.Revision, Data: draft,
+	}, integrationActorOne, "personnel-preserve-save")
+	if err != nil {
+		t.Fatalf("save omitted salesperson: %v", err)
+	}
+	view, err = service.Get(t.Context(), EntitySaleOrder, GetInput{DocumentID: saved.DocumentID})
+	if err != nil || view.Data.Salesperson == nil ||
+		view.Data.Salesperson.ObjectID != override.ObjectID ||
+		view.Data.Salesperson.VersionID != override.VersionID {
+		t.Fatalf("preserved salesperson view=%+v err=%v", view.Data.Salesperson, err)
 	}
 }
 
@@ -684,7 +744,10 @@ func TestVOUIntegrationRejectsInvalidReferencesAndDatabaseContracts(t *testing.T
 	view, _ := service.Get(t.Context(), EntitySaleOrder, GetInput{DocumentID: created.DocumentID})
 	logistics := bobdomain.SupplierTypeLogisticsPlatform
 	otherPlatform := createApprovedBOB(t, bobdomain.NewService(pool), bobdomain.EntitySupplier,
-		bobdomain.CreateDetailInput{Code: "OLP" + newID(), Name: "其它物流", SupplierType: &logistics})
+		bobdomain.CreateDetailInput{
+			Code: "OLP" + newID(), Name: "其它物流", SupplierType: &logistics,
+			SalespersonEmployeeID: refs.employee.ObjectID,
+		})
 	_, err = service.Execute(t.Context(), EntitySaleOrder, ExecuteInput{
 		DocumentID: created.DocumentID, Revision: approved.Revision,
 		OutboundDate: "2026-07-24", SignoffDate: "2026-07-24",

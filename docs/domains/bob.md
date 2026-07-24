@@ -54,8 +54,8 @@ BOB 不负责：
 
 | 实体 | 版本字段 |
 | --- | --- |
-| `customer` | `name`、`customerType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark`、`settlementMethodId`、`salespersonId` |
-| `supplier` | `name`、`supplierType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark`、`settlementMethodId` |
+| `customer` | `name`、`customerType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark`、`settlementMethodId`、`salespersonEmployeeId` |
+| `supplier` | `name`、`supplierType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark`、`settlementMethodId`、`salespersonEmployeeId` |
 | `employee` | `name`、`categoryId`、`departmentId`、`positionId`、`phone`、`email`、`hireDate`、`remark` |
 | `product` | `name`、`unit`、`categoryId`、`specification`、`model`、`barcode`、`remark` |
 | `service` | `name`、`unit`、`categoryId`、`description`、`remark` |
@@ -71,7 +71,7 @@ BOB 不负责：
 
 客户和供应商的 `settlementMethodId` 引用当前有效的结算方式，可选维护。结算方式的 `ruleType` 为 `RELATIVE_DAYS`、`MONTH_END` 或 `FIXED_DAY`，并由月份偏移、月内日期和天数偏移共同表达结算日期规则。
 
-客户的 `salespersonId` 引用任意当前有效的员工，可选维护，不附加岗位限制。
+客户和供应商的 `salespersonEmployeeId` 必填，引用任意当前有效的员工，不附加岗位限制。创建时必须传入；保存时省略表示保持当前员工，显式 `null` 或空字符串无效。存量版本统一回填 `DEMO-EMP-001`，有存量数据但该员工不存在或当前无有效版本时迁移安全失败。
 
 结算规则约束如下：
 
@@ -81,7 +81,7 @@ BOB 不负责：
 - `FIXED_DAY` 要求 `dayOfMonth` 为 `1–31`，偏移月份没有该日时取月末，再加 `dayOffset`；
 - 全部按自然日计算。BOB 和 VOU 均不计算、保存或返回 `dueDate`。
 
-所有新增可选字段在 `save` 中采用补丁语义：省略字段保持当前值，显式传 `null` 或空字符串清空。`name`、`unit`、`currency`、车辆原有字段和 `platformObjectId` 保持既有完整保存契约。调用方不得传入不属于路径实体的字段。
+所有新增可选字段在 `save` 中采用补丁语义：省略字段保持当前值，显式传 `null` 或空字符串清空；必填的 `salespersonEmployeeId` 只能省略保持或显式替换为另一有效员工。`name`、`unit`、`currency`、车辆原有字段和 `platformObjectId` 保持既有完整保存契约。调用方不得传入不属于路径实体的字段。
 
 `code` 创建时去除首尾空白并规范化为大写，同一实体内大小写不敏感唯一。长度为 1–64，只允许字母、数字、点、下划线和连字符，首字符必须是字母或数字。`name` 长度为 1–200；`unit` 长度为 1–32；`currency` 为三位大写字母；`plateNumber` 长度为 1–32；`vehicleType` 长度为 1–64。
 
@@ -118,7 +118,7 @@ BOB 不负责：
 
 `category.targetEntity` 决定分类适用的实体，可取原八类实体以及 `department`、`position`，不允许取 `category`。引用分类的对象必须与其 `targetEntity` 一致。分类和部门通过 `parentId` 建立单父多级树；分类父子必须具有相同 `targetEntity`，两类树均禁止自引用和循环。岗位全局独立，不绑定部门。
 
-`categoryId`、`departmentId`、`positionId`、`managerEmployeeId`、`settlementMethodId`、`salespersonId` 和 `parentId` 是对象 ID 引用。创建、保存、提交和审核时，被引用对象必须存在当前有效版本且实体类型匹配。分类 `targetEntity` 仅在该分类的当前及历史版本均未被任何对象或子分类引用时允许修改。
+`categoryId`、`departmentId`、`positionId`、`managerEmployeeId`、`settlementMethodId`、`salespersonEmployeeId` 和 `parentId` 是对象 ID 引用。创建、保存、提交和审核时，被引用对象必须存在当前有效版本且实体类型匹配。分类 `targetEntity` 仅在该分类的当前及历史版本均未被任何对象或子分类引用时允许修改。
 
 这些通用引用只在写入或审核引用方时校验，不递归改变已经生效对象的可引用性。例如分类进入编辑期时，已生效产品仍可被交易引用；但新的产品草稿不能选择该分类。车辆与物流平台的严格递归有效性规则仍按 2.3 节执行。
 
@@ -335,7 +335,7 @@ edit:    EFFECTIVE → INVALID，并创建新的 DRAFT
 
 各实体必须定义允许过滤、排序和关键字匹配的字段白名单。客户端字段名和排序方向不得拼接进 SQL；`pageSize` 必须设上限。
 
-通用过滤字段为 `keyword`、`status`；类型化过滤字段包括 `customerType`、`supplierType`、`categoryId`、`departmentId`、`positionId`、`currency`、`targetEntity`、`parentId`、`rootOnly`。后端按实体维护白名单并拒绝有值的无关筛选字段：客户支持客户类型和分类，供应商支持供应商类型和分类，员工支持分类、部门和岗位，产品、服务、仓库、车辆和岗位支持分类，资金账户支持分类和币种，分类支持目标实体、父级和只查根节点，部门支持分类、父级和只查根节点。
+通用过滤字段为 `keyword`、`status`；类型化过滤字段包括 `customerType`、`supplierType`、`categoryId`、`departmentId`、`positionId`、`salespersonEmployeeId`、`currency`、`targetEntity`、`parentId`、`rootOnly`。后端按实体维护白名单并拒绝有值的无关筛选字段：客户支持客户类型、分类和业务员，供应商支持供应商类型、分类和业务员，员工支持分类、部门和岗位，产品、服务、仓库、车辆和岗位支持分类，资金账户支持分类和币种，分类支持目标实体、父级和只查根节点，部门支持分类、父级和只查根节点。
 
 `keyword` 在 `code`、`name` 和该实体适合展示的常用属性中匹配；车辆额外匹配 `plateNumber`，资金账户不匹配 `accountNumber`。`status` 最多包含五个合法状态。排序数组最多一个元素，字段白名单为 `updatedAt`、`code`、`name`、`status`、`version`，方向只能是 `asc` 或 `desc`；默认按 `updatedAt desc`，并以对象 ID 作为稳定次序。`pageSize` 范围为 1–100。
 
@@ -514,9 +514,11 @@ BOB 提供内部领域能力 `ResolveEffectiveReference(entity, objectId, versio
 3. 版本状态为 `EFFECTIVE`；
 4. 当前操作者满足必要的数据范围规则。
 
+需要按对象读取其当前有效版本时，内部调用方使用 `ResolveCurrentEffectiveReference(entity, objectId)`；该能力遵循相同的事务共享锁与有效性规则，VOU 仅用它解析客户或供应商配置的默认员工。
+
 解析车辆有效引用时，还必须在同一事务内确认 `platformObjectId` 指向的供应商存在当前 `EFFECTIVE` 版本，且该版本 `supplierType=LOGISTICS_PLATFORM`。车辆和平台对象的共享锁保持到消费方事务结束，防止校验后平台立即进入编辑状态。
 
-通用分类、部门、岗位和负责人引用在引用方的创建、保存、提交和审核阶段校验。`ResolveEffectiveReference` 不递归要求这些参考对象仍处于有效状态；只有车辆—物流平台按上一段执行递归检查。资金账户有效引用不返回完整账号。
+通用分类、部门、岗位、负责人和业务员引用在引用方的创建、保存、提交和审核阶段校验。`ResolveEffectiveReference` 不递归要求这些参考对象仍处于有效状态；只有车辆—物流平台按上一段执行递归检查。VOU 使用客户或供应商业务员作为新单据默认值时，会在同一事务内另行解析该员工的当前有效版本。资金账户有效引用不返回完整账号。
 
 仅在前端下拉框加载时有效不构成写入保证。为避免“校验后、交易写入前”发生编辑失效，交易事务应对对象行取得与 BOB 编辑更新互斥的共享锁，或采用经验证的等效数据库约束/串行化方案。
 

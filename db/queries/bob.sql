@@ -15,24 +15,26 @@ INSERT INTO bob_versions (
 -- name: InsertBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_employee_id
 ) VALUES (
     sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(customer_type),
     sqlc.narg(short_name), sqlc.narg(category_id), sqlc.narg(tax_number),
     sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(email),
     sqlc.narg(address), sqlc.narg(remark), sqlc.narg(settlement_method_id),
-    sqlc.narg(salesperson_id)
+    sqlc.arg(salesperson_employee_id)
 );
 
 -- name: InsertBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id,
+    salesperson_employee_id
 ) VALUES (
     sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(supplier_type),
     sqlc.narg(short_name), sqlc.narg(category_id), sqlc.narg(tax_number),
     sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(email),
-    sqlc.narg(address), sqlc.narg(remark), sqlc.narg(settlement_method_id)
+    sqlc.narg(address), sqlc.narg(remark), sqlc.narg(settlement_method_id),
+    sqlc.arg(salesperson_employee_id)
 );
 
 -- name: InsertBobEmployeeDetail :exec
@@ -119,21 +121,22 @@ INSERT INTO bob_settlement_method_versions (
 -- name: CopyBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_employee_id
 )
 SELECT sqlc.arg(new_version_id), d.name, d.customer_type, d.short_name, d.category_id,
        d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
-       d.settlement_method_id, d.salesperson_id
+       d.settlement_method_id, d.salesperson_employee_id
 FROM bob_customer_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id,
+    salesperson_employee_id
 )
 SELECT sqlc.arg(new_version_id), d.name, d.supplier_type, d.short_name, d.category_id,
        d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
-       d.settlement_method_id
+       d.settlement_method_id, d.salesperson_employee_id
 FROM bob_supplier_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobEmployeeDetail :exec
@@ -213,7 +216,7 @@ SET name = sqlc.arg(name), customer_type = sqlc.arg(customer_type),
     contact_phone = sqlc.narg(contact_phone), email = sqlc.narg(email),
     address = sqlc.narg(address), remark = sqlc.narg(remark),
     settlement_method_id = sqlc.narg(settlement_method_id),
-    salesperson_id = sqlc.narg(salesperson_id)
+    salesperson_employee_id = sqlc.arg(salesperson_employee_id)
 WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobSupplierDetail :execrows
@@ -223,7 +226,8 @@ SET name = sqlc.arg(name), supplier_type = sqlc.arg(supplier_type),
     tax_number = sqlc.narg(tax_number), contact_name = sqlc.narg(contact_name),
     contact_phone = sqlc.narg(contact_phone), email = sqlc.narg(email),
     address = sqlc.narg(address), remark = sqlc.narg(remark),
-    settlement_method_id = sqlc.narg(settlement_method_id)
+    settlement_method_id = sqlc.narg(settlement_method_id),
+    salesperson_employee_id = sqlc.arg(salesperson_employee_id)
 WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobEmployeeDetail :execrows
@@ -336,13 +340,14 @@ SELECT EXISTS (
     SELECT 1 FROM bob_customer_versions
     WHERE category_id = sqlc.arg(target_object_id)
        OR settlement_method_id = sqlc.arg(target_object_id)
-       OR salesperson_id = sqlc.arg(target_object_id)
+       OR salesperson_employee_id = sqlc.arg(target_object_id)
 
     UNION ALL
 
     SELECT 1 FROM bob_supplier_versions
     WHERE category_id = sqlc.arg(target_object_id)
        OR settlement_method_id = sqlc.arg(target_object_id)
+       OR salesperson_employee_id = sqlc.arg(target_object_id)
 
     UNION ALL
 
@@ -669,6 +674,7 @@ WHERE entity = sqlc.arg(entity) AND version_id = current_version_id
   AND (sqlc.arg(category_id)::text = '' OR category_id = sqlc.arg(category_id))
   AND (sqlc.arg(department_id)::text = '' OR department_id = sqlc.arg(department_id))
   AND (sqlc.arg(position_id)::text = '' OR position_id = sqlc.arg(position_id))
+  AND (sqlc.arg(salesperson_employee_id)::text = '' OR salesperson_employee_id = sqlc.arg(salesperson_employee_id))
   AND (sqlc.arg(currency)::text = '' OR currency = sqlc.arg(currency))
   AND (sqlc.arg(target_entity)::text = '' OR target_entity = sqlc.arg(target_entity))
   AND (sqlc.arg(parent_id)::text = '' OR parent_id = sqlc.arg(parent_id))
@@ -705,6 +711,7 @@ WHERE entity = sqlc.arg(entity) AND version_id = current_version_id
   AND (sqlc.arg(category_id)::text = '' OR category_id = sqlc.arg(category_id))
   AND (sqlc.arg(department_id)::text = '' OR department_id = sqlc.arg(department_id))
   AND (sqlc.arg(position_id)::text = '' OR position_id = sqlc.arg(position_id))
+  AND (sqlc.arg(salesperson_employee_id)::text = '' OR salesperson_employee_id = sqlc.arg(salesperson_employee_id))
   AND (sqlc.arg(currency)::text = '' OR currency = sqlc.arg(currency))
   AND (sqlc.arg(target_entity)::text = '' OR target_entity = sqlc.arg(target_entity))
   AND (sqlc.arg(parent_id)::text = '' OR parent_id = sqlc.arg(parent_id))
@@ -771,5 +778,15 @@ JOIN bob_objects o ON o.id = view.object_id AND o.entity = view.entity
 WHERE view.object_id = sqlc.arg(object_id) AND view.entity = sqlc.arg(entity)
   AND view.version_id = sqlc.arg(version_id)
   AND view.effective_version_id = view.version_id
+  AND view.status = 'EFFECTIVE'
+FOR SHARE OF o;
+
+-- name: ResolveCurrentBobEffectiveReference :one
+SELECT view.*
+FROM bob_version_views view
+JOIN bob_objects o ON o.id = view.object_id AND o.entity = view.entity
+WHERE view.object_id = sqlc.arg(object_id) AND view.entity = sqlc.arg(entity)
+  AND view.version_id = o.current_version_id
+  AND view.version_id = o.effective_version_id
   AND view.status = 'EFFECTIVE'
 FOR SHARE OF o;

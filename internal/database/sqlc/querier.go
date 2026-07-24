@@ -162,6 +162,7 @@ type Querier interface {
 	RejectBobVersion(ctx context.Context, arg RejectBobVersionParams) (int64, error)
 	ResetSigninFailures(ctx context.Context, id string) error
 	ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (BobVersionView, error)
+	ResolveCurrentBobEffectiveReference(ctx context.Context, arg ResolveCurrentBobEffectiveReferenceParams) (BobVersionView, error)
 	ReviewVouDocument(ctx context.Context, arg ReviewVouDocumentParams) (int64, error)
 	RevokeAppSession(ctx context.Context, arg RevokeAppSessionParams) error
 	RevokeAppUserSessions(ctx context.Context, arg RevokeAppUserSessionsParams) error

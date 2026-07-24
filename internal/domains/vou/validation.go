@@ -134,7 +134,7 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Customer, "customer", true); err != nil {
 			return validatedDraft{}, err
 		}
-		if err = validateReference(input.Salesperson, "salesperson", true); err != nil {
+		if err = validateReference(input.Salesperson, "salesperson", false); err != nil {
 			return validatedDraft{}, err
 		}
 		if err = validateReference(input.Warehouse, "warehouse", true); err != nil {
@@ -148,7 +148,7 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Supplier, "supplier", true); err != nil {
 			return validatedDraft{}, err
 		}
-		if err = validateReference(input.Purchaser, "purchaser", true); err != nil {
+		if err = validateReference(input.Purchaser, "purchaser", false); err != nil {
 			return validatedDraft{}, err
 		}
 		if err = validateReference(input.Warehouse, "warehouse", true); err != nil {
@@ -165,10 +165,10 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Supplier, "supplier", true); err != nil {
 			return validatedDraft{}, err
 		}
-		if err = validateReference(input.Salesperson, "salesperson", true); err != nil {
+		if err = validateReference(input.Salesperson, "salesperson", false); err != nil {
 			return validatedDraft{}, err
 		}
-		if err = validateReference(input.Purchaser, "purchaser", true); err != nil {
+		if err = validateReference(input.Purchaser, "purchaser", false); err != nil {
 			return validatedDraft{}, err
 		}
 		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)

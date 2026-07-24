@@ -58,9 +58,12 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 func TestLifecycleIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "LSE" + newID(), Name: "Lifecycle Salesperson",
+	}, "lifecycle-salesperson")
 	code := "IT" + newID()
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: code, Name: "Integration Customer",
+		Code: code, Name: "Integration Customer", SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "integration-create")
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -178,6 +181,9 @@ func TestLifecycleIntegration(t *testing.T) {
 func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "LCE" + newID(), Name: "Contract Salesperson",
+	}, "contract-salesperson")
 	platform, _ := createApprovedIntegration(t, service, EntitySupplier, CreateDetailInput{
 		Code: "PL" + newID(), Name: "Lifecycle Platform",
 		SupplierType: stringIntegrationPointer(SupplierTypeLogisticsPlatform),
@@ -207,6 +213,9 @@ func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.entity, func(t *testing.T) {
 			test.data.Code = "LC" + newID()
+			if test.entity == EntityCustomer || test.entity == EntitySupplier {
+				test.data.SalespersonEmployeeID = salesperson.ObjectID
+			}
 			created, err := service.Create(t.Context(), test.entity, CreateInput{Data: test.data}, integrationActorOne, "contract-create")
 			if err != nil {
 				t.Fatalf("create: %v", err)
@@ -499,16 +508,18 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 
 	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "WC" + newID(), Name: "错误分类客户", CategoryID: productCategory.ObjectID,
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "wrong-category-target"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("wrong category target error = %v", err)
 	}
 	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "WS" + newID(), Name: "错误结算方式客户", SettlementMethodID: position.ObjectID,
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "wrong-settlement-target"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("wrong settlement target error = %v", err)
 	}
 	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: "WE" + newID(), Name: "错误业务员客户", SalespersonID: settlementMethod.ObjectID,
+		Code: "WE" + newID(), Name: "错误业务员客户", SalespersonEmployeeID: settlementMethod.ObjectID,
 	}}, integrationActorOne, "wrong-salesperson-target"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("wrong salesperson target error = %v", err)
 	}
@@ -519,7 +530,7 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 		t.Fatalf("create draft salesperson: %v", err)
 	}
 	if _, err = service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: "WD" + newID(), Name: "无效业务员客户", SalespersonID: draftSalesperson.ObjectID,
+		Code: "WD" + newID(), Name: "无效业务员客户", SalespersonEmployeeID: draftSalesperson.ObjectID,
 	}}, integrationActorOne, "inactive-salesperson-target"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("inactive salesperson target error = %v", err)
 	}
@@ -529,8 +540,8 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 		ShortName: "属性客户简称", CategoryID: category.ObjectID, TaxNumber: taxNumber,
 		ContactName: "联系人", ContactPhone: "+86 13800000000",
 		Email: "CONTACT@EXAMPLE.COM", Address: "上海市示例路", Remark: "新增属性",
-		SettlementMethodID: settlementMethod.ObjectID,
-		SalespersonID:      salesperson.ObjectID,
+		SettlementMethodID:    settlementMethod.ObjectID,
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "common-customer-create")
 	if err != nil {
 		t.Fatalf("create customer attributes: %v", err)
@@ -546,19 +557,39 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 	if err != nil || view.Data.ShortName != "属性客户简称" || view.Data.TaxNumber != taxNumber ||
 		view.Data.Email != "contact@example.com" || view.Data.CategoryID != category.ObjectID ||
 		view.Data.SettlementMethodID != settlementMethod.ObjectID ||
-		view.Data.SalespersonID != salesperson.ObjectID {
+		view.Data.SalespersonEmployeeID != salesperson.ObjectID {
 		t.Fatalf("preserved customer view=%+v err=%v", view, err)
 	}
 	page, err := service.Query(t.Context(), EntityCustomer, QueryInput{
 		Page: 1, PageSize: 20,
 		Filters: QueryFilters{
-			CustomerType: CustomerTypeDealer, CategoryID: category.ObjectID, Keyword: taxNumber,
+			CustomerType: CustomerTypeDealer, CategoryID: category.ObjectID,
+			SalespersonEmployeeID: salesperson.ObjectID, Keyword: taxNumber,
 		},
 	})
 	if err != nil || page.Total != 1 || len(page.Items) != 1 ||
 		page.Items[0].CurrentVersion.Summary.SettlementMethodID != settlementMethod.ObjectID ||
-		page.Items[0].CurrentVersion.Summary.SalespersonID != salesperson.ObjectID {
+		page.Items[0].CurrentVersion.Summary.SalespersonEmployeeID != salesperson.ObjectID {
 		t.Fatalf("query common attributes page=%+v err=%v", page, err)
+	}
+	supplier, err := service.Create(t.Context(), EntitySupplier, CreateInput{Data: CreateDetailInput{
+		Code: "SA" + newID(), Name: "属性供应商",
+		SettlementMethodID:    settlementMethod.ObjectID,
+		SalespersonEmployeeID: salesperson.ObjectID,
+	}}, integrationActorOne, "common-supplier-create")
+	if err != nil {
+		t.Fatalf("create supplier salesperson: %v", err)
+	}
+	supplierView, err := service.Get(t.Context(), EntitySupplier, GetInput{ObjectID: supplier.ObjectID})
+	if err != nil || supplierView.Data.SalespersonEmployeeID != salesperson.ObjectID {
+		t.Fatalf("supplier salesperson view=%+v err=%v", supplierView.Data, err)
+	}
+	supplierPage, err := service.Query(t.Context(), EntitySupplier, QueryInput{
+		Page: 1, PageSize: 20,
+		Filters: QueryFilters{SalespersonEmployeeID: salesperson.ObjectID},
+	})
+	if err != nil || supplierPage.Total < 1 {
+		t.Fatalf("query supplier salesperson page=%+v err=%v", supplierPage, err)
 	}
 	saved, err = service.Save(t.Context(), EntityCustomer, SaveInput{
 		ObjectID: customer.ObjectID, VersionID: customer.VersionID, Revision: saved.Revision,
@@ -575,8 +606,8 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 	}
 	clearable, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "CL" + newID(), Name: "清空默认值客户",
-		SettlementMethodID: settlementMethod.ObjectID,
-		SalespersonID:      salesperson.ObjectID,
+		SettlementMethodID:    settlementMethod.ObjectID,
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "common-customer-clear-create")
 	if err != nil {
 		t.Fatalf("create clearable customer: %v", err)
@@ -585,17 +616,19 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 		ObjectID: clearable.ObjectID, VersionID: clearable.VersionID, Revision: clearable.Revision,
 		Data: DetailInput{
 			Name: "清空默认值客户", SettlementMethodID: Optional(""),
-			SalespersonID: Optional(""),
+			SalespersonEmployeeID: Optional(""),
 		},
-	}, integrationActorOne, "common-customer-clear-references"); err != nil {
-		t.Fatalf("clear customer references: %v", err)
+	}, integrationActorOne, "common-customer-clear-references"); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("clear required salesperson error = %v", err)
 	}
 	clearedView, err := service.Get(t.Context(), EntityCustomer, GetInput{ObjectID: clearable.ObjectID})
-	if err != nil || clearedView.Data.SettlementMethodID != "" || clearedView.Data.SalespersonID != "" {
-		t.Fatalf("cleared customer view=%+v err=%v", clearedView, err)
+	if err != nil || clearedView.Data.SettlementMethodID != settlementMethod.ObjectID ||
+		clearedView.Data.SalespersonEmployeeID != salesperson.ObjectID {
+		t.Fatalf("rejected clear changed customer view=%+v err=%v", clearedView, err)
 	}
 	if _, err = service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "DU" + newID(), Name: "重复税号客户", TaxNumber: strings.ToLower(taxNumber),
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "duplicate-tax"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("duplicate tax error = %v", err)
 	}
@@ -913,7 +946,8 @@ func TestCurrentIdentifierUniquenessAndHistoryReleaseIntegration(t *testing.T) {
 		Code: "VP" + newID(), Name: "VIN 测试平台",
 		SupplierType: stringIntegrationPointer(SupplierTypeLogisticsPlatform),
 	}, "identifier-platform")
-	vin := "LSVAA4187N2" + newID()[20:]
+	vinSuffix := strings.ReplaceAll(newID()[20:], "Q", "A")
+	vin := "LSVAA4187N2" + vinSuffix
 	vehicle, err := service.Create(t.Context(), EntityVehicle, CreateInput{Data: CreateDetailInput{
 		Code: "VU" + newID(), Name: "唯一 VIN 车辆", PlateNumber: "沪B" + newID()[20:],
 		VehicleType: "货车", PlatformObjectID: platform.ObjectID, VIN: strings.ToLower(vin),
@@ -1151,6 +1185,9 @@ func TestDeletePermissionCatalogIntegration(t *testing.T) {
 func TestDeleteFirstDraftEveryEntityIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "DSE" + newID(), Name: "Delete Salesperson",
+	}, "delete-salesperson")
 	platform, _ := createApprovedIntegration(t, service, EntitySupplier, CreateDetailInput{
 		Code:         "DP" + newID(),
 		Name:         "Delete Vehicle Platform",
@@ -1162,7 +1199,7 @@ func TestDeleteFirstDraftEveryEntityIntegration(t *testing.T) {
 			created, err := service.Create(
 				t.Context(),
 				entity,
-				CreateInput{Data: deleteIntegrationData(entity, platform.ObjectID)},
+				CreateInput{Data: deleteIntegrationData(entity, platform.ObjectID, salesperson.ObjectID)},
 				integrationActorOne,
 				"delete-create-"+entity,
 			)
@@ -1196,12 +1233,16 @@ func TestDeleteFirstDraftEveryEntityIntegration(t *testing.T) {
 func TestDeleteFirstDraftRejectsLifecycleAndIdentityConflictsIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "DCE" + newID(), Name: "Delete Conflict Salesperson",
+	}, "delete-conflict-salesperson")
 
 	newCustomer := func(prefix string) MutationResult {
 		t.Helper()
 		created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-			Code: prefix + newID(),
-			Name: prefix + " Customer",
+			Code:                  prefix + newID(),
+			Name:                  prefix + " Customer",
+			SalespersonEmployeeID: salesperson.ObjectID,
 		}}, integrationActorOne, prefix+"-create")
 		if err != nil {
 			t.Fatalf("create %s customer: %v", prefix, err)
@@ -1306,9 +1347,13 @@ func TestDeleteFirstDraftRejectsLifecycleAndIdentityConflictsIntegration(t *test
 func TestDeleteFirstDraftRejectsVOUReferenceAndPreservesDataIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "DRE" + newID(), Name: "Referenced Draft Salesperson",
+	}, "delete-reference-salesperson")
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: "DREF" + newID(),
-		Name: "Referenced Draft Customer",
+		Code:                  "DREF" + newID(),
+		Name:                  "Referenced Draft Customer",
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "delete-reference-create")
 	if err != nil {
 		t.Fatalf("create referenced draft: %v", err)
@@ -1339,9 +1384,13 @@ func TestDeleteFirstDraftRejectsVOUReferenceAndPreservesDataIntegration(t *testi
 func TestDeleteFirstDraftRollbackAfterPartialWorkIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "DRBE" + newID(), Name: "Rollback Salesperson",
+	}, "delete-rollback-salesperson")
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: "DRB" + newID(),
-		Name: "Rollback Delete Customer",
+		Code:                  "DRB" + newID(),
+		Name:                  "Rollback Delete Customer",
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "delete-rollback-create")
 	if err != nil {
 		t.Fatalf("create rollback draft: %v", err)
@@ -1364,6 +1413,9 @@ func TestDeleteFirstDraftRollbackAfterPartialWorkIntegration(t *testing.T) {
 func TestDeleteFirstDraftConcurrencyIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "DCCE" + newID(), Name: "Delete Concurrency Salesperson",
+	}, "delete-concurrency-salesperson")
 	tests := []struct {
 		name   string
 		action func(MutationResult) error
@@ -1400,8 +1452,9 @@ func TestDeleteFirstDraftConcurrencyIntegration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-				Code: "DC" + newID(),
-				Name: "Concurrent Delete Customer",
+				Code:                  "DC" + newID(),
+				Name:                  "Concurrent Delete Customer",
+				SalespersonEmployeeID: salesperson.ObjectID,
 			}}, integrationActorOne, "delete-concurrent-create")
 			if err != nil {
 				t.Fatalf("create concurrent delete draft: %v", err)
@@ -1459,8 +1512,12 @@ func TestDeleteFirstDraftConcurrencyIntegration(t *testing.T) {
 func TestConcurrentEditAllowsOneWinnerIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "CCE" + newID(), Name: "Concurrent Edit Salesperson",
+	}, "concurrent-salesperson")
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "CC" + newID(), Name: "Concurrent Customer",
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "concurrent-create")
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -1510,8 +1567,12 @@ func TestConcurrentEditAllowsOneWinnerIntegration(t *testing.T) {
 func TestEffectiveReferenceLockBlocksEditIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "RLE" + newID(), Name: "Reference Lock Salesperson",
+	}, "lock-salesperson")
 	created, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "RL" + newID(), Name: "Reference Lock Customer",
+		SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "lock-create")
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -1592,14 +1653,17 @@ func TestDatabaseRejectsVersionWithoutTypedDetail(t *testing.T) {
 func TestDuplicateCodeReturnsConflictAndRollsBackIntegration(t *testing.T) {
 	pool := integrationPool(t)
 	service := NewService(pool)
+	_, salesperson := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "DUE" + newID(), Name: "Duplicate Code Salesperson",
+	}, "duplicate-salesperson")
 	code := "DU" + newID()
 	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: code, Name: "Original",
+		Code: code, Name: "Original", SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "duplicate-create-original"); err != nil {
 		t.Fatalf("create original: %v", err)
 	}
 	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
-		Code: code, Name: "Duplicate",
+		Code: code, Name: "Duplicate", SalespersonEmployeeID: salesperson.ObjectID,
 	}}, integrationActorOne, "duplicate-create-conflict"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("duplicate create error = %v", err)
 	}
@@ -1618,12 +1682,14 @@ func TestDuplicateCodeReturnsConflictAndRollsBackIntegration(t *testing.T) {
 	}
 }
 
-func deleteIntegrationData(entity, platformObjectID string) CreateDetailInput {
+func deleteIntegrationData(entity, platformObjectID, salespersonEmployeeID string) CreateDetailInput {
 	data := CreateDetailInput{
 		Code: "DEL" + newID(),
 		Name: "Deletable " + entity,
 	}
 	switch entity {
+	case EntityCustomer, EntitySupplier:
+		data.SalespersonEmployeeID = salespersonEmployeeID
 	case EntityProduct, EntityService:
 		data.Unit = "unit"
 	case EntityFundAccount:
@@ -1763,6 +1829,12 @@ func createApprovedIntegration(
 	requestPrefix string,
 ) (MutationResult, MutationResult) {
 	t.Helper()
+	if (entity == EntityCustomer || entity == EntitySupplier) && data.SalespersonEmployeeID == "" {
+		_, employee := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+			Code: "AUTOEMP" + newID(), Name: "Integration Salesperson",
+		}, requestPrefix+"-salesperson")
+		data.SalespersonEmployeeID = employee.ObjectID
+	}
 	created, err := service.Create(
 		t.Context(), entity, CreateInput{Data: data}, integrationActorOne, requestPrefix+"-create",
 	)

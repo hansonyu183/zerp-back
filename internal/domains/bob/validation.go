@@ -52,7 +52,7 @@ func validateCreate(entity string, input CreateDetailInput) (DetailView, string,
 		VIN: input.VIN, EngineNumber: input.EngineNumber, LoadCapacityKG: input.LoadCapacityKG,
 		AccountName: input.AccountName, BankName: input.BankName, BankBranch: input.BankBranch,
 		AccountNumber: input.AccountNumber, ParentID: input.ParentID,
-		SettlementMethodID: input.SettlementMethodID, SalespersonID: input.SalespersonID,
+		SettlementMethodID: input.SettlementMethodID, SalespersonEmployeeID: input.SalespersonEmployeeID,
 		RuleType:    input.RuleType,
 		MonthOffset: input.MonthOffset, DayOfMonth: input.DayOfMonth, DayOffset: input.DayOffset,
 	}
@@ -112,7 +112,7 @@ func mergeDetailInput(current DetailView, input DetailInput) DetailView {
 	mergeOptional(input.AccountNumber, &result.AccountNumber)
 	mergeOptional(input.ParentID, &result.ParentID)
 	mergeOptional(input.SettlementMethodID, &result.SettlementMethodID)
-	mergeOptional(input.SalespersonID, &result.SalespersonID)
+	mergeOptional(input.SalespersonEmployeeID, &result.SalespersonEmployeeID)
 	return result
 }
 
@@ -141,9 +141,9 @@ func validateDetailInputFields(entity string, input DetailInput) error {
 	}
 	switch entity {
 	case EntityCustomer:
-		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonId")
+		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonEmployeeId")
 	case EntitySupplier:
-		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId")
+		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonEmployeeId")
 	case EntityEmployee:
 		allow("categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark")
 	case EntityProduct:
@@ -181,7 +181,7 @@ func validateDetailInputFields(entity string, input DetailInput) error {
 		"accountName": input.AccountName.Set, "bankName": input.BankName.Set,
 		"bankBranch": input.BankBranch.Set, "accountNumber": input.AccountNumber.Set,
 		"parentId": input.ParentID.Set, "settlementMethodId": input.SettlementMethodID.Set,
-		"salespersonId": input.SalespersonID.Set,
+		"salespersonEmployeeId": input.SalespersonEmployeeID.Set,
 	}
 	for field, present := range provided {
 		if present && !allowed[field] {
@@ -227,7 +227,7 @@ func normalizeDetail(input *DetailView) {
 	}
 	for _, value := range []*string{
 		&input.PlatformObjectID, &input.CategoryID, &input.DepartmentID, &input.PositionID,
-		&input.ManagerEmployeeID, &input.ParentID, &input.SettlementMethodID, &input.SalespersonID,
+		&input.ManagerEmployeeID, &input.ParentID, &input.SettlementMethodID, &input.SalespersonEmployeeID,
 	} {
 		trim(value)
 	}
@@ -300,14 +300,20 @@ func validateEntityFields(entity string, input DetailView) error {
 	}
 	switch entity {
 	case EntityCustomer:
-		allow("customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonId")
+		allow("customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonEmployeeId")
 		if !validCustomerType(input.CustomerType) {
 			return domainError(ErrorValidation, "invalid customer type", nil, nil)
 		}
+		if input.SalespersonEmployeeID == "" {
+			return domainError(ErrorValidation, "salesperson employee is required", nil, nil)
+		}
 	case EntitySupplier:
-		allow("supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId")
+		allow("supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonEmployeeId")
 		if !validSupplierType(input.SupplierType) {
 			return domainError(ErrorValidation, "invalid supplier type", nil, nil)
+		}
+		if input.SalespersonEmployeeID == "" {
+			return domainError(ErrorValidation, "salesperson employee is required", nil, nil)
 		}
 	case EntityEmployee:
 		allow("categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark")
@@ -360,7 +366,7 @@ func validateEntityFields(entity string, input DetailView) error {
 	}
 	for _, id := range []string{
 		input.CategoryID, input.DepartmentID, input.PositionID, input.ManagerEmployeeID,
-		input.ParentID, input.SettlementMethodID, input.SalespersonID,
+		input.ParentID, input.SettlementMethodID, input.SalespersonEmployeeID,
 	} {
 		if id != "" && !validID(id) {
 			return domainError(ErrorValidation, "invalid reference id", nil, nil)
@@ -384,10 +390,10 @@ func detailFieldValues(input DetailView) map[string]string {
 		"engineNumber": input.EngineNumber, "loadCapacityKg": input.LoadCapacityKG,
 		"accountName": input.AccountName, "bankName": input.BankName, "bankBranch": input.BankBranch,
 		"accountNumber": input.AccountNumber, "parentId": input.ParentID,
-		"settlementMethodId": input.SettlementMethodID,
-		"salespersonId":      input.SalespersonID,
-		"ruleType":           input.RuleType,
-		"monthOffset":        numericField(input.MonthOffset), "dayOfMonth": optionalNumericField(input.DayOfMonth),
+		"settlementMethodId":    input.SettlementMethodID,
+		"salespersonEmployeeId": input.SalespersonEmployeeID,
+		"ruleType":              input.RuleType,
+		"monthOffset":           numericField(input.MonthOffset), "dayOfMonth": optionalNumericField(input.DayOfMonth),
 		"dayOffset": numericField(input.DayOffset),
 	}
 }
@@ -477,6 +483,7 @@ func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, erro
 	input.CategoryID = strings.TrimSpace(input.CategoryID)
 	input.DepartmentID = strings.TrimSpace(input.DepartmentID)
 	input.PositionID = strings.TrimSpace(input.PositionID)
+	input.SalespersonEmployeeID = strings.TrimSpace(input.SalespersonEmployeeID)
 	input.ParentID = strings.TrimSpace(input.ParentID)
 	if utf8.RuneCountInString(input.Keyword) > 128 || len(input.Status) > 5 ||
 		(input.CustomerType != "" && !validCustomerType(input.CustomerType)) ||
@@ -486,7 +493,10 @@ func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, erro
 		(input.ParentID != "" && input.RootOnly) {
 		return QueryFilters{}, domainError(ErrorValidation, "invalid query filters", nil, nil)
 	}
-	for _, id := range []string{input.CategoryID, input.DepartmentID, input.PositionID, input.ParentID} {
+	for _, id := range []string{
+		input.CategoryID, input.DepartmentID, input.PositionID,
+		input.SalespersonEmployeeID, input.ParentID,
+	} {
 		if id != "" && !validID(id) {
 			return QueryFilters{}, domainError(ErrorValidation, "invalid query reference filter", nil, nil)
 		}
@@ -502,6 +512,8 @@ func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, erro
 			"categoryId":   input.CategoryID != "" || input.provided["categoryId"],
 			"departmentId": input.DepartmentID != "" || input.provided["departmentId"],
 			"positionId":   input.PositionID != "" || input.provided["positionId"],
+			"salespersonEmployeeId": input.SalespersonEmployeeID != "" ||
+				input.provided["salespersonEmployeeId"],
 			"currency":     input.Currency != "" || input.provided["currency"],
 			"targetEntity": input.TargetEntity != "" || input.provided["targetEntity"],
 			"parentId":     input.ParentID != "" || input.provided["parentId"],
@@ -517,9 +529,9 @@ func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, erro
 	var unexpected bool
 	switch entity {
 	case EntityCustomer:
-		unexpected = hasUnexpected("customerType", "categoryId")
+		unexpected = hasUnexpected("customerType", "categoryId", "salespersonEmployeeId")
 	case EntitySupplier:
-		unexpected = hasUnexpected("supplierType", "categoryId")
+		unexpected = hasUnexpected("supplierType", "categoryId", "salespersonEmployeeId")
 	case EntityEmployee:
 		unexpected = hasUnexpected("categoryId", "departmentId", "positionId")
 	case EntityProduct, EntityService, EntityWarehouse, EntityVehicle:

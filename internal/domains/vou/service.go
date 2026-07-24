@@ -20,6 +20,7 @@ import (
 
 type effectiveReferenceResolver interface {
 	ResolveEffectiveReference(context.Context, pgx.Tx, string, string, string) (bobdomain.EffectiveReference, error)
+	ResolveCurrentEffectiveReference(context.Context, pgx.Tx, string, string) (bobdomain.EffectiveReference, error)
 }
 
 type eventPublisher interface {
@@ -114,7 +115,7 @@ func (s *Service) Create(
 	}); err != nil {
 		return MutationResult{}, s.writeError("insert document", err)
 	}
-	resolved, err := s.resolveDraft(ctx, tx, entity, draft)
+	resolved, err := s.resolveDraft(ctx, tx, entity, draft, resolvedDraft{}, true)
 	if err != nil {
 		return MutationResult{}, err
 	}
@@ -157,7 +158,11 @@ func (s *Service) Save(
 	if err = documentWriteConflict(err, document.Revision, input.Revision, document.Status, StatusDraft); err != nil {
 		return MutationResult{}, err
 	}
-	resolved, err := s.resolveDraft(ctx, tx, entity, draft)
+	preserved, err := s.loadPreservedPersonnel(ctx, q, entity, input.DocumentID)
+	if err != nil {
+		return MutationResult{}, err
+	}
+	resolved, err := s.resolveDraft(ctx, tx, entity, draft, preserved, false)
 	if err != nil {
 		return MutationResult{}, err
 	}
@@ -575,8 +580,64 @@ func (s *Service) AuditHistory(ctx context.Context, entity string, input History
 	return Page[AuditEventView]{Items: items, Total: total, Page: input.Page, PageSize: input.PageSize}, nil
 }
 
+func (s *Service) loadPreservedPersonnel(
+	ctx context.Context, q *dbsqlc.Queries, entity, documentID string,
+) (resolvedDraft, error) {
+	var result resolvedDraft
+	makeReference := func(
+		objectID, versionID, code, name *string,
+	) *bobdomain.EffectiveReference {
+		if objectID == nil || versionID == nil || code == nil || name == nil {
+			return nil
+		}
+		return &bobdomain.EffectiveReference{
+			ObjectID: *objectID, Entity: bobdomain.EntityEmployee, Code: *code, VersionID: *versionID,
+			Data: bobdomain.DetailView{Name: *name},
+		}
+	}
+	switch entity {
+	case EntitySaleOrder:
+		detail, err := q.GetVouSaleOrderDetail(ctx, documentID)
+		if err != nil {
+			return result, s.internal("read sale order salesperson", err)
+		}
+		result.Salesperson = makeReference(
+			detail.SalespersonObjectID, detail.SalespersonVersionID,
+			detail.SalespersonCode, detail.SalespersonName,
+		)
+	case EntityPurchaseOrder:
+		detail, err := q.GetVouPurchaseOrderDetail(ctx, documentID)
+		if err != nil {
+			return result, s.internal("read purchase order purchaser", err)
+		}
+		result.Purchaser = makeReference(
+			detail.PurchaserObjectID, detail.PurchaserVersionID,
+			detail.PurchaserCode, detail.PurchaserName,
+		)
+	case EntityIntermediarySaleOrder:
+		detail, err := q.GetVouIntermediarySaleOrderDetail(ctx, documentID)
+		if err != nil {
+			return result, s.internal("read intermediary order personnel", err)
+		}
+		result.Salesperson = makeReference(
+			detail.SalespersonObjectID, detail.SalespersonVersionID,
+			detail.SalespersonCode, detail.SalespersonName,
+		)
+		result.Purchaser = makeReference(
+			detail.PurchaserObjectID, detail.PurchaserVersionID,
+			detail.PurchaserCode, detail.PurchaserName,
+		)
+	}
+	return result, nil
+}
+
 func (s *Service) resolveDraft(
-	ctx context.Context, tx pgx.Tx, entity string, draft validatedDraft,
+	ctx context.Context,
+	tx pgx.Tx,
+	entity string,
+	draft validatedDraft,
+	preserved resolvedDraft,
+	allowPersonnelDefaults bool,
 ) (resolvedDraft, error) {
 	var result resolvedDraft
 	var err error
@@ -605,10 +666,41 @@ func (s *Service) resolveDraft(
 	if result.Employee, err = resolve(bobdomain.EntityEmployee, draft.Employee); err != nil {
 		return result, err
 	}
-	if result.Salesperson, err = resolve(bobdomain.EntityEmployee, draft.Salesperson); err != nil {
+	resolveCurrentEmployee := func(objectID, field string) (*bobdomain.EffectiveReference, error) {
+		ref, resolveErr := s.resolver.ResolveCurrentEffectiveReference(
+			ctx, tx, bobdomain.EntityEmployee, objectID,
+		)
+		if resolveErr != nil {
+			return nil, domainError(ErrorConflict, field+" is not an effective employee", nil, resolveErr)
+		}
+		return &ref, nil
+	}
+	if draft.Salesperson != nil {
+		result.Salesperson, err = resolve(bobdomain.EntityEmployee, draft.Salesperson)
+	} else if preserved.Salesperson != nil {
+		result.Salesperson = preserved.Salesperson
+	} else if allowPersonnelDefaults && result.Customer != nil {
+		result.Salesperson, err = resolveCurrentEmployee(
+			result.Customer.Data.SalespersonEmployeeID, "customer salesperson",
+		)
+	} else if entity == EntitySaleOrder || entity == EntityIntermediarySaleOrder {
+		err = domainError(ErrorConflict, "salesperson is required", nil, nil)
+	}
+	if err != nil {
 		return result, err
 	}
-	if result.Purchaser, err = resolve(bobdomain.EntityEmployee, draft.Purchaser); err != nil {
+	if draft.Purchaser != nil {
+		result.Purchaser, err = resolve(bobdomain.EntityEmployee, draft.Purchaser)
+	} else if preserved.Purchaser != nil {
+		result.Purchaser = preserved.Purchaser
+	} else if allowPersonnelDefaults && result.Supplier != nil {
+		result.Purchaser, err = resolveCurrentEmployee(
+			result.Supplier.Data.SalespersonEmployeeID, "supplier salesperson",
+		)
+	} else if entity == EntityPurchaseOrder || entity == EntityIntermediarySaleOrder {
+		err = domainError(ErrorConflict, "purchaser is required", nil, nil)
+	}
+	if err != nil {
 		return result, err
 	}
 	if result.Handler, err = resolve(bobdomain.EntityEmployee, draft.Handler); err != nil {

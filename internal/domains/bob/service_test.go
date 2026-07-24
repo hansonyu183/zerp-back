@@ -15,12 +15,17 @@ func errorIsKind(err error, kind ErrorKind) bool {
 
 func TestValidateCreateNormalizesCodeAndEntityFields(t *testing.T) {
 	const platformObjectID = "01J00000000000000000000020"
+	const salespersonEmployeeID = "01J00000000000000000000021"
 	tests := []struct {
 		entity string
 		input  CreateDetailInput
 	}{
-		{EntityCustomer, CreateDetailInput{Code: " cus.01 ", Name: " Customer "}},
-		{EntitySupplier, CreateDetailInput{Code: "sup-01", Name: "Supplier"}},
+		{EntityCustomer, CreateDetailInput{
+			Code: " cus.01 ", Name: " Customer ", SalespersonEmployeeID: salespersonEmployeeID,
+		}},
+		{EntitySupplier, CreateDetailInput{
+			Code: "sup-01", Name: "Supplier", SalespersonEmployeeID: salespersonEmployeeID,
+		}},
 		{EntityEmployee, CreateDetailInput{Code: "emp_01", Name: "Employee"}},
 		{EntityProduct, CreateDetailInput{Code: "prd01", Name: "Product", Unit: "piece"}},
 		{EntityService, CreateDetailInput{Code: "svc01", Name: "Service", Unit: "hour"}},
@@ -71,11 +76,14 @@ func TestValidateSupplierTypeCompatibility(t *testing.T) {
 	logisticsPlatform := " logistics_platform "
 	data, _, err := validateCreate(EntitySupplier, CreateDetailInput{
 		Code: "platform01", Name: "物流平台", SupplierType: &logisticsPlatform,
+		SalespersonEmployeeID: "01J00000000000000000000021",
 	})
 	if err != nil || data.SupplierType != SupplierTypeLogisticsPlatform {
 		t.Fatalf("logistics supplier data=%+v err=%v", data, err)
 	}
-	if _, err = validateDetail(EntitySupplier, DetailInput{Name: "兼容保存"}); err != nil {
+	if _, err = validateDetail(EntitySupplier, DetailInput{
+		Name: "兼容保存", SalespersonEmployeeID: Optional("01J00000000000000000000021"),
+	}); err != nil {
 		t.Fatalf("omitted supplier type rejected: %v", err)
 	}
 	invalid := "OTHER"
@@ -166,7 +174,10 @@ func TestQueryValidationBoundaries(t *testing.T) {
 }
 
 func TestValidateDetailCountsUnicodeCharacters(t *testing.T) {
-	if _, err := validateDetail(EntityCustomer, DetailInput{Name: strings.Repeat("客", 200)}); err != nil {
+	if _, err := validateDetail(EntityCustomer, DetailInput{
+		Name:                  strings.Repeat("客", 200),
+		SalespersonEmployeeID: Optional("01J00000000000000000000021"),
+	}); err != nil {
 		t.Fatalf("200-character name rejected: %v", err)
 	}
 	if _, err := validateDetail(EntityCustomer, DetailInput{Name: strings.Repeat("客", 201)}); !errorIsKind(err, ErrorValidation) {
@@ -213,6 +224,7 @@ func TestCommonAttributesNormalizeAndValidate(t *testing.T) {
 	customer, _, err := validateCreate(EntityCustomer, CreateDetailInput{
 		Code: " customer-1 ", Name: " 客户 ",
 		TaxNumber: " ab-123 ", Email: " SALES@EXAMPLE.COM ",
+		SalespersonEmployeeID: "01J00000000000000000000021",
 	})
 	if err != nil {
 		t.Fatalf("validate customer: %v", err)
@@ -271,7 +283,13 @@ func TestCommonAttributesNormalizeAndValidate(t *testing.T) {
 			Code: "SERVICE-2", Name: "服务", Unit: "次", Remark: strings.Repeat("注", 1001),
 		}},
 		{"invalid customer salesperson id", EntityCustomer, CreateDetailInput{
-			Code: "CUSTOMER-4", Name: "客户", SalespersonID: "not-an-object-id",
+			Code: "CUSTOMER-4", Name: "客户", SalespersonEmployeeID: "not-an-object-id",
+		}},
+		{"missing customer salesperson", EntityCustomer, CreateDetailInput{
+			Code: "CUSTOMER-5", Name: "客户",
+		}},
+		{"missing supplier salesperson", EntitySupplier, CreateDetailInput{
+			Code: "SUPPLIER-5", Name: "供应商",
 		}},
 	}
 	for _, test := range invalidCases {
@@ -287,8 +305,8 @@ func TestCommonAttributeSaveOmissionAndExplicitClear(t *testing.T) {
 	current := DetailView{
 		Name: "客户", CustomerType: CustomerTypeDealer, ShortName: "简称",
 		TaxNumber: "TAX001", CategoryID: "01J00000000000000000000020",
-		SettlementMethodID: "01J00000000000000000000021",
-		SalespersonID:      "01J00000000000000000000022",
+		SettlementMethodID:    "01J00000000000000000000021",
+		SalespersonEmployeeID: "01J00000000000000000000022",
 	}
 	var omitted DetailInput
 	if err := json.Unmarshal([]byte(`{"name":"更新客户"}`), &omitted); err != nil {
@@ -296,20 +314,23 @@ func TestCommonAttributeSaveOmissionAndExplicitClear(t *testing.T) {
 	}
 	merged := mergeDetailInput(current, omitted)
 	if merged.ShortName != "简称" || merged.TaxNumber != "TAX001" || merged.CategoryID == "" ||
-		merged.SettlementMethodID == "" || merged.SalespersonID == "" {
+		merged.SettlementMethodID == "" || merged.SalespersonEmployeeID == "" {
 		t.Fatalf("omitted fields were not preserved: %+v", merged)
 	}
 
 	var cleared DetailInput
 	if err := json.Unmarshal([]byte(
-		`{"name":"更新客户","shortName":null,"taxNumber":"","settlementMethodId":null,"salespersonId":""}`,
+		`{"name":"更新客户","shortName":null,"taxNumber":"","settlementMethodId":null,"salespersonEmployeeId":""}`,
 	), &cleared); err != nil {
 		t.Fatalf("decode clear input: %v", err)
 	}
 	merged = mergeDetailInput(current, cleared)
 	if merged.ShortName != "" || merged.TaxNumber != "" || merged.CategoryID == "" ||
-		merged.SettlementMethodID != "" || merged.SalespersonID != "" {
+		merged.SettlementMethodID != "" || merged.SalespersonEmployeeID != "" {
 		t.Fatalf("explicit clear failed: %+v", merged)
+	}
+	if _, err := validateDetailData(EntityCustomer, merged); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("required salesperson clear error = %v", err)
 	}
 }
 
@@ -329,6 +350,11 @@ func TestCategoryAndQueryFilterValidation(t *testing.T) {
 		PositionID:   "01J00000000000000000000021",
 	}); err != nil {
 		t.Fatalf("employee filters rejected: %v", err)
+	}
+	if _, err := validateQueryFilters(EntitySupplier, QueryFilters{
+		SalespersonEmployeeID: "01J00000000000000000000022",
+	}); err != nil {
+		t.Fatalf("supplier salesperson filter rejected: %v", err)
 	}
 	if _, err := validateQueryFilters(EntityProduct, QueryFilters{CustomerType: CustomerTypeDealer}); !errorIsKind(err, ErrorValidation) {
 		t.Fatalf("cross-entity filter error = %v", err)

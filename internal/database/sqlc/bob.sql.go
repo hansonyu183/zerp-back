@@ -110,13 +110,14 @@ SELECT EXISTS (
     SELECT 1 FROM bob_customer_versions
     WHERE category_id = $1
        OR settlement_method_id = $1
-       OR salesperson_id = $1
+       OR salesperson_employee_id = $1
 
     UNION ALL
 
     SELECT 1 FROM bob_supplier_versions
     WHERE category_id = $1
        OR settlement_method_id = $1
+       OR salesperson_employee_id = $1
 
     UNION ALL
 
@@ -295,11 +296,11 @@ func (q *Queries) CopyBobCategoryDetail(ctx context.Context, arg CopyBobCategory
 const copyBobCustomerDetail = `-- name: CopyBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_employee_id
 )
 SELECT $1, d.name, d.customer_type, d.short_name, d.category_id,
        d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
-       d.settlement_method_id, d.salesperson_id
+       d.settlement_method_id, d.salesperson_employee_id
 FROM bob_customer_versions d WHERE d.version_id = $2
 `
 
@@ -440,11 +441,12 @@ func (q *Queries) CopyBobSettlementMethodDetail(ctx context.Context, arg CopyBob
 const copyBobSupplierDetail = `-- name: CopyBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id,
+    salesperson_employee_id
 )
 SELECT $1, d.name, d.supplier_type, d.short_name, d.category_id,
        d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
-       d.settlement_method_id
+       d.settlement_method_id, d.salesperson_employee_id
 FROM bob_supplier_versions d WHERE d.version_id = $2
 `
 
@@ -523,46 +525,48 @@ WHERE entity = $1 AND version_id = current_version_id
   AND ($5::text = '' OR category_id = $5)
   AND ($6::text = '' OR department_id = $6)
   AND ($7::text = '' OR position_id = $7)
-  AND ($8::text = '' OR currency = $8)
-  AND ($9::text = '' OR target_entity = $9)
-  AND ($10::text = '' OR parent_id = $10)
-  AND (NOT $11::boolean OR parent_id = '')
+  AND ($8::text = '' OR salesperson_employee_id = $8)
+  AND ($9::text = '' OR currency = $9)
+  AND ($10::text = '' OR target_entity = $10)
+  AND ($11::text = '' OR parent_id = $11)
+  AND (NOT $12::boolean OR parent_id = '')
   AND (
-      $12::text = ''
-      OR code ILIKE '%' || $12 || '%'
-      OR name ILIKE '%' || $12 || '%'
-      OR (entity = 'vehicle' AND plate_number ILIKE '%' || $12 || '%')
-      OR short_name ILIKE '%' || $12 || '%'
-      OR tax_number ILIKE '%' || $12 || '%'
-      OR contact_name ILIKE '%' || $12 || '%'
-      OR contact_phone ILIKE '%' || $12 || '%'
-      OR email ILIKE '%' || $12 || '%'
-      OR address ILIKE '%' || $12 || '%'
-      OR phone ILIKE '%' || $12 || '%'
-      OR specification ILIKE '%' || $12 || '%'
-      OR model ILIKE '%' || $12 || '%'
-      OR barcode ILIKE '%' || $12 || '%'
-      OR vin ILIKE '%' || $12 || '%'
-      OR engine_number ILIKE '%' || $12 || '%'
-      OR account_name ILIKE '%' || $12 || '%'
-      OR bank_name ILIKE '%' || $12 || '%'
-      OR bank_branch ILIKE '%' || $12 || '%'
+      $13::text = ''
+      OR code ILIKE '%' || $13 || '%'
+      OR name ILIKE '%' || $13 || '%'
+      OR (entity = 'vehicle' AND plate_number ILIKE '%' || $13 || '%')
+      OR short_name ILIKE '%' || $13 || '%'
+      OR tax_number ILIKE '%' || $13 || '%'
+      OR contact_name ILIKE '%' || $13 || '%'
+      OR contact_phone ILIKE '%' || $13 || '%'
+      OR email ILIKE '%' || $13 || '%'
+      OR address ILIKE '%' || $13 || '%'
+      OR phone ILIKE '%' || $13 || '%'
+      OR specification ILIKE '%' || $13 || '%'
+      OR model ILIKE '%' || $13 || '%'
+      OR barcode ILIKE '%' || $13 || '%'
+      OR vin ILIKE '%' || $13 || '%'
+      OR engine_number ILIKE '%' || $13 || '%'
+      OR account_name ILIKE '%' || $13 || '%'
+      OR bank_name ILIKE '%' || $13 || '%'
+      OR bank_branch ILIKE '%' || $13 || '%'
   )
 `
 
 type CountBobObjectsParams struct {
-	Entity       string   `db:"entity" json:"entity"`
-	Statuses     []string `db:"statuses" json:"statuses"`
-	CustomerType string   `db:"customer_type" json:"customer_type"`
-	SupplierType string   `db:"supplier_type" json:"supplier_type"`
-	CategoryID   string   `db:"category_id" json:"category_id"`
-	DepartmentID string   `db:"department_id" json:"department_id"`
-	PositionID   string   `db:"position_id" json:"position_id"`
-	Currency     string   `db:"currency" json:"currency"`
-	TargetEntity string   `db:"target_entity" json:"target_entity"`
-	ParentID     string   `db:"parent_id" json:"parent_id"`
-	RootOnly     bool     `db:"root_only" json:"root_only"`
-	Keyword      string   `db:"keyword" json:"keyword"`
+	Entity                string   `db:"entity" json:"entity"`
+	Statuses              []string `db:"statuses" json:"statuses"`
+	CustomerType          string   `db:"customer_type" json:"customer_type"`
+	SupplierType          string   `db:"supplier_type" json:"supplier_type"`
+	CategoryID            string   `db:"category_id" json:"category_id"`
+	DepartmentID          string   `db:"department_id" json:"department_id"`
+	PositionID            string   `db:"position_id" json:"position_id"`
+	SalespersonEmployeeID string   `db:"salesperson_employee_id" json:"salesperson_employee_id"`
+	Currency              string   `db:"currency" json:"currency"`
+	TargetEntity          string   `db:"target_entity" json:"target_entity"`
+	ParentID              string   `db:"parent_id" json:"parent_id"`
+	RootOnly              bool     `db:"root_only" json:"root_only"`
+	Keyword               string   `db:"keyword" json:"keyword"`
 }
 
 func (q *Queries) CountBobObjects(ctx context.Context, arg CountBobObjectsParams) (int64, error) {
@@ -574,6 +578,7 @@ func (q *Queries) CountBobObjects(ctx context.Context, arg CountBobObjectsParams
 		arg.CategoryID,
 		arg.DepartmentID,
 		arg.PositionID,
+		arg.SalespersonEmployeeID,
 		arg.Currency,
 		arg.TargetEntity,
 		arg.ParentID,
@@ -851,7 +856,7 @@ func (q *Queries) FindBobObjectIDByCode(ctx context.Context, arg FindBobObjectID
 }
 
 const getBobVersionView = `-- name: GetBobVersionView :one
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset FROM bob_version_views
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_employee_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset FROM bob_version_views
 WHERE object_id = $1 AND entity = $2
   AND version_id = COALESCE(NULLIF($3::text, ''), current_version_id)
 `
@@ -921,7 +926,7 @@ func (q *Queries) GetBobVersionView(ctx context.Context, arg GetBobVersionViewPa
 		&i.TargetEntity,
 		&i.ParentID,
 		&i.SettlementMethodID,
-		&i.SalespersonID,
+		&i.SalespersonEmployeeID,
 		&i.SettlementMethodVersionID,
 		&i.SettlementRuleType,
 		&i.SettlementMonthOffset,
@@ -1001,7 +1006,7 @@ func (q *Queries) InsertBobCategoryDetail(ctx context.Context, arg InsertBobCate
 const insertBobCustomerDetail = `-- name: InsertBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_employee_id
 ) VALUES (
     $1, $2, $3,
     $4, $5, $6,
@@ -1012,19 +1017,19 @@ INSERT INTO bob_customer_versions (
 `
 
 type InsertBobCustomerDetailParams struct {
-	VersionID          string  `db:"version_id" json:"version_id"`
-	Name               string  `db:"name" json:"name"`
-	CustomerType       string  `db:"customer_type" json:"customer_type"`
-	ShortName          *string `db:"short_name" json:"short_name"`
-	CategoryID         *string `db:"category_id" json:"category_id"`
-	TaxNumber          *string `db:"tax_number" json:"tax_number"`
-	ContactName        *string `db:"contact_name" json:"contact_name"`
-	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
-	Email              *string `db:"email" json:"email"`
-	Address            *string `db:"address" json:"address"`
-	Remark             *string `db:"remark" json:"remark"`
-	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
-	SalespersonID      *string `db:"salesperson_id" json:"salesperson_id"`
+	VersionID             string  `db:"version_id" json:"version_id"`
+	Name                  string  `db:"name" json:"name"`
+	CustomerType          string  `db:"customer_type" json:"customer_type"`
+	ShortName             *string `db:"short_name" json:"short_name"`
+	CategoryID            *string `db:"category_id" json:"category_id"`
+	TaxNumber             *string `db:"tax_number" json:"tax_number"`
+	ContactName           *string `db:"contact_name" json:"contact_name"`
+	ContactPhone          *string `db:"contact_phone" json:"contact_phone"`
+	Email                 *string `db:"email" json:"email"`
+	Address               *string `db:"address" json:"address"`
+	Remark                *string `db:"remark" json:"remark"`
+	SettlementMethodID    *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SalespersonEmployeeID string  `db:"salesperson_employee_id" json:"salesperson_employee_id"`
 }
 
 func (q *Queries) InsertBobCustomerDetail(ctx context.Context, arg InsertBobCustomerDetailParams) error {
@@ -1041,7 +1046,7 @@ func (q *Queries) InsertBobCustomerDetail(ctx context.Context, arg InsertBobCust
 		arg.Address,
 		arg.Remark,
 		arg.SettlementMethodID,
-		arg.SalespersonID,
+		arg.SalespersonEmployeeID,
 	)
 	return err
 }
@@ -1296,28 +1301,31 @@ func (q *Queries) InsertBobSettlementMethodDetail(ctx context.Context, arg Inser
 const insertBobSupplierDetail = `-- name: InsertBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark, settlement_method_id
+    contact_name, contact_phone, email, address, remark, settlement_method_id,
+    salesperson_employee_id
 ) VALUES (
     $1, $2, $3,
     $4, $5, $6,
     $7, $8, $9,
-    $10, $11, $12
+    $10, $11, $12,
+    $13
 )
 `
 
 type InsertBobSupplierDetailParams struct {
-	VersionID          string  `db:"version_id" json:"version_id"`
-	Name               string  `db:"name" json:"name"`
-	SupplierType       string  `db:"supplier_type" json:"supplier_type"`
-	ShortName          *string `db:"short_name" json:"short_name"`
-	CategoryID         *string `db:"category_id" json:"category_id"`
-	TaxNumber          *string `db:"tax_number" json:"tax_number"`
-	ContactName        *string `db:"contact_name" json:"contact_name"`
-	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
-	Email              *string `db:"email" json:"email"`
-	Address            *string `db:"address" json:"address"`
-	Remark             *string `db:"remark" json:"remark"`
-	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
+	VersionID             string  `db:"version_id" json:"version_id"`
+	Name                  string  `db:"name" json:"name"`
+	SupplierType          string  `db:"supplier_type" json:"supplier_type"`
+	ShortName             *string `db:"short_name" json:"short_name"`
+	CategoryID            *string `db:"category_id" json:"category_id"`
+	TaxNumber             *string `db:"tax_number" json:"tax_number"`
+	ContactName           *string `db:"contact_name" json:"contact_name"`
+	ContactPhone          *string `db:"contact_phone" json:"contact_phone"`
+	Email                 *string `db:"email" json:"email"`
+	Address               *string `db:"address" json:"address"`
+	Remark                *string `db:"remark" json:"remark"`
+	SettlementMethodID    *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SalespersonEmployeeID string  `db:"salesperson_employee_id" json:"salesperson_employee_id"`
 }
 
 func (q *Queries) InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error {
@@ -1334,6 +1342,7 @@ func (q *Queries) InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupp
 		arg.Address,
 		arg.Remark,
 		arg.SettlementMethodID,
+		arg.SalespersonEmployeeID,
 	)
 	return err
 }
@@ -1525,7 +1534,7 @@ func (q *Queries) ListBobAuditEvents(ctx context.Context, arg ListBobAuditEvents
 }
 
 const listBobObjects = `-- name: ListBobObjects :many
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_employee_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset
 FROM bob_version_views
 WHERE entity = $1 AND version_id = current_version_id
   AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
@@ -1534,63 +1543,65 @@ WHERE entity = $1 AND version_id = current_version_id
   AND ($5::text = '' OR category_id = $5)
   AND ($6::text = '' OR department_id = $6)
   AND ($7::text = '' OR position_id = $7)
-  AND ($8::text = '' OR currency = $8)
-  AND ($9::text = '' OR target_entity = $9)
-  AND ($10::text = '' OR parent_id = $10)
-  AND (NOT $11::boolean OR parent_id = '')
+  AND ($8::text = '' OR salesperson_employee_id = $8)
+  AND ($9::text = '' OR currency = $9)
+  AND ($10::text = '' OR target_entity = $10)
+  AND ($11::text = '' OR parent_id = $11)
+  AND (NOT $12::boolean OR parent_id = '')
   AND (
-      $12::text = ''
-      OR code ILIKE '%' || $12 || '%'
-      OR name ILIKE '%' || $12 || '%'
-      OR (entity = 'vehicle' AND plate_number ILIKE '%' || $12 || '%')
-      OR short_name ILIKE '%' || $12 || '%'
-      OR tax_number ILIKE '%' || $12 || '%'
-      OR contact_name ILIKE '%' || $12 || '%'
-      OR contact_phone ILIKE '%' || $12 || '%'
-      OR email ILIKE '%' || $12 || '%'
-      OR address ILIKE '%' || $12 || '%'
-      OR phone ILIKE '%' || $12 || '%'
-      OR specification ILIKE '%' || $12 || '%'
-      OR model ILIKE '%' || $12 || '%'
-      OR barcode ILIKE '%' || $12 || '%'
-      OR vin ILIKE '%' || $12 || '%'
-      OR engine_number ILIKE '%' || $12 || '%'
-      OR account_name ILIKE '%' || $12 || '%'
-      OR bank_name ILIKE '%' || $12 || '%'
-      OR bank_branch ILIKE '%' || $12 || '%'
+      $13::text = ''
+      OR code ILIKE '%' || $13 || '%'
+      OR name ILIKE '%' || $13 || '%'
+      OR (entity = 'vehicle' AND plate_number ILIKE '%' || $13 || '%')
+      OR short_name ILIKE '%' || $13 || '%'
+      OR tax_number ILIKE '%' || $13 || '%'
+      OR contact_name ILIKE '%' || $13 || '%'
+      OR contact_phone ILIKE '%' || $13 || '%'
+      OR email ILIKE '%' || $13 || '%'
+      OR address ILIKE '%' || $13 || '%'
+      OR phone ILIKE '%' || $13 || '%'
+      OR specification ILIKE '%' || $13 || '%'
+      OR model ILIKE '%' || $13 || '%'
+      OR barcode ILIKE '%' || $13 || '%'
+      OR vin ILIKE '%' || $13 || '%'
+      OR engine_number ILIKE '%' || $13 || '%'
+      OR account_name ILIKE '%' || $13 || '%'
+      OR bank_name ILIKE '%' || $13 || '%'
+      OR bank_branch ILIKE '%' || $13 || '%'
   )
 ORDER BY
-  CASE WHEN $13::text = 'updatedAt' AND $14::text = 'asc' THEN object_updated_at END ASC,
-  CASE WHEN $13::text = 'updatedAt' AND $14::text = 'desc' THEN object_updated_at END DESC,
-  CASE WHEN $13::text = 'code' AND $14::text = 'asc' THEN code END ASC,
-  CASE WHEN $13::text = 'code' AND $14::text = 'desc' THEN code END DESC,
-  CASE WHEN $13::text = 'name' AND $14::text = 'asc' THEN name END ASC,
-  CASE WHEN $13::text = 'name' AND $14::text = 'desc' THEN name END DESC,
-  CASE WHEN $13::text = 'status' AND $14::text = 'asc' THEN status END ASC,
-  CASE WHEN $13::text = 'status' AND $14::text = 'desc' THEN status END DESC,
-  CASE WHEN $13::text = 'version' AND $14::text = 'asc' THEN version_no END ASC,
-  CASE WHEN $13::text = 'version' AND $14::text = 'desc' THEN version_no END DESC,
+  CASE WHEN $14::text = 'updatedAt' AND $15::text = 'asc' THEN object_updated_at END ASC,
+  CASE WHEN $14::text = 'updatedAt' AND $15::text = 'desc' THEN object_updated_at END DESC,
+  CASE WHEN $14::text = 'code' AND $15::text = 'asc' THEN code END ASC,
+  CASE WHEN $14::text = 'code' AND $15::text = 'desc' THEN code END DESC,
+  CASE WHEN $14::text = 'name' AND $15::text = 'asc' THEN name END ASC,
+  CASE WHEN $14::text = 'name' AND $15::text = 'desc' THEN name END DESC,
+  CASE WHEN $14::text = 'status' AND $15::text = 'asc' THEN status END ASC,
+  CASE WHEN $14::text = 'status' AND $15::text = 'desc' THEN status END DESC,
+  CASE WHEN $14::text = 'version' AND $15::text = 'asc' THEN version_no END ASC,
+  CASE WHEN $14::text = 'version' AND $15::text = 'desc' THEN version_no END DESC,
   object_id DESC
-LIMIT $16 OFFSET $15
+LIMIT $17 OFFSET $16
 `
 
 type ListBobObjectsParams struct {
-	Entity       string   `db:"entity" json:"entity"`
-	Statuses     []string `db:"statuses" json:"statuses"`
-	CustomerType string   `db:"customer_type" json:"customer_type"`
-	SupplierType string   `db:"supplier_type" json:"supplier_type"`
-	CategoryID   string   `db:"category_id" json:"category_id"`
-	DepartmentID string   `db:"department_id" json:"department_id"`
-	PositionID   string   `db:"position_id" json:"position_id"`
-	Currency     string   `db:"currency" json:"currency"`
-	TargetEntity string   `db:"target_entity" json:"target_entity"`
-	ParentID     string   `db:"parent_id" json:"parent_id"`
-	RootOnly     bool     `db:"root_only" json:"root_only"`
-	Keyword      string   `db:"keyword" json:"keyword"`
-	SortField    string   `db:"sort_field" json:"sort_field"`
-	SortOrder    string   `db:"sort_order" json:"sort_order"`
-	PageOffset   int32    `db:"page_offset" json:"page_offset"`
-	PageSize     int32    `db:"page_size" json:"page_size"`
+	Entity                string   `db:"entity" json:"entity"`
+	Statuses              []string `db:"statuses" json:"statuses"`
+	CustomerType          string   `db:"customer_type" json:"customer_type"`
+	SupplierType          string   `db:"supplier_type" json:"supplier_type"`
+	CategoryID            string   `db:"category_id" json:"category_id"`
+	DepartmentID          string   `db:"department_id" json:"department_id"`
+	PositionID            string   `db:"position_id" json:"position_id"`
+	SalespersonEmployeeID string   `db:"salesperson_employee_id" json:"salesperson_employee_id"`
+	Currency              string   `db:"currency" json:"currency"`
+	TargetEntity          string   `db:"target_entity" json:"target_entity"`
+	ParentID              string   `db:"parent_id" json:"parent_id"`
+	RootOnly              bool     `db:"root_only" json:"root_only"`
+	Keyword               string   `db:"keyword" json:"keyword"`
+	SortField             string   `db:"sort_field" json:"sort_field"`
+	SortOrder             string   `db:"sort_order" json:"sort_order"`
+	PageOffset            int32    `db:"page_offset" json:"page_offset"`
+	PageSize              int32    `db:"page_size" json:"page_size"`
 }
 
 func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) ([]BobVersionView, error) {
@@ -1602,6 +1613,7 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 		arg.CategoryID,
 		arg.DepartmentID,
 		arg.PositionID,
+		arg.SalespersonEmployeeID,
 		arg.Currency,
 		arg.TargetEntity,
 		arg.ParentID,
@@ -1675,7 +1687,7 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 			&i.TargetEntity,
 			&i.ParentID,
 			&i.SettlementMethodID,
-			&i.SalespersonID,
+			&i.SalespersonEmployeeID,
 			&i.SettlementMethodVersionID,
 			&i.SettlementRuleType,
 			&i.SettlementMonthOffset,
@@ -1693,7 +1705,7 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 }
 
 const listBobVersions = `-- name: ListBobVersions :many
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset FROM bob_version_views
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_employee_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset FROM bob_version_views
 WHERE object_id = $1 AND entity = $2
 ORDER BY version_no DESC
 LIMIT $4 OFFSET $3
@@ -1776,7 +1788,7 @@ func (q *Queries) ListBobVersions(ctx context.Context, arg ListBobVersionsParams
 			&i.TargetEntity,
 			&i.ParentID,
 			&i.SettlementMethodID,
-			&i.SalespersonID,
+			&i.SalespersonEmployeeID,
 			&i.SettlementMethodVersionID,
 			&i.SettlementRuleType,
 			&i.SettlementMonthOffset,
@@ -2010,7 +2022,7 @@ func (q *Queries) RejectBobVersion(ctx context.Context, arg RejectBobVersionPara
 }
 
 const resolveBobEffectiveReference = `-- name: ResolveBobEffectiveReference :one
-SELECT view.object_id, view.entity, view.code, view.current_version_id, view.effective_version_id, view.object_revision, view.object_updated_at, view.version_id, view.version_no, view.status, view.version_revision, view.created_at, view.created_by, view.updated_at, view.updated_by, view.submitted_at, view.submitted_by, view.reviewed_at, view.reviewed_by, view.review_comment, view.name, view.unit, view.currency, view.supplier_type, view.plate_number, view.vehicle_type, view.platform_object_id, view.customer_type, view.short_name, view.category_id, view.tax_number, view.contact_name, view.contact_phone, view.email, view.address, view.remark, view.department_id, view.position_id, view.phone, view.hire_date, view.specification, view.model, view.barcode, view.description, view.manager_employee_id, view.vin, view.engine_number, view.load_capacity_kg, view.account_name, view.bank_name, view.bank_branch, view.account_number, view.target_entity, view.parent_id, view.settlement_method_id, view.salesperson_id, view.settlement_method_version_id, view.settlement_rule_type, view.settlement_month_offset, view.settlement_day_of_month, view.settlement_day_offset
+SELECT view.object_id, view.entity, view.code, view.current_version_id, view.effective_version_id, view.object_revision, view.object_updated_at, view.version_id, view.version_no, view.status, view.version_revision, view.created_at, view.created_by, view.updated_at, view.updated_by, view.submitted_at, view.submitted_by, view.reviewed_at, view.reviewed_by, view.review_comment, view.name, view.unit, view.currency, view.supplier_type, view.plate_number, view.vehicle_type, view.platform_object_id, view.customer_type, view.short_name, view.category_id, view.tax_number, view.contact_name, view.contact_phone, view.email, view.address, view.remark, view.department_id, view.position_id, view.phone, view.hire_date, view.specification, view.model, view.barcode, view.description, view.manager_employee_id, view.vin, view.engine_number, view.load_capacity_kg, view.account_name, view.bank_name, view.bank_branch, view.account_number, view.target_entity, view.parent_id, view.settlement_method_id, view.salesperson_employee_id, view.settlement_method_version_id, view.settlement_rule_type, view.settlement_month_offset, view.settlement_day_of_month, view.settlement_day_offset
 FROM bob_version_views view
 JOIN bob_objects o ON o.id = view.object_id AND o.entity = view.entity
 WHERE view.object_id = $1 AND view.entity = $2
@@ -2085,7 +2097,92 @@ func (q *Queries) ResolveBobEffectiveReference(ctx context.Context, arg ResolveB
 		&i.TargetEntity,
 		&i.ParentID,
 		&i.SettlementMethodID,
-		&i.SalespersonID,
+		&i.SalespersonEmployeeID,
+		&i.SettlementMethodVersionID,
+		&i.SettlementRuleType,
+		&i.SettlementMonthOffset,
+		&i.SettlementDayOfMonth,
+		&i.SettlementDayOffset,
+	)
+	return i, err
+}
+
+const resolveCurrentBobEffectiveReference = `-- name: ResolveCurrentBobEffectiveReference :one
+SELECT view.object_id, view.entity, view.code, view.current_version_id, view.effective_version_id, view.object_revision, view.object_updated_at, view.version_id, view.version_no, view.status, view.version_revision, view.created_at, view.created_by, view.updated_at, view.updated_by, view.submitted_at, view.submitted_by, view.reviewed_at, view.reviewed_by, view.review_comment, view.name, view.unit, view.currency, view.supplier_type, view.plate_number, view.vehicle_type, view.platform_object_id, view.customer_type, view.short_name, view.category_id, view.tax_number, view.contact_name, view.contact_phone, view.email, view.address, view.remark, view.department_id, view.position_id, view.phone, view.hire_date, view.specification, view.model, view.barcode, view.description, view.manager_employee_id, view.vin, view.engine_number, view.load_capacity_kg, view.account_name, view.bank_name, view.bank_branch, view.account_number, view.target_entity, view.parent_id, view.settlement_method_id, view.salesperson_employee_id, view.settlement_method_version_id, view.settlement_rule_type, view.settlement_month_offset, view.settlement_day_of_month, view.settlement_day_offset
+FROM bob_version_views view
+JOIN bob_objects o ON o.id = view.object_id AND o.entity = view.entity
+WHERE view.object_id = $1 AND view.entity = $2
+  AND view.version_id = o.current_version_id
+  AND view.version_id = o.effective_version_id
+  AND view.status = 'EFFECTIVE'
+FOR SHARE OF o
+`
+
+type ResolveCurrentBobEffectiveReferenceParams struct {
+	ObjectID string `db:"object_id" json:"object_id"`
+	Entity   string `db:"entity" json:"entity"`
+}
+
+func (q *Queries) ResolveCurrentBobEffectiveReference(ctx context.Context, arg ResolveCurrentBobEffectiveReferenceParams) (BobVersionView, error) {
+	row := q.db.QueryRow(ctx, resolveCurrentBobEffectiveReference, arg.ObjectID, arg.Entity)
+	var i BobVersionView
+	err := row.Scan(
+		&i.ObjectID,
+		&i.Entity,
+		&i.Code,
+		&i.CurrentVersionID,
+		&i.EffectiveVersionID,
+		&i.ObjectRevision,
+		&i.ObjectUpdatedAt,
+		&i.VersionID,
+		&i.VersionNo,
+		&i.Status,
+		&i.VersionRevision,
+		&i.CreatedAt,
+		&i.CreatedBy,
+		&i.UpdatedAt,
+		&i.UpdatedBy,
+		&i.SubmittedAt,
+		&i.SubmittedBy,
+		&i.ReviewedAt,
+		&i.ReviewedBy,
+		&i.ReviewComment,
+		&i.Name,
+		&i.Unit,
+		&i.Currency,
+		&i.SupplierType,
+		&i.PlateNumber,
+		&i.VehicleType,
+		&i.PlatformObjectID,
+		&i.CustomerType,
+		&i.ShortName,
+		&i.CategoryID,
+		&i.TaxNumber,
+		&i.ContactName,
+		&i.ContactPhone,
+		&i.Email,
+		&i.Address,
+		&i.Remark,
+		&i.DepartmentID,
+		&i.PositionID,
+		&i.Phone,
+		&i.HireDate,
+		&i.Specification,
+		&i.Model,
+		&i.Barcode,
+		&i.Description,
+		&i.ManagerEmployeeID,
+		&i.Vin,
+		&i.EngineNumber,
+		&i.LoadCapacityKg,
+		&i.AccountName,
+		&i.BankName,
+		&i.BankBranch,
+		&i.AccountNumber,
+		&i.TargetEntity,
+		&i.ParentID,
+		&i.SettlementMethodID,
+		&i.SalespersonEmployeeID,
 		&i.SettlementMethodVersionID,
 		&i.SettlementRuleType,
 		&i.SettlementMonthOffset,
@@ -2207,24 +2304,24 @@ SET name = $1, customer_type = $2,
     contact_phone = $7, email = $8,
     address = $9, remark = $10,
     settlement_method_id = $11,
-    salesperson_id = $12
+    salesperson_employee_id = $12
 WHERE version_id = $13
 `
 
 type UpdateBobCustomerDetailParams struct {
-	Name               string  `db:"name" json:"name"`
-	CustomerType       string  `db:"customer_type" json:"customer_type"`
-	ShortName          *string `db:"short_name" json:"short_name"`
-	CategoryID         *string `db:"category_id" json:"category_id"`
-	TaxNumber          *string `db:"tax_number" json:"tax_number"`
-	ContactName        *string `db:"contact_name" json:"contact_name"`
-	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
-	Email              *string `db:"email" json:"email"`
-	Address            *string `db:"address" json:"address"`
-	Remark             *string `db:"remark" json:"remark"`
-	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
-	SalespersonID      *string `db:"salesperson_id" json:"salesperson_id"`
-	VersionID          string  `db:"version_id" json:"version_id"`
+	Name                  string  `db:"name" json:"name"`
+	CustomerType          string  `db:"customer_type" json:"customer_type"`
+	ShortName             *string `db:"short_name" json:"short_name"`
+	CategoryID            *string `db:"category_id" json:"category_id"`
+	TaxNumber             *string `db:"tax_number" json:"tax_number"`
+	ContactName           *string `db:"contact_name" json:"contact_name"`
+	ContactPhone          *string `db:"contact_phone" json:"contact_phone"`
+	Email                 *string `db:"email" json:"email"`
+	Address               *string `db:"address" json:"address"`
+	Remark                *string `db:"remark" json:"remark"`
+	SettlementMethodID    *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SalespersonEmployeeID string  `db:"salesperson_employee_id" json:"salesperson_employee_id"`
+	VersionID             string  `db:"version_id" json:"version_id"`
 }
 
 func (q *Queries) UpdateBobCustomerDetail(ctx context.Context, arg UpdateBobCustomerDetailParams) (int64, error) {
@@ -2240,7 +2337,7 @@ func (q *Queries) UpdateBobCustomerDetail(ctx context.Context, arg UpdateBobCust
 		arg.Address,
 		arg.Remark,
 		arg.SettlementMethodID,
-		arg.SalespersonID,
+		arg.SalespersonEmployeeID,
 		arg.VersionID,
 	)
 	if err != nil {
@@ -2490,23 +2587,25 @@ SET name = $1, supplier_type = $2,
     tax_number = $5, contact_name = $6,
     contact_phone = $7, email = $8,
     address = $9, remark = $10,
-    settlement_method_id = $11
-WHERE version_id = $12
+    settlement_method_id = $11,
+    salesperson_employee_id = $12
+WHERE version_id = $13
 `
 
 type UpdateBobSupplierDetailParams struct {
-	Name               string  `db:"name" json:"name"`
-	SupplierType       string  `db:"supplier_type" json:"supplier_type"`
-	ShortName          *string `db:"short_name" json:"short_name"`
-	CategoryID         *string `db:"category_id" json:"category_id"`
-	TaxNumber          *string `db:"tax_number" json:"tax_number"`
-	ContactName        *string `db:"contact_name" json:"contact_name"`
-	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
-	Email              *string `db:"email" json:"email"`
-	Address            *string `db:"address" json:"address"`
-	Remark             *string `db:"remark" json:"remark"`
-	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
-	VersionID          string  `db:"version_id" json:"version_id"`
+	Name                  string  `db:"name" json:"name"`
+	SupplierType          string  `db:"supplier_type" json:"supplier_type"`
+	ShortName             *string `db:"short_name" json:"short_name"`
+	CategoryID            *string `db:"category_id" json:"category_id"`
+	TaxNumber             *string `db:"tax_number" json:"tax_number"`
+	ContactName           *string `db:"contact_name" json:"contact_name"`
+	ContactPhone          *string `db:"contact_phone" json:"contact_phone"`
+	Email                 *string `db:"email" json:"email"`
+	Address               *string `db:"address" json:"address"`
+	Remark                *string `db:"remark" json:"remark"`
+	SettlementMethodID    *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SalespersonEmployeeID string  `db:"salesperson_employee_id" json:"salesperson_employee_id"`
+	VersionID             string  `db:"version_id" json:"version_id"`
 }
 
 func (q *Queries) UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error) {
@@ -2522,6 +2621,7 @@ func (q *Queries) UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupp
 		arg.Address,
 		arg.Remark,
 		arg.SettlementMethodID,
+		arg.SalespersonEmployeeID,
 		arg.VersionID,
 	)
 	if err != nil {

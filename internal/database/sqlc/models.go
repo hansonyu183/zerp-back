@@ -118,23 +118,23 @@ type BobCategoryVersion struct {
 }
 
 type BobCustomerVersion struct {
-	VersionID              string  `db:"version_id" json:"version_id"`
-	Entity                 string  `db:"entity" json:"entity"`
-	Name                   string  `db:"name" json:"name"`
-	CustomerType           string  `db:"customer_type" json:"customer_type"`
-	ShortName              *string `db:"short_name" json:"short_name"`
-	CategoryID             *string `db:"category_id" json:"category_id"`
-	CategoryEntity         string  `db:"category_entity" json:"category_entity"`
-	TaxNumber              *string `db:"tax_number" json:"tax_number"`
-	ContactName            *string `db:"contact_name" json:"contact_name"`
-	ContactPhone           *string `db:"contact_phone" json:"contact_phone"`
-	Email                  *string `db:"email" json:"email"`
-	Address                *string `db:"address" json:"address"`
-	Remark                 *string `db:"remark" json:"remark"`
-	SettlementMethodID     *string `db:"settlement_method_id" json:"settlement_method_id"`
-	SettlementMethodEntity string  `db:"settlement_method_entity" json:"settlement_method_entity"`
-	SalespersonID          *string `db:"salesperson_id" json:"salesperson_id"`
-	SalespersonEntity      string  `db:"salesperson_entity" json:"salesperson_entity"`
+	VersionID                 string  `db:"version_id" json:"version_id"`
+	Entity                    string  `db:"entity" json:"entity"`
+	Name                      string  `db:"name" json:"name"`
+	CustomerType              string  `db:"customer_type" json:"customer_type"`
+	ShortName                 *string `db:"short_name" json:"short_name"`
+	CategoryID                *string `db:"category_id" json:"category_id"`
+	CategoryEntity            string  `db:"category_entity" json:"category_entity"`
+	TaxNumber                 *string `db:"tax_number" json:"tax_number"`
+	ContactName               *string `db:"contact_name" json:"contact_name"`
+	ContactPhone              *string `db:"contact_phone" json:"contact_phone"`
+	Email                     *string `db:"email" json:"email"`
+	Address                   *string `db:"address" json:"address"`
+	Remark                    *string `db:"remark" json:"remark"`
+	SettlementMethodID        *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SettlementMethodEntity    string  `db:"settlement_method_entity" json:"settlement_method_entity"`
+	SalespersonEmployeeID     string  `db:"salesperson_employee_id" json:"salesperson_employee_id"`
+	SalespersonEmployeeEntity string  `db:"salesperson_employee_entity" json:"salesperson_employee_entity"`
 }
 
 type BobDepartmentVersion struct {
@@ -237,21 +237,23 @@ type BobSettlementMethodVersion struct {
 }
 
 type BobSupplierVersion struct {
-	VersionID              string  `db:"version_id" json:"version_id"`
-	Entity                 string  `db:"entity" json:"entity"`
-	Name                   string  `db:"name" json:"name"`
-	SupplierType           string  `db:"supplier_type" json:"supplier_type"`
-	ShortName              *string `db:"short_name" json:"short_name"`
-	CategoryID             *string `db:"category_id" json:"category_id"`
-	CategoryEntity         string  `db:"category_entity" json:"category_entity"`
-	TaxNumber              *string `db:"tax_number" json:"tax_number"`
-	ContactName            *string `db:"contact_name" json:"contact_name"`
-	ContactPhone           *string `db:"contact_phone" json:"contact_phone"`
-	Email                  *string `db:"email" json:"email"`
-	Address                *string `db:"address" json:"address"`
-	Remark                 *string `db:"remark" json:"remark"`
-	SettlementMethodID     *string `db:"settlement_method_id" json:"settlement_method_id"`
-	SettlementMethodEntity string  `db:"settlement_method_entity" json:"settlement_method_entity"`
+	VersionID                 string  `db:"version_id" json:"version_id"`
+	Entity                    string  `db:"entity" json:"entity"`
+	Name                      string  `db:"name" json:"name"`
+	SupplierType              string  `db:"supplier_type" json:"supplier_type"`
+	ShortName                 *string `db:"short_name" json:"short_name"`
+	CategoryID                *string `db:"category_id" json:"category_id"`
+	CategoryEntity            string  `db:"category_entity" json:"category_entity"`
+	TaxNumber                 *string `db:"tax_number" json:"tax_number"`
+	ContactName               *string `db:"contact_name" json:"contact_name"`
+	ContactPhone              *string `db:"contact_phone" json:"contact_phone"`
+	Email                     *string `db:"email" json:"email"`
+	Address                   *string `db:"address" json:"address"`
+	Remark                    *string `db:"remark" json:"remark"`
+	SettlementMethodID        *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SettlementMethodEntity    string  `db:"settlement_method_entity" json:"settlement_method_entity"`
+	SalespersonEmployeeID     string  `db:"salesperson_employee_id" json:"salesperson_employee_id"`
+	SalespersonEmployeeEntity string  `db:"salesperson_employee_entity" json:"salesperson_employee_entity"`
 }
 
 type BobVehicleVersion struct {
@@ -344,7 +346,7 @@ type BobVersionView struct {
 	TargetEntity              string             `db:"target_entity" json:"target_entity"`
 	ParentID                  string             `db:"parent_id" json:"parent_id"`
 	SettlementMethodID        string             `db:"settlement_method_id" json:"settlement_method_id"`
-	SalespersonID             string             `db:"salesperson_id" json:"salesperson_id"`
+	SalespersonEmployeeID     string             `db:"salesperson_employee_id" json:"salesperson_employee_id"`
 	SettlementMethodVersionID string             `db:"settlement_method_version_id" json:"settlement_method_version_id"`
 	SettlementRuleType        string             `db:"settlement_rule_type" json:"settlement_rule_type"`
 	SettlementMonthOffset     int32              `db:"settlement_month_offset" json:"settlement_month_offset"`

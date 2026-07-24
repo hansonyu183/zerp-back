@@ -17,11 +17,12 @@ const dateLayout = "2006-01-02"
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
 type fixedProductLine struct {
-	Product    ReferenceInput
-	Quantity   int64
-	UnitPrice  int64
-	LineAmount int64
-	Remark     *string
+	Product           ReferenceInput
+	Quantity          int64
+	UnitPrice         int64
+	PurchaseUnitPrice *int64
+	LineAmount        int64
+	Remark            *string
 }
 
 type fixedExpenseLine struct {
@@ -140,7 +141,7 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Warehouse, "warehouse", true); err != nil {
 			return validatedDraft{}, err
 		}
-		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)
+		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines, false)
 	case EntityPurchaseOrder:
 		if err = requireOnlyDraftRefs(input, false, true, false, false, false, true, false, true, false, false); err != nil {
 			return validatedDraft{}, err
@@ -154,7 +155,7 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Warehouse, "warehouse", true); err != nil {
 			return validatedDraft{}, err
 		}
-		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)
+		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines, false)
 	case EntityIntermediarySaleOrder:
 		if err = requireOnlyDraftRefs(input, true, true, false, false, true, true, false, false, false, false); err != nil {
 			return validatedDraft{}, err
@@ -171,7 +172,7 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Purchaser, "purchaser", false); err != nil {
 			return validatedDraft{}, err
 		}
-		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)
+		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines, true)
 	case EntityReceipt, EntityPayment:
 		if err = requireOnlyDraftRefs(input, false, false, true, false, false, false, true, false, true, false); err != nil {
 			return validatedDraft{}, err
@@ -255,7 +256,7 @@ func requireOnlyDraftRefs(
 	return nil
 }
 
-func validateProductLines(lines []ProductLineInput) ([]fixedProductLine, int64, error) {
+func validateProductLines(lines []ProductLineInput, requirePurchasePrice bool) ([]fixedProductLine, int64, error) {
 	if len(lines) == 0 || len(lines) > 200 {
 		return nil, 0, domainError(ErrorValidation, "productLines must contain 1 to 200 items", nil, nil)
 	}
@@ -279,6 +280,16 @@ func validateProductLines(lines []ProductLineInput) ([]fixedProductLine, int64, 
 		if err != nil {
 			return nil, 0, err
 		}
+		var purchasePrice *int64
+		if requirePurchasePrice {
+			parsed, purchaseErr := moneyCents(line.PurchaseUnitPrice)
+			if purchaseErr != nil {
+				return nil, 0, domainError(ErrorValidation, "purchaseUnitPrice is required for intermediary sale lines", nil, purchaseErr)
+			}
+			purchasePrice = &parsed
+		} else if strings.TrimSpace(line.PurchaseUnitPrice) != "" {
+			return nil, 0, domainError(ErrorValidation, "purchaseUnitPrice only applies to intermediary sale lines", nil, nil)
+		}
 		amount, err := lineAmountCents(quantity, price)
 		if err != nil || total > math.MaxInt64-amount {
 			return nil, 0, domainError(ErrorValidation, "amount out of range", nil, err)
@@ -289,7 +300,8 @@ func validateProductLines(lines []ProductLineInput) ([]fixedProductLine, int64, 
 			return nil, 0, err
 		}
 		result = append(result, fixedProductLine{
-			Product: line.Product, Quantity: quantity, UnitPrice: price, LineAmount: amount, Remark: remark,
+			Product: line.Product, Quantity: quantity, UnitPrice: price,
+			PurchaseUnitPrice: purchasePrice, LineAmount: amount, Remark: remark,
 		})
 	}
 	return result, total, nil

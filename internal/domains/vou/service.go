@@ -1030,7 +1030,7 @@ func (s *Service) replaceLines(
 				ProductObjectID: ref.ObjectID, ProductVersionID: ref.VersionID,
 				ProductCode: ref.Code, ProductName: ref.Data.Name, ProductUnit: ref.Data.Unit,
 				OrderedQtyMicros: line.Quantity, UnitPriceCents: line.UnitPrice, LineAmountCents: line.LineAmount,
-				Remark: line.Remark,
+				PurchaseUnitPriceCents: line.PurchaseUnitPrice, Remark: line.Remark,
 			}); err != nil {
 				return err
 			}
@@ -1080,6 +1080,18 @@ func (s *Service) validateStoredAttributes(
 		missing = detail.SalespersonObjectID == nil || detail.PurchaserObjectID == nil ||
 			detail.CustomerSettlementMethodObjectID == nil ||
 			detail.SupplierSettlementMethodObjectID == nil
+		if !missing {
+			lines, lineErr := q.ListVouProductLines(ctx, documentID)
+			if lineErr != nil {
+				return s.internal("read intermediary purchase prices", lineErr)
+			}
+			for _, line := range lines {
+				if line.PurchaseUnitPriceCents == nil {
+					missing = true
+					break
+				}
+			}
+		}
 	case EntityReceipt:
 		detail, err := q.GetVouReceiptDetail(ctx, documentID)
 		if err != nil {

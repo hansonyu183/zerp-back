@@ -1133,29 +1133,31 @@ const insertVouProductLine = `-- name: InsertVouProductLine :exec
 INSERT INTO vou_product_lines (
     id, document_id, document_entity, line_no, product_object_id, product_version_id,
     product_code, product_name, product_unit, ordered_qty_micros, unit_price_cents,
-    line_amount_cents, remark
+    line_amount_cents, purchase_unit_price_cents, remark
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6, $7,
     $8, $9, $10,
-    $11, $12, $13
+    $11, $12,
+    $13, $14
 )
 `
 
 type InsertVouProductLineParams struct {
-	ID               string  `db:"id" json:"id"`
-	DocumentID       string  `db:"document_id" json:"document_id"`
-	DocumentEntity   string  `db:"document_entity" json:"document_entity"`
-	LineNo           int32   `db:"line_no" json:"line_no"`
-	ProductObjectID  string  `db:"product_object_id" json:"product_object_id"`
-	ProductVersionID string  `db:"product_version_id" json:"product_version_id"`
-	ProductCode      string  `db:"product_code" json:"product_code"`
-	ProductName      string  `db:"product_name" json:"product_name"`
-	ProductUnit      string  `db:"product_unit" json:"product_unit"`
-	OrderedQtyMicros int64   `db:"ordered_qty_micros" json:"ordered_qty_micros"`
-	UnitPriceCents   int64   `db:"unit_price_cents" json:"unit_price_cents"`
-	LineAmountCents  int64   `db:"line_amount_cents" json:"line_amount_cents"`
-	Remark           *string `db:"remark" json:"remark"`
+	ID                     string  `db:"id" json:"id"`
+	DocumentID             string  `db:"document_id" json:"document_id"`
+	DocumentEntity         string  `db:"document_entity" json:"document_entity"`
+	LineNo                 int32   `db:"line_no" json:"line_no"`
+	ProductObjectID        string  `db:"product_object_id" json:"product_object_id"`
+	ProductVersionID       string  `db:"product_version_id" json:"product_version_id"`
+	ProductCode            string  `db:"product_code" json:"product_code"`
+	ProductName            string  `db:"product_name" json:"product_name"`
+	ProductUnit            string  `db:"product_unit" json:"product_unit"`
+	OrderedQtyMicros       int64   `db:"ordered_qty_micros" json:"ordered_qty_micros"`
+	UnitPriceCents         int64   `db:"unit_price_cents" json:"unit_price_cents"`
+	LineAmountCents        int64   `db:"line_amount_cents" json:"line_amount_cents"`
+	PurchaseUnitPriceCents *int64  `db:"purchase_unit_price_cents" json:"purchase_unit_price_cents"`
+	Remark                 *string `db:"remark" json:"remark"`
 }
 
 func (q *Queries) InsertVouProductLine(ctx context.Context, arg InsertVouProductLineParams) error {
@@ -1172,6 +1174,7 @@ func (q *Queries) InsertVouProductLine(ctx context.Context, arg InsertVouProduct
 		arg.OrderedQtyMicros,
 		arg.UnitPriceCents,
 		arg.LineAmountCents,
+		arg.PurchaseUnitPriceCents,
 		arg.Remark,
 	)
 	return err
@@ -1729,7 +1732,7 @@ func (q *Queries) ListVouExpenseLines(ctx context.Context, documentID string) ([
 }
 
 const listVouProductLines = `-- name: ListVouProductLines :many
-SELECT id, document_id, document_entity, line_no, product_object_id, product_version_id, product_code, product_name, product_unit, ordered_qty_micros, unit_price_cents, line_amount_cents, outbound_qty_micros, signed_qty_micros, rejected_qty_micros, loss_qty_micros, inbound_qty_micros, remark FROM vou_product_lines WHERE document_id = $1 ORDER BY line_no
+SELECT id, document_id, document_entity, line_no, product_object_id, product_version_id, product_code, product_name, product_unit, ordered_qty_micros, unit_price_cents, line_amount_cents, outbound_qty_micros, signed_qty_micros, rejected_qty_micros, loss_qty_micros, inbound_qty_micros, remark, purchase_unit_price_cents FROM vou_product_lines WHERE document_id = $1 ORDER BY line_no
 `
 
 func (q *Queries) ListVouProductLines(ctx context.Context, documentID string) ([]VouProductLine, error) {
@@ -1760,6 +1763,7 @@ func (q *Queries) ListVouProductLines(ctx context.Context, documentID string) ([
 			&i.LossQtyMicros,
 			&i.InboundQtyMicros,
 			&i.Remark,
+			&i.PurchaseUnitPriceCents,
 		); err != nil {
 			return nil, err
 		}

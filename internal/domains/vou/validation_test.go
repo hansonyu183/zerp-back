@@ -46,13 +46,13 @@ func TestValidateLineRemarkBoundaries(t *testing.T) {
 	if _, _, err := validateProductLines([]ProductLineInput{{
 		Product: product, OrderedQuantity: "1", UnitPrice: "1.00",
 		Remark: strings.Repeat("注", 1000),
-	}}); err != nil {
+	}}, false); err != nil {
 		t.Fatalf("1000-character product remark rejected: %v", err)
 	}
 	if _, _, err := validateProductLines([]ProductLineInput{{
 		Product: product, OrderedQuantity: "1", UnitPrice: "1.00",
 		Remark: strings.Repeat("注", 1001),
-	}}); err == nil {
+	}}, false); err == nil {
 		t.Fatalf("1001-character product remark error = %v", err)
 	}
 	if _, _, err := validateExpenseLines([]ExpenseLineInput{{
@@ -84,6 +84,32 @@ func TestValidateDraftRejectsCrossEntityAndDuplicateProduct(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("purchase accepted duplicate product")
+	}
+}
+
+func TestIntermediaryRequiresPurchaseUnitPrice(t *testing.T) {
+	t.Parallel()
+	product := *refInput()
+	customer := *refInput()
+	supplier := *refInput()
+	_, err := validateDraft(EntityIntermediarySaleOrder, DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Customer: &customer, Supplier: &supplier,
+		ProductLines: []ProductLineInput{{
+			Product: product, OrderedQuantity: "1", UnitPrice: "12.00",
+		}},
+	})
+	if err == nil {
+		t.Fatal("intermediary line without purchaseUnitPrice was accepted")
+	}
+	validated, err := validateDraft(EntityIntermediarySaleOrder, DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Customer: &customer, Supplier: &supplier,
+		ProductLines: []ProductLineInput{{
+			Product: product, OrderedQuantity: "1", UnitPrice: "12.00", PurchaseUnitPrice: "10.00",
+		}},
+	})
+	if err != nil || validated.ProductLines[0].PurchaseUnitPrice == nil ||
+		*validated.ProductLines[0].PurchaseUnitPrice != 1000 {
+		t.Fatalf("validated intermediary = %+v, err=%v", validated, err)
 	}
 }
 

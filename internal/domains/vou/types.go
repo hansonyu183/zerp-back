@@ -58,10 +58,11 @@ type ReferenceInput struct {
 }
 
 type ProductLineInput struct {
-	Product         ReferenceInput `json:"product"`
-	OrderedQuantity string         `json:"orderedQuantity"`
-	UnitPrice       string         `json:"unitPrice"`
-	Remark          string         `json:"remark,omitempty"`
+	Product           ReferenceInput `json:"product"`
+	OrderedQuantity   string         `json:"orderedQuantity"`
+	UnitPrice         string         `json:"unitPrice"`
+	PurchaseUnitPrice string         `json:"purchaseUnitPrice,omitempty"`
+	Remark            string         `json:"remark,omitempty"`
 }
 
 type ExpenseLineInput struct {
@@ -200,18 +201,19 @@ type ReferenceView struct {
 }
 
 type ProductLineView struct {
-	LineID           string        `json:"lineId"`
-	LineNo           int32         `json:"lineNo"`
-	Product          ReferenceView `json:"product"`
-	OrderedQuantity  string        `json:"orderedQuantity"`
-	UnitPrice        string        `json:"unitPrice"`
-	LineAmount       string        `json:"lineAmount"`
-	Remark           string        `json:"remark,omitempty"`
-	OutboundQuantity string        `json:"outboundQuantity,omitempty"`
-	SignedQuantity   string        `json:"signedQuantity,omitempty"`
-	RejectedQuantity string        `json:"rejectedQuantity,omitempty"`
-	LossQuantity     string        `json:"lossQuantity,omitempty"`
-	InboundQuantity  string        `json:"inboundQuantity,omitempty"`
+	LineID            string        `json:"lineId"`
+	LineNo            int32         `json:"lineNo"`
+	Product           ReferenceView `json:"product"`
+	OrderedQuantity   string        `json:"orderedQuantity"`
+	UnitPrice         string        `json:"unitPrice"`
+	PurchaseUnitPrice string        `json:"purchaseUnitPrice,omitempty"`
+	LineAmount        string        `json:"lineAmount"`
+	Remark            string        `json:"remark,omitempty"`
+	OutboundQuantity  string        `json:"outboundQuantity,omitempty"`
+	SignedQuantity    string        `json:"signedQuantity,omitempty"`
+	RejectedQuantity  string        `json:"rejectedQuantity,omitempty"`
+	LossQuantity      string        `json:"lossQuantity,omitempty"`
+	InboundQuantity   string        `json:"inboundQuantity,omitempty"`
 }
 
 type ExpenseLineView struct {

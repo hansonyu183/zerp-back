@@ -368,6 +368,183 @@ type BobWarehouseVersion struct {
 	Remark                *string `db:"remark" json:"remark"`
 }
 
+type LedAuditEvent struct {
+	ID           string             `db:"id" json:"id"`
+	EventType    string             `db:"event_type" json:"event_type"`
+	FromStatus   *string            `db:"from_status" json:"from_status"`
+	ToStatus     string             `db:"to_status" json:"to_status"`
+	GenerationID *string            `db:"generation_id" json:"generation_id"`
+	Revision     int64              `db:"revision" json:"revision"`
+	ActorID      string             `db:"actor_id" json:"actor_id"`
+	OccurredAt   pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	Reason       *string            `db:"reason" json:"reason"`
+	RequestID    string             `db:"request_id" json:"request_id"`
+	Summary      []byte             `db:"summary" json:"summary"`
+}
+
+type LedControl struct {
+	Singleton          bool               `db:"singleton" json:"singleton"`
+	Status             string             `db:"status" json:"status"`
+	CutoverDate        pgtype.Date        `db:"cutover_date" json:"cutover_date"`
+	ActiveGenerationID *string            `db:"active_generation_id" json:"active_generation_id"`
+	Revision           int64              `db:"revision" json:"revision"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UpdatedBy          *string            `db:"updated_by" json:"updated_by"`
+}
+
+type LedDraftFund struct {
+	ID                   string `db:"id" json:"id"`
+	FundAccountObjectID  string `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID string `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode      string `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName      string `db:"fund_account_name" json:"fund_account_name"`
+	Currency             string `db:"currency" json:"currency"`
+	AmountCents          int64  `db:"amount_cents" json:"amount_cents"`
+}
+
+type LedDraftInventory struct {
+	ID                 string `db:"id" json:"id"`
+	WarehouseObjectID  string `db:"warehouse_object_id" json:"warehouse_object_id"`
+	WarehouseVersionID string `db:"warehouse_version_id" json:"warehouse_version_id"`
+	WarehouseCode      string `db:"warehouse_code" json:"warehouse_code"`
+	WarehouseName      string `db:"warehouse_name" json:"warehouse_name"`
+	ProductObjectID    string `db:"product_object_id" json:"product_object_id"`
+	ProductVersionID   string `db:"product_version_id" json:"product_version_id"`
+	ProductCode        string `db:"product_code" json:"product_code"`
+	ProductName        string `db:"product_name" json:"product_name"`
+	ProductUnit        string `db:"product_unit" json:"product_unit"`
+	QuantityMicros     int64  `db:"quantity_micros" json:"quantity_micros"`
+}
+
+type LedDraftParty struct {
+	ID                    string `db:"id" json:"id"`
+	CounterpartyEntity    string `db:"counterparty_entity" json:"counterparty_entity"`
+	CounterpartyObjectID  string `db:"counterparty_object_id" json:"counterparty_object_id"`
+	CounterpartyVersionID string `db:"counterparty_version_id" json:"counterparty_version_id"`
+	CounterpartyCode      string `db:"counterparty_code" json:"counterparty_code"`
+	CounterpartyName      string `db:"counterparty_name" json:"counterparty_name"`
+	Currency              string `db:"currency" json:"currency"`
+	AmountCents           int64  `db:"amount_cents" json:"amount_cents"`
+}
+
+type LedFundEntry struct {
+	ID                   string             `db:"id" json:"id"`
+	GenerationID         string             `db:"generation_id" json:"generation_id"`
+	EntryType            string             `db:"entry_type" json:"entry_type"`
+	SourceEntity         string             `db:"source_entity" json:"source_entity"`
+	SourceDocumentID     string             `db:"source_document_id" json:"source_document_id"`
+	SourceDocumentNo     string             `db:"source_document_no" json:"source_document_no"`
+	SourceLineID         string             `db:"source_line_id" json:"source_line_id"`
+	SourceRevision       int64              `db:"source_revision" json:"source_revision"`
+	EffectiveDate        pgtype.Date        `db:"effective_date" json:"effective_date"`
+	OccurredAt           pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	ActorID              string             `db:"actor_id" json:"actor_id"`
+	RequestID            string             `db:"request_id" json:"request_id"`
+	Reason               *string            `db:"reason" json:"reason"`
+	FundAccountObjectID  string             `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID string             `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode      string             `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName      string             `db:"fund_account_name" json:"fund_account_name"`
+	Currency             string             `db:"currency" json:"currency"`
+	AmountDeltaCents     int64              `db:"amount_delta_cents" json:"amount_delta_cents"`
+}
+
+type LedGeneration struct {
+	ID          string             `db:"id" json:"id"`
+	CutoverDate pgtype.Date        `db:"cutover_date" json:"cutover_date"`
+	Status      string             `db:"status" json:"status"`
+	ActivatedAt pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
+	ActivatedBy string             `db:"activated_by" json:"activated_by"`
+	RequestID   string             `db:"request_id" json:"request_id"`
+}
+
+type LedInventoryEntry struct {
+	ID                  string             `db:"id" json:"id"`
+	GenerationID        string             `db:"generation_id" json:"generation_id"`
+	EntryType           string             `db:"entry_type" json:"entry_type"`
+	SourceEntity        string             `db:"source_entity" json:"source_entity"`
+	SourceDocumentID    string             `db:"source_document_id" json:"source_document_id"`
+	SourceDocumentNo    string             `db:"source_document_no" json:"source_document_no"`
+	SourceLineID        string             `db:"source_line_id" json:"source_line_id"`
+	SourceRevision      int64              `db:"source_revision" json:"source_revision"`
+	EffectiveDate       pgtype.Date        `db:"effective_date" json:"effective_date"`
+	OccurredAt          pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	ActorID             string             `db:"actor_id" json:"actor_id"`
+	RequestID           string             `db:"request_id" json:"request_id"`
+	Reason              *string            `db:"reason" json:"reason"`
+	WarehouseObjectID   string             `db:"warehouse_object_id" json:"warehouse_object_id"`
+	WarehouseVersionID  string             `db:"warehouse_version_id" json:"warehouse_version_id"`
+	WarehouseCode       string             `db:"warehouse_code" json:"warehouse_code"`
+	WarehouseName       string             `db:"warehouse_name" json:"warehouse_name"`
+	ProductObjectID     string             `db:"product_object_id" json:"product_object_id"`
+	ProductVersionID    string             `db:"product_version_id" json:"product_version_id"`
+	ProductCode         string             `db:"product_code" json:"product_code"`
+	ProductName         string             `db:"product_name" json:"product_name"`
+	ProductUnit         string             `db:"product_unit" json:"product_unit"`
+	QuantityDeltaMicros int64              `db:"quantity_delta_micros" json:"quantity_delta_micros"`
+}
+
+type LedOpeningFund struct {
+	ID                   string `db:"id" json:"id"`
+	GenerationID         string `db:"generation_id" json:"generation_id"`
+	FundAccountObjectID  string `db:"fund_account_object_id" json:"fund_account_object_id"`
+	FundAccountVersionID string `db:"fund_account_version_id" json:"fund_account_version_id"`
+	FundAccountCode      string `db:"fund_account_code" json:"fund_account_code"`
+	FundAccountName      string `db:"fund_account_name" json:"fund_account_name"`
+	Currency             string `db:"currency" json:"currency"`
+	AmountCents          int64  `db:"amount_cents" json:"amount_cents"`
+}
+
+type LedOpeningInventory struct {
+	ID                 string `db:"id" json:"id"`
+	GenerationID       string `db:"generation_id" json:"generation_id"`
+	WarehouseObjectID  string `db:"warehouse_object_id" json:"warehouse_object_id"`
+	WarehouseVersionID string `db:"warehouse_version_id" json:"warehouse_version_id"`
+	WarehouseCode      string `db:"warehouse_code" json:"warehouse_code"`
+	WarehouseName      string `db:"warehouse_name" json:"warehouse_name"`
+	ProductObjectID    string `db:"product_object_id" json:"product_object_id"`
+	ProductVersionID   string `db:"product_version_id" json:"product_version_id"`
+	ProductCode        string `db:"product_code" json:"product_code"`
+	ProductName        string `db:"product_name" json:"product_name"`
+	ProductUnit        string `db:"product_unit" json:"product_unit"`
+	QuantityMicros     int64  `db:"quantity_micros" json:"quantity_micros"`
+}
+
+type LedOpeningParty struct {
+	ID                    string `db:"id" json:"id"`
+	GenerationID          string `db:"generation_id" json:"generation_id"`
+	CounterpartyEntity    string `db:"counterparty_entity" json:"counterparty_entity"`
+	CounterpartyObjectID  string `db:"counterparty_object_id" json:"counterparty_object_id"`
+	CounterpartyVersionID string `db:"counterparty_version_id" json:"counterparty_version_id"`
+	CounterpartyCode      string `db:"counterparty_code" json:"counterparty_code"`
+	CounterpartyName      string `db:"counterparty_name" json:"counterparty_name"`
+	Currency              string `db:"currency" json:"currency"`
+	AmountCents           int64  `db:"amount_cents" json:"amount_cents"`
+}
+
+type LedPartyEntry struct {
+	ID                    string             `db:"id" json:"id"`
+	GenerationID          string             `db:"generation_id" json:"generation_id"`
+	EntryType             string             `db:"entry_type" json:"entry_type"`
+	SourceEntity          string             `db:"source_entity" json:"source_entity"`
+	SourceDocumentID      string             `db:"source_document_id" json:"source_document_id"`
+	SourceDocumentNo      string             `db:"source_document_no" json:"source_document_no"`
+	SourceLineID          string             `db:"source_line_id" json:"source_line_id"`
+	SourceRevision        int64              `db:"source_revision" json:"source_revision"`
+	EffectiveDate         pgtype.Date        `db:"effective_date" json:"effective_date"`
+	OccurredAt            pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	ActorID               string             `db:"actor_id" json:"actor_id"`
+	RequestID             string             `db:"request_id" json:"request_id"`
+	Reason                *string            `db:"reason" json:"reason"`
+	CounterpartyEntity    string             `db:"counterparty_entity" json:"counterparty_entity"`
+	CounterpartyObjectID  string             `db:"counterparty_object_id" json:"counterparty_object_id"`
+	CounterpartyVersionID string             `db:"counterparty_version_id" json:"counterparty_version_id"`
+	CounterpartyCode      string             `db:"counterparty_code" json:"counterparty_code"`
+	CounterpartyName      string             `db:"counterparty_name" json:"counterparty_name"`
+	Currency              string             `db:"currency" json:"currency"`
+	AmountDeltaCents      int64              `db:"amount_delta_cents" json:"amount_delta_cents"`
+}
+
 type VouAuditEvent struct {
 	ID         string             `db:"id" json:"id"`
 	DocumentID string             `db:"document_id" json:"document_id"`
@@ -557,24 +734,25 @@ type VouPaymentDetail struct {
 }
 
 type VouProductLine struct {
-	ID                string  `db:"id" json:"id"`
-	DocumentID        string  `db:"document_id" json:"document_id"`
-	DocumentEntity    string  `db:"document_entity" json:"document_entity"`
-	LineNo            int32   `db:"line_no" json:"line_no"`
-	ProductObjectID   string  `db:"product_object_id" json:"product_object_id"`
-	ProductVersionID  string  `db:"product_version_id" json:"product_version_id"`
-	ProductCode       string  `db:"product_code" json:"product_code"`
-	ProductName       string  `db:"product_name" json:"product_name"`
-	ProductUnit       string  `db:"product_unit" json:"product_unit"`
-	OrderedQtyMicros  int64   `db:"ordered_qty_micros" json:"ordered_qty_micros"`
-	UnitPriceCents    int64   `db:"unit_price_cents" json:"unit_price_cents"`
-	LineAmountCents   int64   `db:"line_amount_cents" json:"line_amount_cents"`
-	OutboundQtyMicros *int64  `db:"outbound_qty_micros" json:"outbound_qty_micros"`
-	SignedQtyMicros   *int64  `db:"signed_qty_micros" json:"signed_qty_micros"`
-	RejectedQtyMicros *int64  `db:"rejected_qty_micros" json:"rejected_qty_micros"`
-	LossQtyMicros     *int64  `db:"loss_qty_micros" json:"loss_qty_micros"`
-	InboundQtyMicros  *int64  `db:"inbound_qty_micros" json:"inbound_qty_micros"`
-	Remark            *string `db:"remark" json:"remark"`
+	ID                     string  `db:"id" json:"id"`
+	DocumentID             string  `db:"document_id" json:"document_id"`
+	DocumentEntity         string  `db:"document_entity" json:"document_entity"`
+	LineNo                 int32   `db:"line_no" json:"line_no"`
+	ProductObjectID        string  `db:"product_object_id" json:"product_object_id"`
+	ProductVersionID       string  `db:"product_version_id" json:"product_version_id"`
+	ProductCode            string  `db:"product_code" json:"product_code"`
+	ProductName            string  `db:"product_name" json:"product_name"`
+	ProductUnit            string  `db:"product_unit" json:"product_unit"`
+	OrderedQtyMicros       int64   `db:"ordered_qty_micros" json:"ordered_qty_micros"`
+	UnitPriceCents         int64   `db:"unit_price_cents" json:"unit_price_cents"`
+	LineAmountCents        int64   `db:"line_amount_cents" json:"line_amount_cents"`
+	OutboundQtyMicros      *int64  `db:"outbound_qty_micros" json:"outbound_qty_micros"`
+	SignedQtyMicros        *int64  `db:"signed_qty_micros" json:"signed_qty_micros"`
+	RejectedQtyMicros      *int64  `db:"rejected_qty_micros" json:"rejected_qty_micros"`
+	LossQtyMicros          *int64  `db:"loss_qty_micros" json:"loss_qty_micros"`
+	InboundQtyMicros       *int64  `db:"inbound_qty_micros" json:"inbound_qty_micros"`
+	Remark                 *string `db:"remark" json:"remark"`
+	PurchaseUnitPriceCents *int64  `db:"purchase_unit_price_cents" json:"purchase_unit_price_cents"`
 }
 
 type VouPurchaseOrderDetail struct {

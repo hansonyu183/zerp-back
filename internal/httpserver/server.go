@@ -10,6 +10,7 @@ import (
 	"github.com/hansonyu183/zerp-back/internal/config"
 	appdomain "github.com/hansonyu183/zerp-back/internal/domains/app"
 	bobdomain "github.com/hansonyu183/zerp-back/internal/domains/bob"
+	leddomain "github.com/hansonyu183/zerp-back/internal/domains/led"
 	voudomain "github.com/hansonyu183/zerp-back/internal/domains/vou"
 	"github.com/hansonyu183/zerp-back/internal/platform/txevent"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,11 +30,19 @@ func New(cfg config.Config, db *pgxpool.Pool, logger *slog.Logger) (*gin.Engine,
 	if err != nil {
 		return nil, err
 	}
+	ledService, err := leddomain.NewService(db, bobService)
+	if err != nil {
+		return nil, err
+	}
+	if err = ledService.RegisterSubscriptions(eventBus); err != nil {
+		return nil, err
+	}
 	return newRouter(cfg, db, logger, func(router *gin.Engine) {
 		appdomain.NewHandler(appService, cfg, logger).Register(router)
 		authorizer := appAuthorizer{service: appService, cfg: cfg}
 		bobdomain.NewHandler(bobService, authorizer, logger).Register(router)
 		voudomain.NewHandler(vouService, authorizer, logger).Register(router)
+		leddomain.NewHandler(ledService, authorizer, logger).Register(router)
 	}), nil
 }
 

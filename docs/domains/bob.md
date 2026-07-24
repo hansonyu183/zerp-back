@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文定义 ZERP 后端 **BOB（Business Object Base）** 领域的业务模型、状态机、数据约束、事务边界和 API 契约，作为客户、供应商、员工、产品、服务、仓库、资金账户等基础业务对象的统一实现规范。
+本文定义 ZERP 后端 **BOB（Business Object Base）** 领域的业务模型、状态机、数据约束、事务边界和 API 契约，作为客户、供应商、员工、产品、服务、仓库、车辆、资金账户等基础业务对象的统一实现规范。
 
 BOB 使用固定领域标识 `bob`。所有外部业务接口遵循：
 
@@ -19,6 +19,7 @@ employee
 product
 service
 warehouse
+vehicle
 fund-account
 ```
 
@@ -45,21 +46,30 @@ BOB 不负责：
 
 ### 2.1 最小 V1 业务字段
 
-首批七类实体使用以下类型化字段，不使用无约束 JSONB 保存正式业务数据：
+首批八类实体使用以下类型化字段，不使用无约束 JSONB 保存正式业务数据：
 
 | 实体 | 创建及版本字段 | 约束 |
 | --- | --- | --- |
 | `customer` | `code`、`name` | `code` 创建后不可修改；`name` 必填 |
-| `supplier` | `code`、`name` | `code` 创建后不可修改；`name` 必填 |
+| `supplier` | `code`、`name`、`supplierType` | `supplierType` 为 `GENERAL` 或 `LOGISTICS_PLATFORM`；创建时缺省为 `GENERAL` |
 | `employee` | `code`、`name` | V1 不关联 APP 用户、组织或岗位 |
 | `product` | `code`、`name`、`unit` | `unit` 必填；V1 不包含分类、价格或税率 |
 | `service` | `code`、`name`、`unit` | `unit` 必填；V1 不包含分类、价格或税率 |
 | `warehouse` | `code`、`name` | V1 不包含组织归属、地址、库区或库位 |
+| `vehicle` | `code`、`name`、`plateNumber`、`vehicleType`、`platformObjectId` | 必须归属一个当前有效的物流平台供应商 |
 | `fund-account` | `code`、`name`、`currency` | `currency` 为三位大写币种代码；V1 不保存账号等敏感字段 |
 
-`code` 属于稳定对象，在创建时传入、去除首尾空白并规范化为大写，同一实体内大小写不敏感唯一。长度为 1–64，只允许字母、数字、点、下划线和连字符，且首字符必须是字母或数字。`name` 去除首尾空白后长度为 1–200；`unit` 长度为 1–32；`currency` 必须匹配三位大写字母。
+`code` 属于稳定对象，在创建时传入、去除首尾空白并规范化为大写，同一实体内大小写不敏感唯一。长度为 1–64，只允许字母、数字、点、下划线和连字符，且首字符必须是字母或数字。`name` 去除首尾空白后长度为 1–200；`unit` 长度为 1–32；`currency` 必须匹配三位大写字母。`plateNumber` 去除首尾空白并规范化为大写，长度为 1–32；不同车辆的当前版本不得使用相同车牌，历史非当前版本不占用车牌。`vehicleType` 去除首尾空白后长度为 1–64。
 
 V1 使用单级审核，不实现多级审核、委托审核、主动停用、数据范围、归档或自动编号。对象与版本 ID、审计事件 ID 由服务端生成 ULID；客户端不得传入操作者或审计时间。
+
+### 2.2 物流平台供应商与车辆
+
+物流平台不是独立领域或独立对象，而是 `supplierType=LOGISTICS_PLATFORM` 的供应商。普通供应商使用 `GENERAL`。现有调用方创建供应商时未传 `supplierType`，后端按 `GENERAL` 处理；保存时未传则保持当前类型。物流平台存在当前车辆引用时，不允许改为普通供应商，名称等其他字段仍按统一版本生命周期编辑。
+
+所有车辆都通过 `platformObjectId` 关联一个物流平台供应商。自有、临时和外部车辆分别关联通过供应商 API 创建并审核生效的“自营物流平台”“临时物流平台”或外部物流平台；平台类别不增加独立枚举，由供应商编码和名称表达。车辆不保存平台版本 ID，创建、保存、提交和审核时均重新校验平台当前有效版本及供应商类型。
+
+物流平台发起编辑后，到新版本再次审核生效前没有有效版本。此期间相关车辆自身状态不变，但不能通过 `ResolveEffectiveReference` 被新的业务引用；平台重新生效后自动恢复可引用。
 
 ## 3. 聚合模型
 
@@ -88,6 +98,7 @@ BusinessObject (稳定身份)
 | 产品版本明细 | `bob_product_versions` | 产品类型化业务字段，与版本一对一 |
 | 服务版本明细 | `bob_service_versions` | 服务类型化业务字段，与版本一对一 |
 | 仓库版本明细 | `bob_warehouse_versions` | 仓库类型化业务字段，与版本一对一 |
+| 车辆版本明细 | `bob_vehicle_versions` | 车辆字段及物流平台对象引用，与版本一对一 |
 | 资金账户版本明细 | `bob_fund_account_versions` | 资金账户类型化业务字段，与版本一对一 |
 
 业务字段尚未确定前，不应仅为追求通用性把全部正式字段长期存入无约束 JSONB。类型化明细表可以提供外键、唯一性、精度、长度和查询索引约束；共享表只承载所有实体一致的生命周期信息。
@@ -202,7 +213,7 @@ edit:    EFFECTIVE → INVALID，并创建新的 DRAFT
 
 ## 5. 领域动作与 API
 
-首批七类实体提供相同的十个动作，共定义 70 条业务 API：
+首批八类实体提供相同的十个动作，共定义 80 条业务 API：
 
 | 动作 | 路径 | 说明 |
 | --- | --- | --- |
@@ -267,7 +278,7 @@ edit:    EFFECTIVE → INVALID，并创建新的 DRAFT
 
 各实体必须定义允许过滤、排序和关键字匹配的字段白名单。客户端字段名和排序方向不得拼接进 SQL；`pageSize` 必须设上限。
 
-V1 只允许 `keyword` 和 `status` 过滤：`keyword` 在 `code`、`name` 中匹配，`status` 最多包含五个合法状态。排序数组最多一个元素，字段白名单为 `updatedAt`、`code`、`name`、`status`、`version`，方向只能是 `asc` 或 `desc`；默认按 `updatedAt desc`，并以对象 ID 作为稳定次序。`pageSize` 范围为 1–100。
+V1 只允许 `keyword` 和 `status` 过滤：`keyword` 在 `code`、`name` 中匹配，车辆额外匹配 `plateNumber`；`status` 最多包含五个合法状态。排序数组最多一个元素，字段白名单为 `updatedAt`、`code`、`name`、`status`、`version`，方向只能是 `asc` 或 `desc`；默认按 `updatedAt desc`，并以对象 ID 作为稳定次序。`pageSize` 范围为 1–100。
 
 ### 6.2 查看
 
@@ -423,6 +434,8 @@ BOB 提供内部领域能力 `ResolveEffectiveReference(entity, objectId, versio
 3. 版本状态为 `EFFECTIVE`；
 4. 当前操作者满足必要的数据范围规则。
 
+解析车辆有效引用时，还必须在同一事务内确认 `platformObjectId` 指向的供应商存在当前 `EFFECTIVE` 版本，且该版本 `supplierType=LOGISTICS_PLATFORM`。车辆和平台对象的共享锁保持到消费方事务结束，防止校验后平台立即进入编辑状态。
+
 仅在前端下拉框加载时有效不构成写入保证。为避免“校验后、交易写入前”发生编辑失效，交易事务应对对象行取得与 BOB 编辑更新互斥的共享锁，或采用经验证的等效数据库约束/串行化方案。
 
 已经保存的历史业务引用不因版本后续变为 `INVALID` 而失效、级联更新或删除。BOB 表禁止配置会破坏历史引用的级联删除。
@@ -479,6 +492,9 @@ BOB 提供内部领域能力 `ResolveEffectiveReference(entity, objectId, versio
 11. 历史引用和快照不受后续版本状态变化影响；
 12. 无权限用户不能通过查询、详情或猜测 ID 读取数据；
 13. 数据库约束错误被转换为稳定业务错误且事务完整回滚。
+14. 物流平台编辑期间相关车辆不能被新业务引用，平台重新生效后恢复；
+15. 当前车辆车牌并发唯一，车辆编辑后的历史车牌允许被其他车辆重新使用；
+16. 有当前车辆引用的物流平台不能改为普通供应商。
 
 ## 13. 待决事项
 
@@ -487,6 +503,8 @@ BOB 提供内部领域能力 `ResolveEffectiveReference(entity, objectId, versio
 - 员工与 APP 用户、组织及岗位的后续关联方式；
 - 产品与服务后续的分类、价格、税率和多币种属性；
 - 仓库与组织、地址、库区、库位及库存核算范围的后续关联方式；
+- 车辆后续的载重、车型目录、证照、司机、轨迹和调度属性；
+- 物流平台后续是否需要自营、临时、外部等结构化分类；
 - 资金账户后续的账户类型、敏感字段加密和数据可见范围；
 - 是否需要多级审核及委托审核；
 - 历史版本和审计记录的保留、归档和脱敏策略。

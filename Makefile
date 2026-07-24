@@ -5,7 +5,7 @@ include $(ENV_FILE)
 export
 endif
 
-.PHONY: run build test test-unit test-db-prepare test-integration generate migrate-status migrate-up migrate-down bootstrap-admin compose-up compose-down
+.PHONY: run build test test-unit test-db-prepare test-integration generate migrate-status migrate-up migrate-down bootstrap-admin seed-bob compose-up compose-down
 
 run:
 	go run ./cmd/server
@@ -36,7 +36,7 @@ test-db-prepare:
 
 test-integration: test-db-prepare
 	@TEST_POSTGRES_DB="$(TEST_POSTGRES_DB)" TEST_DATABASE_URL="$(TEST_DATABASE_URL)" \
-		go test -tags=integration ./internal/domains/app ./internal/domains/bob -run 'Integration|Database' -count=1 -v
+		go test -tags=integration ./internal/domains/app ./internal/domains/bob ./internal/seed/bobseed -run 'Integration|Database' -count=1 -v
 
 generate:
 	go -C tools tool sqlc generate -f ../sqlc.yaml
@@ -52,6 +52,9 @@ migrate-down:
 
 bootstrap-admin:
 	@go run ./cmd/bootstrap-admin
+
+seed-bob:
+	@go run ./cmd/seed-bob
 
 compose-up:
 	docker compose --env-file $(ENV_FILE) up --build -d

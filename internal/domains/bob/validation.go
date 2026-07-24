@@ -17,7 +17,20 @@ func validateCreate(entity string, input CreateDetailInput) (DetailInput, string
 	if len(code) < 1 || len(code) > 64 || !codePattern.MatchString(code) {
 		return DetailInput{}, "", domainError(ErrorValidation, "invalid code", nil, nil)
 	}
-	data, err := validateDetail(entity, DetailInput{Name: input.Name, Unit: input.Unit, Currency: input.Currency})
+	supplierType := input.SupplierType
+	if entity == EntitySupplier && supplierType == nil {
+		defaultType := SupplierTypeGeneral
+		supplierType = &defaultType
+	}
+	data, err := validateDetail(entity, DetailInput{
+		Name:             input.Name,
+		Unit:             input.Unit,
+		Currency:         input.Currency,
+		SupplierType:     supplierType,
+		PlateNumber:      input.PlateNumber,
+		VehicleType:      input.VehicleType,
+		PlatformObjectID: input.PlatformObjectID,
+	})
 	return data, code, err
 }
 
@@ -28,26 +41,55 @@ func validateDetail(entity string, input DetailInput) (DetailInput, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Unit = strings.TrimSpace(input.Unit)
 	input.Currency = strings.ToUpper(strings.TrimSpace(input.Currency))
+	input.PlateNumber = strings.ToUpper(strings.TrimSpace(input.PlateNumber))
+	input.VehicleType = strings.TrimSpace(input.VehicleType)
+	input.PlatformObjectID = strings.TrimSpace(input.PlatformObjectID)
+	if input.SupplierType != nil {
+		normalized := strings.ToUpper(strings.TrimSpace(*input.SupplierType))
+		input.SupplierType = &normalized
+	}
 	if !runeLengthBetween(input.Name, 1, 200) {
 		return DetailInput{}, domainError(ErrorValidation, "invalid name", nil, nil)
 	}
 	switch entity {
 	case EntityProduct, EntityService:
-		if !runeLengthBetween(input.Unit, 1, 32) || input.Currency != "" {
-			return DetailInput{}, domainError(ErrorValidation, "invalid unit or unexpected currency", nil, nil)
+		if !runeLengthBetween(input.Unit, 1, 32) || hasLogisticsFields(input) || input.Currency != "" {
+			return DetailInput{}, domainError(ErrorValidation, "invalid unit or unexpected fields", nil, nil)
 		}
 	case EntityFundAccount:
-		if input.Unit != "" || !currencyPattern.MatchString(input.Currency) {
-			return DetailInput{}, domainError(ErrorValidation, "invalid currency or unexpected unit", nil, nil)
+		if input.Unit != "" || !currencyPattern.MatchString(input.Currency) || hasLogisticsFields(input) {
+			return DetailInput{}, domainError(ErrorValidation, "invalid currency or unexpected fields", nil, nil)
 		}
-	case EntityCustomer, EntitySupplier, EntityEmployee, EntityWarehouse:
-		if input.Unit != "" || input.Currency != "" {
+	case EntitySupplier:
+		if input.Unit != "" || input.Currency != "" || input.PlateNumber != "" ||
+			input.VehicleType != "" || input.PlatformObjectID != "" ||
+			(input.SupplierType != nil && !validSupplierType(*input.SupplierType)) {
+			return DetailInput{}, domainError(ErrorValidation, "invalid supplier type or unexpected fields", nil, nil)
+		}
+	case EntityVehicle:
+		if input.Unit != "" || input.Currency != "" || input.SupplierType != nil ||
+			!runeLengthBetween(input.PlateNumber, 1, 32) ||
+			!runeLengthBetween(input.VehicleType, 1, 64) ||
+			!validID(input.PlatformObjectID) {
+			return DetailInput{}, domainError(ErrorValidation, "invalid vehicle fields", nil, nil)
+		}
+	case EntityCustomer, EntityEmployee, EntityWarehouse:
+		if input.Unit != "" || input.Currency != "" || hasLogisticsFields(input) {
 			return DetailInput{}, domainError(ErrorValidation, "unexpected entity fields", nil, nil)
 		}
 	default:
 		return DetailInput{}, domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
 	return input, nil
+}
+
+func hasLogisticsFields(input DetailInput) bool {
+	return input.SupplierType != nil || input.PlateNumber != "" ||
+		input.VehicleType != "" || input.PlatformObjectID != ""
+}
+
+func validSupplierType(value string) bool {
+	return slices.Contains([]string{SupplierTypeGeneral, SupplierTypeLogisticsPlatform}, value)
 }
 
 func validWriteInput(entity, objectID, versionID string, revision int64, actorID, requestID string) bool {

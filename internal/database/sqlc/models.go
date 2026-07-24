@@ -155,9 +155,20 @@ type BobServiceVersion struct {
 }
 
 type BobSupplierVersion struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Entity    string `db:"entity" json:"entity"`
-	Name      string `db:"name" json:"name"`
+	VersionID    string `db:"version_id" json:"version_id"`
+	Entity       string `db:"entity" json:"entity"`
+	Name         string `db:"name" json:"name"`
+	SupplierType string `db:"supplier_type" json:"supplier_type"`
+}
+
+type BobVehicleVersion struct {
+	VersionID        string `db:"version_id" json:"version_id"`
+	Entity           string `db:"entity" json:"entity"`
+	Name             string `db:"name" json:"name"`
+	PlateNumber      string `db:"plate_number" json:"plate_number"`
+	VehicleType      string `db:"vehicle_type" json:"vehicle_type"`
+	PlatformObjectID string `db:"platform_object_id" json:"platform_object_id"`
+	PlatformEntity   string `db:"platform_entity" json:"platform_entity"`
 }
 
 type BobVersion struct {
@@ -202,6 +213,10 @@ type BobVersionView struct {
 	Name               string             `db:"name" json:"name"`
 	Unit               string             `db:"unit" json:"unit"`
 	Currency           *string            `db:"currency" json:"currency"`
+	SupplierType       *string            `db:"supplier_type" json:"supplier_type"`
+	PlateNumber        *string            `db:"plate_number" json:"plate_number"`
+	VehicleType        *string            `db:"vehicle_type" json:"vehicle_type"`
+	PlatformObjectID   *string            `db:"platform_object_id" json:"platform_object_id"`
 }
 
 type BobWarehouseVersion struct {

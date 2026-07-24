@@ -93,7 +93,7 @@ func newBOBTestRouter(service applicationService, authorizer authorization.Autho
 func TestHandlerRegistersEveryEntityAction(t *testing.T) {
 	router := newBOBTestRouter(&serviceStub{}, authorization.FailClosed{})
 	routes := router.Routes()
-	expectedEntities := []string{"customer", "supplier", "employee", "product", "service", "warehouse", "fund-account"}
+	expectedEntities := []string{"customer", "supplier", "employee", "product", "service", "warehouse", "vehicle", "fund-account"}
 	expectedActions := []string{
 		"query", "get", "create", "edit", "save",
 		"submit", "approve", "reject", "versions", "audit-history",
@@ -170,7 +170,7 @@ func TestHandlerUsesExactPermissionPathAndPrincipal(t *testing.T) {
 		return authorization.Principal{ActorID: "01J00000000000000000000000"}, nil
 	})
 	router := newBOBTestRouter(service, authorizer)
-	request := httptest.NewRequest(http.MethodPost, "/bob/warehouse/query", strings.NewReader(`{"page":1,"pageSize":20,"filters":{},"sort":[]}`))
+	request := httptest.NewRequest(http.MethodPost, "/bob/vehicle/query", strings.NewReader(`{"page":1,"pageSize":20,"filters":{},"sort":[]}`))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
@@ -178,10 +178,10 @@ func TestHandlerUsesExactPermissionPathAndPrincipal(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
-	if permission != "/bob/warehouse/query" {
+	if permission != "/bob/vehicle/query" {
 		t.Fatalf("permission = %q", permission)
 	}
-	if service.queryCalls != 1 || service.entity != EntityWarehouse {
+	if service.queryCalls != 1 || service.entity != EntityVehicle {
 		t.Fatalf("query calls = %d, entity = %q", service.queryCalls, service.entity)
 	}
 }

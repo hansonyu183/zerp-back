@@ -18,6 +18,7 @@ type Querier interface {
 	CopyBobProductDetail(ctx context.Context, arg CopyBobProductDetailParams) error
 	CopyBobServiceDetail(ctx context.Context, arg CopyBobServiceDetailParams) error
 	CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplierDetailParams) error
+	CopyBobVehicleDetail(ctx context.Context, arg CopyBobVehicleDetailParams) error
 	CopyBobWarehouseDetail(ctx context.Context, arg CopyBobWarehouseDetailParams) error
 	CountAllAppUsers(ctx context.Context) (int64, error)
 	CountAppPermissions(ctx context.Context, arg CountAppPermissionsParams) (int64, error)
@@ -37,6 +38,7 @@ type Querier interface {
 	CreateAppSession(ctx context.Context, arg CreateAppSessionParams) error
 	DeleteAppRolePermissions(ctx context.Context, roleID string) error
 	DeleteAppUserRoles(ctx context.Context, userID string) error
+	FindBobObjectIDByCode(ctx context.Context, arg FindBobObjectIDByCodeParams) (string, error)
 	GetAppPermissionByID(ctx context.Context, id string) (AppPermission, error)
 	GetAppRoleByID(ctx context.Context, id string) (AppRole, error)
 	GetAppRolePermissionIDs(ctx context.Context, roleID string) ([]string, error)
@@ -59,6 +61,7 @@ type Querier interface {
 	InsertBobProductDetail(ctx context.Context, arg InsertBobProductDetailParams) error
 	InsertBobServiceDetail(ctx context.Context, arg InsertBobServiceDetailParams) error
 	InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error
+	InsertBobVehicleDetail(ctx context.Context, arg InsertBobVehicleDetailParams) error
 	InsertBobVersion(ctx context.Context, arg InsertBobVersionParams) error
 	InsertBobWarehouseDetail(ctx context.Context, arg InsertBobWarehouseDetailParams) error
 	InvalidateBobVersion(ctx context.Context, arg InvalidateBobVersionParams) (int64, error)
@@ -72,6 +75,7 @@ type Querier interface {
 	ListBobVersions(ctx context.Context, arg ListBobVersionsParams) ([]BobVersionView, error)
 	LockBobObject(ctx context.Context, arg LockBobObjectParams) (LockBobObjectRow, error)
 	LockBobVersion(ctx context.Context, arg LockBobVersionParams) (LockBobVersionRow, error)
+	LockEffectiveLogisticsPlatform(ctx context.Context, platformObjectID string) (string, error)
 	MarkBobVersionSaved(ctx context.Context, arg MarkBobVersionSavedParams) (int64, error)
 	Ping(ctx context.Context) (int32, error)
 	RecordSigninFailure(ctx context.Context, arg RecordSigninFailureParams) (AppUser, error)
@@ -96,6 +100,7 @@ type Querier interface {
 	UpdateBobProductDetail(ctx context.Context, arg UpdateBobProductDetailParams) (int64, error)
 	UpdateBobServiceDetail(ctx context.Context, arg UpdateBobServiceDetailParams) (int64, error)
 	UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error)
+	UpdateBobVehicleDetail(ctx context.Context, arg UpdateBobVehicleDetailParams) (int64, error)
 	UpdateBobWarehouseDetail(ctx context.Context, arg UpdateBobWarehouseDetailParams) (int64, error)
 }
 

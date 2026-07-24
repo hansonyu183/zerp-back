@@ -77,6 +77,7 @@ make run
 | `make migrate-up` | 升级数据库到最新迁移 |
 | `make migrate-down` | 回滚一个数据库迁移版本 |
 | `make bootstrap-admin` | 在空用户库中创建首个超级管理员（密码取自 `APP_BOOTSTRAP_PASSWORD`） |
+| `make seed-bob` | 向开发或测试库幂等写入 BOB 演示数据 |
 | `make compose-up` | 构建并启动 API、PostgreSQL 与 pgAdmin |
 | `make compose-down` | 停止容器 |
 
@@ -132,13 +133,16 @@ make bootstrap-admin
 unset APP_BOOTSTRAP_PASSWORD
 ```
 
+本地联调可执行 `make seed-bob`，为客户、供应商、员工、产品、服务、仓库、车辆和资金账户各写入两条演示数据，共 16 条，并覆盖 `EFFECTIVE`、`DRAFT`、`PENDING`、`REJECTED` 状态。供应商演示数据包含自营物流平台，车辆归属该平台。命令仅允许在 `development` 或 `test` 环境运行；重复执行会核验并跳过已有演示数据，不会覆盖同代码的其他内容。
+
 ## 目录结构
 
 ```text
 .
 ├─ cmd/
 │  ├─ server/                  # 服务入口与优雅关闭
-│  └─ bootstrap-admin/         # 首个超级管理员初始化命令
+│  ├─ bootstrap-admin/         # 首个超级管理员初始化命令
+│  └─ seed-bob/                # BOB 开发/测试数据填充命令
 ├─ db/
 │  ├─ migrations/              # Goose SQL 迁移
 │  └─ queries/                 # sqlc SQL 查询
@@ -151,7 +155,8 @@ unset APP_BOOTSTRAP_PASSWORD
 │  ├─ config/                  # 环境变量解析与校验
 │  ├─ database/                # pgx 连接池及 sqlc 生成代码
 │  ├─ domains/                 # 领域服务、Handler 和领域类型
-│  └─ httpserver/              # Gin 路由与健康检查
+│  ├─ httpserver/              # Gin 路由与健康检查
+│  └─ seed/                    # 非生产环境演示数据编排
 ├─ tools/                      # sqlc、Goose 独立工具模块
 ├─ compose.yaml
 ├─ Dockerfile
@@ -166,7 +171,7 @@ unset APP_BOOTSTRAP_PASSWORD
 | 领域 | 标识 | 范围 | 文档 |
 | --- | --- | --- | --- |
 | 应用访问与权限 | `app` | 用户认证、Cookie 会话、CSRF、角色与 API 权限 | [APP 后端业务域](docs/domains/app.md) |
-| 基础业务对象 | `bob` | 客户、供应商、员工、产品、服务、仓库、资金账户及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
+| 基础业务对象 | `bob` | 客户、供应商、物流平台、员工、产品、服务、仓库、车辆、资金账户及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
 
 Cloudflare Pages、本地 Vite、Cookie、CSRF 和请求封装见 [前端 API 配置说明](docs/frontend-api-configuration.md)。
 

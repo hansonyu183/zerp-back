@@ -13,7 +13,9 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 	case EntityCustomer:
 		return q.InsertBobCustomerDetail(ctx, dbsqlc.InsertBobCustomerDetailParams{VersionID: versionID, Name: data.Name})
 	case EntitySupplier:
-		return q.InsertBobSupplierDetail(ctx, dbsqlc.InsertBobSupplierDetailParams{VersionID: versionID, Name: data.Name})
+		return q.InsertBobSupplierDetail(ctx, dbsqlc.InsertBobSupplierDetailParams{
+			VersionID: versionID, Name: data.Name, SupplierType: deref(data.SupplierType),
+		})
 	case EntityEmployee:
 		return q.InsertBobEmployeeDetail(ctx, dbsqlc.InsertBobEmployeeDetailParams{VersionID: versionID, Name: data.Name})
 	case EntityProduct:
@@ -22,6 +24,11 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 		return q.InsertBobServiceDetail(ctx, dbsqlc.InsertBobServiceDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
 	case EntityWarehouse:
 		return q.InsertBobWarehouseDetail(ctx, dbsqlc.InsertBobWarehouseDetailParams{VersionID: versionID, Name: data.Name})
+	case EntityVehicle:
+		return q.InsertBobVehicleDetail(ctx, dbsqlc.InsertBobVehicleDetailParams{
+			VersionID: versionID, Name: data.Name, PlateNumber: data.PlateNumber,
+			VehicleType: data.VehicleType, PlatformObjectID: data.PlatformObjectID,
+		})
 	case EntityFundAccount:
 		return q.InsertBobFundAccountDetail(ctx, dbsqlc.InsertBobFundAccountDetailParams{VersionID: versionID, Name: data.Name, Currency: data.Currency})
 	default:
@@ -36,7 +43,9 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 	case EntityCustomer:
 		rows, err = q.UpdateBobCustomerDetail(ctx, dbsqlc.UpdateBobCustomerDetailParams{Name: data.Name, VersionID: versionID})
 	case EntitySupplier:
-		rows, err = q.UpdateBobSupplierDetail(ctx, dbsqlc.UpdateBobSupplierDetailParams{Name: data.Name, VersionID: versionID})
+		rows, err = q.UpdateBobSupplierDetail(ctx, dbsqlc.UpdateBobSupplierDetailParams{
+			Name: data.Name, SupplierType: deref(data.SupplierType), VersionID: versionID,
+		})
 	case EntityEmployee:
 		rows, err = q.UpdateBobEmployeeDetail(ctx, dbsqlc.UpdateBobEmployeeDetailParams{Name: data.Name, VersionID: versionID})
 	case EntityProduct:
@@ -45,6 +54,11 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 		rows, err = q.UpdateBobServiceDetail(ctx, dbsqlc.UpdateBobServiceDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
 	case EntityWarehouse:
 		rows, err = q.UpdateBobWarehouseDetail(ctx, dbsqlc.UpdateBobWarehouseDetailParams{Name: data.Name, VersionID: versionID})
+	case EntityVehicle:
+		rows, err = q.UpdateBobVehicleDetail(ctx, dbsqlc.UpdateBobVehicleDetailParams{
+			Name: data.Name, PlateNumber: data.PlateNumber, VehicleType: data.VehicleType,
+			PlatformObjectID: data.PlatformObjectID, VersionID: versionID,
+		})
 	case EntityFundAccount:
 		rows, err = q.UpdateBobFundAccountDetail(ctx, dbsqlc.UpdateBobFundAccountDetailParams{Name: data.Name, Currency: data.Currency, VersionID: versionID})
 	default:
@@ -70,6 +84,8 @@ func copyDetail(ctx context.Context, q *dbsqlc.Queries, entity, newVersionID, so
 		return q.CopyBobServiceDetail(ctx, dbsqlc.CopyBobServiceDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	case EntityWarehouse:
 		return q.CopyBobWarehouseDetail(ctx, dbsqlc.CopyBobWarehouseDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
+	case EntityVehicle:
+		return q.CopyBobVehicleDetail(ctx, dbsqlc.CopyBobVehicleDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	case EntityFundAccount:
 		return q.CopyBobFundAccountDetail(ctx, dbsqlc.CopyBobFundAccountDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	default:

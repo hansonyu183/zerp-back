@@ -36,6 +36,12 @@ func detailFields(entity string) []string {
 	if entity == EntityFundAccount {
 		fields = append(fields, "currency")
 	}
+	if entity == EntitySupplier {
+		fields = append(fields, "supplierType")
+	}
+	if entity == EntityVehicle {
+		fields = append(fields, "plateNumber", "vehicleType", "platformObjectId")
+	}
 	return fields
 }
 
@@ -78,7 +84,11 @@ func objectView(row dbsqlc.BobVersionView) ObjectView {
 }
 
 func detailView(row dbsqlc.BobVersionView) DetailView {
-	return DetailView{Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency)}
+	return DetailView{
+		Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
+		SupplierType: deref(row.SupplierType), PlateNumber: deref(row.PlateNumber),
+		VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
+	}
 }
 
 func auditEventView(row dbsqlc.BobAuditEvent) AuditEventView {

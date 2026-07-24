@@ -12,7 +12,11 @@ const (
 	EntityProduct     = "product"
 	EntityService     = "service"
 	EntityWarehouse   = "warehouse"
+	EntityVehicle     = "vehicle"
 	EntityFundAccount = "fund-account"
+
+	SupplierTypeGeneral           = "GENERAL"
+	SupplierTypeLogisticsPlatform = "LOGISTICS_PLATFORM"
 
 	StatusDraft     = "DRAFT"
 	StatusPending   = "PENDING"
@@ -28,6 +32,7 @@ var entities = [...]string{
 	EntityProduct,
 	EntityService,
 	EntityWarehouse,
+	EntityVehicle,
 	EntityFundAccount,
 }
 
@@ -54,16 +59,24 @@ func domainError(kind ErrorKind, message string, data any, cause error) error {
 }
 
 type DetailInput struct {
-	Name     string `json:"name"`
-	Unit     string `json:"unit,omitempty"`
-	Currency string `json:"currency,omitempty"`
+	Name             string  `json:"name"`
+	Unit             string  `json:"unit,omitempty"`
+	Currency         string  `json:"currency,omitempty"`
+	SupplierType     *string `json:"supplierType,omitempty"`
+	PlateNumber      string  `json:"plateNumber,omitempty"`
+	VehicleType      string  `json:"vehicleType,omitempty"`
+	PlatformObjectID string  `json:"platformObjectId,omitempty"`
 }
 
 type CreateDetailInput struct {
-	Code     string `json:"code"`
-	Name     string `json:"name"`
-	Unit     string `json:"unit,omitempty"`
-	Currency string `json:"currency,omitempty"`
+	Code             string  `json:"code"`
+	Name             string  `json:"name"`
+	Unit             string  `json:"unit,omitempty"`
+	Currency         string  `json:"currency,omitempty"`
+	SupplierType     *string `json:"supplierType,omitempty"`
+	PlateNumber      string  `json:"plateNumber,omitempty"`
+	VehicleType      string  `json:"vehicleType,omitempty"`
+	PlatformObjectID string  `json:"platformObjectId,omitempty"`
 }
 
 type CreateInput struct {
@@ -124,9 +137,13 @@ type HistoryInput struct {
 }
 
 type DetailView struct {
-	Name     string `json:"name"`
-	Unit     string `json:"unit,omitempty"`
-	Currency string `json:"currency,omitempty"`
+	Name             string `json:"name"`
+	Unit             string `json:"unit,omitempty"`
+	Currency         string `json:"currency,omitempty"`
+	SupplierType     string `json:"supplierType,omitempty"`
+	PlateNumber      string `json:"plateNumber,omitempty"`
+	VehicleType      string `json:"vehicleType,omitempty"`
+	PlatformObjectID string `json:"platformObjectId,omitempty"`
 }
 
 type MutationResult struct {

@@ -97,6 +97,11 @@ func (s *Service) Create(ctx context.Context, entity string, input CreateInput, 
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 	qtx := s.queries.WithTx(tx)
+	if entity == EntityVehicle {
+		if err = s.validatePlatformReference(ctx, qtx, data.PlatformObjectID); err != nil {
+			return MutationResult{}, err
+		}
+	}
 	if err = qtx.InsertBobObject(ctx, dbsqlc.InsertBobObjectParams{
 		ID: objectID, Entity: entity, Code: code, CurrentVersionID: versionID, ActorID: actorID,
 	}); err != nil {
@@ -135,6 +140,21 @@ func (s *Service) Save(ctx context.Context, entity string, input SaveInput, acto
 	if object.CurrentVersionID != input.VersionID || object.EffectiveVersionID != nil || version.Revision != input.Revision ||
 		!slices.Contains([]string{StatusDraft, StatusRejected}, version.Status) {
 		return MutationResult{}, conflict(object, version, "version changed before save")
+	}
+	if entity == EntitySupplier && data.SupplierType == nil {
+		row, readErr := qtx.GetBobVersionView(ctx, dbsqlc.GetBobVersionViewParams{
+			ObjectID: input.ObjectID, Entity: entity, VersionID: input.VersionID,
+		})
+		if readErr != nil {
+			return MutationResult{}, s.internal("read supplier type", readErr)
+		}
+		currentType := deref(row.SupplierType)
+		data.SupplierType = &currentType
+	}
+	if entity == EntityVehicle {
+		if err = s.validatePlatformReference(ctx, qtx, data.PlatformObjectID); err != nil {
+			return MutationResult{}, err
+		}
 	}
 	if err = updateDetail(ctx, qtx, entity, input.VersionID, data); err != nil {
 		return MutationResult{}, s.writeError("update detail", err)
@@ -444,9 +464,18 @@ func (s *Service) ResolveEffectiveReference(ctx context.Context, tx pgx.Tx, enti
 	if err != nil {
 		return EffectiveReference{}, s.internal("resolve effective reference", err)
 	}
+	if entity == EntityVehicle {
+		if err = s.validatePlatformReference(ctx, s.queries.WithTx(tx), deref(row.PlatformObjectID)); err != nil {
+			return EffectiveReference{}, err
+		}
+	}
 	return EffectiveReference{
 		ObjectID: row.ObjectID, Entity: row.Entity, Code: row.Code, VersionID: row.VersionID,
-		Data: DetailView{Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency)},
+		Data: DetailView{
+			Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
+			SupplierType: deref(row.SupplierType), PlateNumber: deref(row.PlateNumber),
+			VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
+		},
 	}, nil
 }
 
@@ -484,6 +513,30 @@ func (s *Service) validateStoredDetail(ctx context.Context, q *dbsqlc.Queries, e
 	if err != nil {
 		return s.internal("read stored detail", err)
 	}
-	_, err = validateDetail(entity, DetailInput{Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency)})
-	return err
+	_, err = validateDetail(entity, DetailInput{
+		Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
+		SupplierType: row.SupplierType, PlateNumber: deref(row.PlateNumber),
+		VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
+	})
+	if err != nil {
+		return err
+	}
+	if entity == EntityVehicle {
+		return s.validatePlatformReference(ctx, q, deref(row.PlatformObjectID))
+	}
+	return nil
+}
+
+func (s *Service) validatePlatformReference(ctx context.Context, q *dbsqlc.Queries, platformObjectID string) error {
+	if !validID(platformObjectID) {
+		return domainError(ErrorValidation, "invalid logistics platform reference", nil, nil)
+	}
+	_, err := q.LockEffectiveLogisticsPlatform(ctx, platformObjectID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domainError(ErrorConflict, "logistics platform is not currently effective", nil, nil)
+	}
+	if err != nil {
+		return s.internal("lock logistics platform", err)
+	}
+	return nil
 }

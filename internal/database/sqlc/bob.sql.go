@@ -151,8 +151,9 @@ func (q *Queries) CopyBobServiceDetail(ctx context.Context, arg CopyBobServiceDe
 }
 
 const copyBobSupplierDetail = `-- name: CopyBobSupplierDetail :exec
-INSERT INTO bob_supplier_versions (version_id, name)
-SELECT $1, d.name FROM bob_supplier_versions d WHERE d.version_id = $2
+INSERT INTO bob_supplier_versions (version_id, name, supplier_type)
+SELECT $1, d.name, d.supplier_type
+FROM bob_supplier_versions d WHERE d.version_id = $2
 `
 
 type CopyBobSupplierDetailParams struct {
@@ -162,6 +163,22 @@ type CopyBobSupplierDetailParams struct {
 
 func (q *Queries) CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplierDetailParams) error {
 	_, err := q.db.Exec(ctx, copyBobSupplierDetail, arg.NewVersionID, arg.SourceVersionID)
+	return err
+}
+
+const copyBobVehicleDetail = `-- name: CopyBobVehicleDetail :exec
+INSERT INTO bob_vehicle_versions (version_id, name, plate_number, vehicle_type, platform_object_id)
+SELECT $1, d.name, d.plate_number, d.vehicle_type, d.platform_object_id
+FROM bob_vehicle_versions d WHERE d.version_id = $2
+`
+
+type CopyBobVehicleDetailParams struct {
+	NewVersionID    string `db:"new_version_id" json:"new_version_id"`
+	SourceVersionID string `db:"source_version_id" json:"source_version_id"`
+}
+
+func (q *Queries) CopyBobVehicleDetail(ctx context.Context, arg CopyBobVehicleDetailParams) error {
+	_, err := q.db.Exec(ctx, copyBobVehicleDetail, arg.NewVersionID, arg.SourceVersionID)
 	return err
 }
 
@@ -201,7 +218,12 @@ SELECT count(*)
 FROM bob_version_views
 WHERE entity = $1 AND version_id = current_version_id
   AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
-  AND ($3::text = '' OR code ILIKE '%' || $3 || '%' OR name ILIKE '%' || $3 || '%')
+  AND (
+      $3::text = ''
+      OR code ILIKE '%' || $3 || '%'
+      OR name ILIKE '%' || $3 || '%'
+      OR (entity = 'vehicle' AND plate_number ILIKE '%' || $3 || '%')
+  )
 `
 
 type CountBobObjectsParams struct {
@@ -233,8 +255,27 @@ func (q *Queries) CountBobVersions(ctx context.Context, arg CountBobVersionsPara
 	return count, err
 }
 
+const findBobObjectIDByCode = `-- name: FindBobObjectIDByCode :one
+SELECT id
+FROM bob_objects
+WHERE entity = $1 AND upper(code) = upper($2::text)
+LIMIT 1
+`
+
+type FindBobObjectIDByCodeParams struct {
+	Entity string `db:"entity" json:"entity"`
+	Code   string `db:"code" json:"code"`
+}
+
+func (q *Queries) FindBobObjectIDByCode(ctx context.Context, arg FindBobObjectIDByCodeParams) (string, error) {
+	row := q.db.QueryRow(ctx, findBobObjectIDByCode, arg.Entity, arg.Code)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getBobVersionView = `-- name: GetBobVersionView :one
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency FROM bob_version_views
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id FROM bob_version_views
 WHERE object_id = $1 AND entity = $2
   AND version_id = COALESCE(NULLIF($3::text, ''), current_version_id)
 `
@@ -272,6 +313,10 @@ func (q *Queries) GetBobVersionView(ctx context.Context, arg GetBobVersionViewPa
 		&i.Name,
 		&i.Unit,
 		&i.Currency,
+		&i.SupplierType,
+		&i.PlateNumber,
+		&i.VehicleType,
+		&i.PlatformObjectID,
 	)
 	return i, err
 }
@@ -417,16 +462,45 @@ func (q *Queries) InsertBobServiceDetail(ctx context.Context, arg InsertBobServi
 }
 
 const insertBobSupplierDetail = `-- name: InsertBobSupplierDetail :exec
-INSERT INTO bob_supplier_versions (version_id, name) VALUES ($1, $2)
+INSERT INTO bob_supplier_versions (version_id, name, supplier_type)
+VALUES ($1, $2, $3)
 `
 
 type InsertBobSupplierDetailParams struct {
-	VersionID string `db:"version_id" json:"version_id"`
-	Name      string `db:"name" json:"name"`
+	VersionID    string `db:"version_id" json:"version_id"`
+	Name         string `db:"name" json:"name"`
+	SupplierType string `db:"supplier_type" json:"supplier_type"`
 }
 
 func (q *Queries) InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error {
-	_, err := q.db.Exec(ctx, insertBobSupplierDetail, arg.VersionID, arg.Name)
+	_, err := q.db.Exec(ctx, insertBobSupplierDetail, arg.VersionID, arg.Name, arg.SupplierType)
+	return err
+}
+
+const insertBobVehicleDetail = `-- name: InsertBobVehicleDetail :exec
+INSERT INTO bob_vehicle_versions (version_id, name, plate_number, vehicle_type, platform_object_id)
+VALUES (
+    $1, $2, $3,
+    $4, $5
+)
+`
+
+type InsertBobVehicleDetailParams struct {
+	VersionID        string `db:"version_id" json:"version_id"`
+	Name             string `db:"name" json:"name"`
+	PlateNumber      string `db:"plate_number" json:"plate_number"`
+	VehicleType      string `db:"vehicle_type" json:"vehicle_type"`
+	PlatformObjectID string `db:"platform_object_id" json:"platform_object_id"`
+}
+
+func (q *Queries) InsertBobVehicleDetail(ctx context.Context, arg InsertBobVehicleDetailParams) error {
+	_, err := q.db.Exec(ctx, insertBobVehicleDetail,
+		arg.VersionID,
+		arg.Name,
+		arg.PlateNumber,
+		arg.VehicleType,
+		arg.PlatformObjectID,
+	)
 	return err
 }
 
@@ -555,11 +629,16 @@ func (q *Queries) ListBobAuditEvents(ctx context.Context, arg ListBobAuditEvents
 }
 
 const listBobObjects = `-- name: ListBobObjects :many
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id
 FROM bob_version_views
 WHERE entity = $1 AND version_id = current_version_id
   AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
-  AND ($3::text = '' OR code ILIKE '%' || $3 || '%' OR name ILIKE '%' || $3 || '%')
+  AND (
+      $3::text = ''
+      OR code ILIKE '%' || $3 || '%'
+      OR name ILIKE '%' || $3 || '%'
+      OR (entity = 'vehicle' AND plate_number ILIKE '%' || $3 || '%')
+  )
 ORDER BY
   CASE WHEN $4::text = 'updatedAt' AND $5::text = 'asc' THEN object_updated_at END ASC,
   CASE WHEN $4::text = 'updatedAt' AND $5::text = 'desc' THEN object_updated_at END DESC,
@@ -626,6 +705,10 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 			&i.Name,
 			&i.Unit,
 			&i.Currency,
+			&i.SupplierType,
+			&i.PlateNumber,
+			&i.VehicleType,
+			&i.PlatformObjectID,
 		); err != nil {
 			return nil, err
 		}
@@ -638,7 +721,7 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 }
 
 const listBobVersions = `-- name: ListBobVersions :many
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency FROM bob_version_views
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id FROM bob_version_views
 WHERE object_id = $1 AND entity = $2
 ORDER BY version_no DESC
 LIMIT $4 OFFSET $3
@@ -689,6 +772,10 @@ func (q *Queries) ListBobVersions(ctx context.Context, arg ListBobVersionsParams
 			&i.Name,
 			&i.Unit,
 			&i.Currency,
+			&i.SupplierType,
+			&i.PlateNumber,
+			&i.VehicleType,
+			&i.PlatformObjectID,
 		); err != nil {
 			return nil, err
 		}
@@ -777,6 +864,29 @@ func (q *Queries) LockBobVersion(ctx context.Context, arg LockBobVersionParams) 
 	return i, err
 }
 
+const lockEffectiveLogisticsPlatform = `-- name: LockEffectiveLogisticsPlatform :one
+SELECT o.id
+FROM bob_objects o
+JOIN bob_versions v
+  ON v.id = o.effective_version_id
+ AND v.object_id = o.id
+ AND v.entity = o.entity
+JOIN bob_supplier_versions s ON s.version_id = v.id
+WHERE o.id = $1
+  AND o.entity = 'supplier'
+  AND o.current_version_id = o.effective_version_id
+  AND v.status = 'EFFECTIVE'
+  AND s.supplier_type = 'LOGISTICS_PLATFORM'
+FOR SHARE OF o
+`
+
+func (q *Queries) LockEffectiveLogisticsPlatform(ctx context.Context, platformObjectID string) (string, error) {
+	row := q.db.QueryRow(ctx, lockEffectiveLogisticsPlatform, platformObjectID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const markBobVersionSaved = `-- name: MarkBobVersionSaved :execrows
 UPDATE bob_versions
 SET revision = revision + 1, updated_at = now(), updated_by = $1
@@ -840,8 +950,9 @@ func (q *Queries) RejectBobVersion(ctx context.Context, arg RejectBobVersionPara
 
 const resolveBobEffectiveReference = `-- name: ResolveBobEffectiveReference :one
 SELECT o.id AS object_id, o.entity, o.code, v.id AS version_id,
-       COALESCE(c.name, s.name, e.name, p.name, sv.name, w.name, f.name) AS name,
-       COALESCE(p.unit, sv.unit, '') AS unit, f.currency
+       COALESCE(c.name, s.name, e.name, p.name, sv.name, w.name, vh.name, f.name) AS name,
+       COALESCE(p.unit, sv.unit, '') AS unit, f.currency, s.supplier_type,
+       vh.plate_number, vh.vehicle_type, vh.platform_object_id
 FROM bob_objects o
 JOIN bob_versions v ON v.object_id = o.id AND v.entity = o.entity
 LEFT JOIN bob_customer_versions c ON c.version_id = v.id
@@ -850,6 +961,7 @@ LEFT JOIN bob_employee_versions e ON e.version_id = v.id
 LEFT JOIN bob_product_versions p ON p.version_id = v.id
 LEFT JOIN bob_service_versions sv ON sv.version_id = v.id
 LEFT JOIN bob_warehouse_versions w ON w.version_id = v.id
+LEFT JOIN bob_vehicle_versions vh ON vh.version_id = v.id
 LEFT JOIN bob_fund_account_versions f ON f.version_id = v.id
 WHERE o.id = $1 AND o.entity = $2
   AND v.id = $3 AND o.effective_version_id = v.id AND v.status = 'EFFECTIVE'
@@ -863,13 +975,17 @@ type ResolveBobEffectiveReferenceParams struct {
 }
 
 type ResolveBobEffectiveReferenceRow struct {
-	ObjectID  string  `db:"object_id" json:"object_id"`
-	Entity    string  `db:"entity" json:"entity"`
-	Code      string  `db:"code" json:"code"`
-	VersionID string  `db:"version_id" json:"version_id"`
-	Name      string  `db:"name" json:"name"`
-	Unit      string  `db:"unit" json:"unit"`
-	Currency  *string `db:"currency" json:"currency"`
+	ObjectID         string  `db:"object_id" json:"object_id"`
+	Entity           string  `db:"entity" json:"entity"`
+	Code             string  `db:"code" json:"code"`
+	VersionID        string  `db:"version_id" json:"version_id"`
+	Name             string  `db:"name" json:"name"`
+	Unit             string  `db:"unit" json:"unit"`
+	Currency         *string `db:"currency" json:"currency"`
+	SupplierType     *string `db:"supplier_type" json:"supplier_type"`
+	PlateNumber      *string `db:"plate_number" json:"plate_number"`
+	VehicleType      *string `db:"vehicle_type" json:"vehicle_type"`
+	PlatformObjectID *string `db:"platform_object_id" json:"platform_object_id"`
 }
 
 func (q *Queries) ResolveBobEffectiveReference(ctx context.Context, arg ResolveBobEffectiveReferenceParams) (ResolveBobEffectiveReferenceRow, error) {
@@ -883,6 +999,10 @@ func (q *Queries) ResolveBobEffectiveReference(ctx context.Context, arg ResolveB
 		&i.Name,
 		&i.Unit,
 		&i.Currency,
+		&i.SupplierType,
+		&i.PlateNumber,
+		&i.VehicleType,
+		&i.PlatformObjectID,
 	)
 	return i, err
 }
@@ -1051,16 +1171,48 @@ func (q *Queries) UpdateBobServiceDetail(ctx context.Context, arg UpdateBobServi
 }
 
 const updateBobSupplierDetail = `-- name: UpdateBobSupplierDetail :execrows
-UPDATE bob_supplier_versions SET name = $1 WHERE version_id = $2
+UPDATE bob_supplier_versions
+SET name = $1, supplier_type = $2
+WHERE version_id = $3
 `
 
 type UpdateBobSupplierDetailParams struct {
-	Name      string `db:"name" json:"name"`
-	VersionID string `db:"version_id" json:"version_id"`
+	Name         string `db:"name" json:"name"`
+	SupplierType string `db:"supplier_type" json:"supplier_type"`
+	VersionID    string `db:"version_id" json:"version_id"`
 }
 
 func (q *Queries) UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateBobSupplierDetail, arg.Name, arg.VersionID)
+	result, err := q.db.Exec(ctx, updateBobSupplierDetail, arg.Name, arg.SupplierType, arg.VersionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateBobVehicleDetail = `-- name: UpdateBobVehicleDetail :execrows
+UPDATE bob_vehicle_versions
+SET name = $1, plate_number = $2,
+    vehicle_type = $3, platform_object_id = $4
+WHERE version_id = $5
+`
+
+type UpdateBobVehicleDetailParams struct {
+	Name             string `db:"name" json:"name"`
+	PlateNumber      string `db:"plate_number" json:"plate_number"`
+	VehicleType      string `db:"vehicle_type" json:"vehicle_type"`
+	PlatformObjectID string `db:"platform_object_id" json:"platform_object_id"`
+	VersionID        string `db:"version_id" json:"version_id"`
+}
+
+func (q *Queries) UpdateBobVehicleDetail(ctx context.Context, arg UpdateBobVehicleDetailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateBobVehicleDetail,
+		arg.Name,
+		arg.PlateNumber,
+		arg.VehicleType,
+		arg.PlatformObjectID,
+		arg.VersionID,
+	)
 	if err != nil {
 		return 0, err
 	}

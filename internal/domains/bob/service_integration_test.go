@@ -200,6 +200,9 @@ func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 		{EntityCategory, CreateDetailInput{Name: "Product Category", TargetEntity: EntityProduct}},
 		{EntityDepartment, CreateDetailInput{Name: "Operations"}},
 		{EntityPosition, CreateDetailInput{Name: "Operator"}},
+		{EntitySettlementMethod, CreateDetailInput{
+			Name: "Month End", RuleType: SettlementRuleMonthEnd, MonthOffset: 1,
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.entity, func(t *testing.T) {
@@ -478,19 +481,56 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 	position, _ := createApprovedIntegration(t, service, EntityPosition, CreateDetailInput{
 		Code: "PS" + newID(), Name: "运营专员",
 	}, "common-position")
+	salesperson, _ := createApprovedIntegration(t, service, EntityEmployee, CreateDetailInput{
+		Code: "SP" + newID(), Name: "客户业务员", DepartmentID: department.ObjectID,
+		PositionID: position.ObjectID,
+	}, "common-salesperson")
+	settlementCode := "SM" + newID()
+	settlementMethod, _ := createApprovedIntegration(t, service, EntitySettlementMethod, CreateDetailInput{
+		Code: settlementCode, Name: "月结 30 天", RuleType: SettlementRuleRelativeDays,
+		DayOffset: 30,
+	}, "common-settlement-method")
+	settlementPage, err := service.Query(t.Context(), EntitySettlementMethod, QueryInput{
+		Page: 1, PageSize: 20, Filters: QueryFilters{Keyword: settlementCode},
+	})
+	if err != nil || settlementPage.Total != 1 {
+		t.Fatalf("query settlement methods page=%+v err=%v", settlementPage, err)
+	}
 
 	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "WC" + newID(), Name: "错误分类客户", CategoryID: productCategory.ObjectID,
 	}}, integrationActorOne, "wrong-category-target"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("wrong category target error = %v", err)
 	}
-
+	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
+		Code: "WS" + newID(), Name: "错误结算方式客户", SettlementMethodID: position.ObjectID,
+	}}, integrationActorOne, "wrong-settlement-target"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("wrong settlement target error = %v", err)
+	}
+	if _, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
+		Code: "WE" + newID(), Name: "错误业务员客户", SalespersonID: settlementMethod.ObjectID,
+	}}, integrationActorOne, "wrong-salesperson-target"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("wrong salesperson target error = %v", err)
+	}
+	draftSalesperson, err := service.Create(t.Context(), EntityEmployee, CreateInput{Data: CreateDetailInput{
+		Code: "SD" + newID(), Name: "草稿业务员",
+	}}, integrationActorOne, "draft-salesperson")
+	if err != nil {
+		t.Fatalf("create draft salesperson: %v", err)
+	}
+	if _, err = service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
+		Code: "WD" + newID(), Name: "无效业务员客户", SalespersonID: draftSalesperson.ObjectID,
+	}}, integrationActorOne, "inactive-salesperson-target"); !errorIsKind(err, ErrorConflict) {
+		t.Fatalf("inactive salesperson target error = %v", err)
+	}
 	taxNumber := "TAX" + newID()
 	customer, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "CA" + newID(), Name: "属性客户", CustomerType: stringIntegrationPointer(CustomerTypeDealer),
 		ShortName: "属性客户简称", CategoryID: category.ObjectID, TaxNumber: taxNumber,
 		ContactName: "联系人", ContactPhone: "+86 13800000000",
 		Email: "CONTACT@EXAMPLE.COM", Address: "上海市示例路", Remark: "新增属性",
+		SettlementMethodID: settlementMethod.ObjectID,
+		SalespersonID:      salesperson.ObjectID,
 	}}, integrationActorOne, "common-customer-create")
 	if err != nil {
 		t.Fatalf("create customer attributes: %v", err)
@@ -504,8 +544,21 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 	}
 	view, err := service.Get(t.Context(), EntityCustomer, GetInput{ObjectID: customer.ObjectID})
 	if err != nil || view.Data.ShortName != "属性客户简称" || view.Data.TaxNumber != taxNumber ||
-		view.Data.Email != "contact@example.com" || view.Data.CategoryID != category.ObjectID {
+		view.Data.Email != "contact@example.com" || view.Data.CategoryID != category.ObjectID ||
+		view.Data.SettlementMethodID != settlementMethod.ObjectID ||
+		view.Data.SalespersonID != salesperson.ObjectID {
 		t.Fatalf("preserved customer view=%+v err=%v", view, err)
+	}
+	page, err := service.Query(t.Context(), EntityCustomer, QueryInput{
+		Page: 1, PageSize: 20,
+		Filters: QueryFilters{
+			CustomerType: CustomerTypeDealer, CategoryID: category.ObjectID, Keyword: taxNumber,
+		},
+	})
+	if err != nil || page.Total != 1 || len(page.Items) != 1 ||
+		page.Items[0].CurrentVersion.Summary.SettlementMethodID != settlementMethod.ObjectID ||
+		page.Items[0].CurrentVersion.Summary.SalespersonID != salesperson.ObjectID {
+		t.Fatalf("query common attributes page=%+v err=%v", page, err)
 	}
 	saved, err = service.Save(t.Context(), EntityCustomer, SaveInput{
 		ObjectID: customer.ObjectID, VersionID: customer.VersionID, Revision: saved.Revision,
@@ -520,14 +573,26 @@ func TestCommonAttributesReferencesFiltersAndRedactionIntegration(t *testing.T) 
 	if view.Data.ShortName != "" || view.Data.ContactPhone != "" || view.Data.TaxNumber != taxNumber {
 		t.Fatalf("explicit clear view = %+v", view.Data)
 	}
-	page, err := service.Query(t.Context(), EntityCustomer, QueryInput{
-		Page: 1, PageSize: 20,
-		Filters: QueryFilters{
-			CustomerType: CustomerTypeDealer, CategoryID: category.ObjectID, Keyword: taxNumber,
+	clearable, err := service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
+		Code: "CL" + newID(), Name: "清空默认值客户",
+		SettlementMethodID: settlementMethod.ObjectID,
+		SalespersonID:      salesperson.ObjectID,
+	}}, integrationActorOne, "common-customer-clear-create")
+	if err != nil {
+		t.Fatalf("create clearable customer: %v", err)
+	}
+	if _, err = service.Save(t.Context(), EntityCustomer, SaveInput{
+		ObjectID: clearable.ObjectID, VersionID: clearable.VersionID, Revision: clearable.Revision,
+		Data: DetailInput{
+			Name: "清空默认值客户", SettlementMethodID: Optional(""),
+			SalespersonID: Optional(""),
 		},
-	})
-	if err != nil || page.Total != 1 || len(page.Items) != 1 {
-		t.Fatalf("query common attributes page=%+v err=%v", page, err)
+	}, integrationActorOne, "common-customer-clear-references"); err != nil {
+		t.Fatalf("clear customer references: %v", err)
+	}
+	clearedView, err := service.Get(t.Context(), EntityCustomer, GetInput{ObjectID: clearable.ObjectID})
+	if err != nil || clearedView.Data.SettlementMethodID != "" || clearedView.Data.SalespersonID != "" {
+		t.Fatalf("cleared customer view=%+v err=%v", clearedView, err)
 	}
 	if _, err = service.Create(t.Context(), EntityCustomer, CreateInput{Data: CreateDetailInput{
 		Code: "DU" + newID(), Name: "重复税号客户", TaxNumber: strings.ToLower(taxNumber),
@@ -854,7 +919,7 @@ func TestCurrentIdentifierUniquenessAndHistoryReleaseIntegration(t *testing.T) {
 		VehicleType: "货车", PlatformObjectID: platform.ObjectID, VIN: strings.ToLower(vin),
 	}}, integrationActorOne, "identifier-vehicle")
 	if err != nil {
-		t.Fatalf("create unique VIN vehicle: %v", err)
+		t.Fatalf("create unique VIN vehicle: %v cause=%v vin=%q", err, errors.Unwrap(err), vin)
 	}
 	vehicleView, _ := service.Get(t.Context(), EntityVehicle, GetInput{ObjectID: vehicle.ObjectID})
 	if vehicleView.Data.VIN != vin {
@@ -1056,6 +1121,7 @@ func TestDeletePermissionCatalogIntegration(t *testing.T) {
 		{EntityCategory, 92},
 		{EntityDepartment, 103},
 		{EntityPosition, 114},
+		{EntitySettlementMethod, 125},
 	}
 	index := 0
 	for rows.Next() {
@@ -1568,6 +1634,9 @@ func deleteIntegrationData(entity, platformObjectID string) CreateDetailInput {
 		data.PlatformObjectID = platformObjectID
 	case EntityCategory:
 		data.TargetEntity = EntityProduct
+	case EntitySettlementMethod:
+		data.RuleType = SettlementRuleRelativeDays
+		data.DayOffset = 30
 	}
 	return data
 }
@@ -1594,7 +1663,8 @@ func assertBobAggregateCounts(
 			(SELECT count(*) FROM bob_fund_account_versions WHERE version_id = $2) +
 			(SELECT count(*) FROM bob_category_versions WHERE version_id = $2) +
 			(SELECT count(*) FROM bob_department_versions WHERE version_id = $2) +
-			(SELECT count(*) FROM bob_position_versions WHERE version_id = $2),
+			(SELECT count(*) FROM bob_position_versions WHERE version_id = $2) +
+			(SELECT count(*) FROM bob_settlement_method_versions WHERE version_id = $2),
 			(SELECT count(*) FROM bob_audit_events WHERE object_id = $1 AND version_id = $2)
 	`, objectID, versionID).Scan(&objects, &versions, &details, &audits)
 	if err != nil {

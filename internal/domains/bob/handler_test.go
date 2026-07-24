@@ -101,6 +101,7 @@ func TestHandlerRegistersEveryEntityAction(t *testing.T) {
 	expectedEntities := []string{
 		"customer", "supplier", "employee", "product", "service", "warehouse",
 		"vehicle", "fund-account", "category", "department", "position",
+		"settlement-method",
 	}
 	expectedActions := []string{
 		"query", "get", "create", "edit", "save", "delete",

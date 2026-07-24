@@ -109,11 +109,14 @@ SELECT EXISTS (
 
     SELECT 1 FROM bob_customer_versions
     WHERE category_id = $1
+       OR settlement_method_id = $1
+       OR salesperson_id = $1
 
     UNION ALL
 
     SELECT 1 FROM bob_supplier_versions
     WHERE category_id = $1
+       OR settlement_method_id = $1
 
     UNION ALL
 
@@ -165,6 +168,12 @@ SELECT EXISTS (
     FROM vou_sale_order_details sale_order
     WHERE sale_order.customer_object_id = $1
        OR sale_order.customer_version_id = $2
+       OR sale_order.salesperson_object_id = $1
+       OR sale_order.salesperson_version_id = $2
+       OR sale_order.warehouse_object_id = $1
+       OR sale_order.warehouse_version_id = $2
+       OR sale_order.settlement_method_object_id = $1
+       OR sale_order.settlement_method_version_id = $2
        OR sale_order.platform_object_id = $1
        OR sale_order.platform_version_id = $2
        OR sale_order.vehicle_object_id = $1
@@ -176,6 +185,12 @@ SELECT EXISTS (
     FROM vou_purchase_order_details purchase_order
     WHERE purchase_order.supplier_object_id = $1
        OR purchase_order.supplier_version_id = $2
+       OR purchase_order.purchaser_object_id = $1
+       OR purchase_order.purchaser_version_id = $2
+       OR purchase_order.warehouse_object_id = $1
+       OR purchase_order.warehouse_version_id = $2
+       OR purchase_order.settlement_method_object_id = $1
+       OR purchase_order.settlement_method_version_id = $2
 
     UNION ALL
 
@@ -185,6 +200,14 @@ SELECT EXISTS (
        OR intermediary.customer_version_id = $2
        OR intermediary.supplier_object_id = $1
        OR intermediary.supplier_version_id = $2
+       OR intermediary.salesperson_object_id = $1
+       OR intermediary.salesperson_version_id = $2
+       OR intermediary.purchaser_object_id = $1
+       OR intermediary.purchaser_version_id = $2
+       OR intermediary.customer_settlement_method_object_id = $1
+       OR intermediary.customer_settlement_method_version_id = $2
+       OR intermediary.supplier_settlement_method_object_id = $1
+       OR intermediary.supplier_settlement_method_version_id = $2
        OR intermediary.platform_object_id = $1
        OR intermediary.platform_version_id = $2
        OR intermediary.vehicle_object_id = $1
@@ -198,6 +221,8 @@ SELECT EXISTS (
        OR receipt.counterparty_version_id = $2
        OR receipt.fund_account_object_id = $1
        OR receipt.fund_account_version_id = $2
+       OR receipt.handler_object_id = $1
+       OR receipt.handler_version_id = $2
 
     UNION ALL
 
@@ -207,6 +232,8 @@ SELECT EXISTS (
        OR payment.counterparty_version_id = $2
        OR payment.fund_account_object_id = $1
        OR payment.fund_account_version_id = $2
+       OR payment.handler_object_id = $1
+       OR payment.handler_version_id = $2
 
     UNION ALL
 
@@ -225,6 +252,8 @@ SELECT EXISTS (
        OR other_income.counterparty_version_id = $2
        OR other_income.fund_account_object_id = $1
        OR other_income.fund_account_version_id = $2
+       OR other_income.handler_object_id = $1
+       OR other_income.handler_version_id = $2
 
     UNION ALL
 
@@ -266,10 +295,11 @@ func (q *Queries) CopyBobCategoryDetail(ctx context.Context, arg CopyBobCategory
 const copyBobCustomerDetail = `-- name: CopyBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
 )
 SELECT $1, d.name, d.customer_type, d.short_name, d.category_id,
-       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark
+       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
+       d.settlement_method_id, d.salesperson_id
 FROM bob_customer_versions d WHERE d.version_id = $2
 `
 
@@ -388,13 +418,33 @@ func (q *Queries) CopyBobServiceDetail(ctx context.Context, arg CopyBobServiceDe
 	return err
 }
 
+const copyBobSettlementMethodDetail = `-- name: CopyBobSettlementMethodDetail :exec
+INSERT INTO bob_settlement_method_versions (
+    version_id, name, rule_type, month_offset, day_of_month, day_offset, description
+)
+SELECT $1, d.name, d.rule_type, d.month_offset,
+       d.day_of_month, d.day_offset, d.description
+FROM bob_settlement_method_versions d WHERE d.version_id = $2
+`
+
+type CopyBobSettlementMethodDetailParams struct {
+	NewVersionID    string `db:"new_version_id" json:"new_version_id"`
+	SourceVersionID string `db:"source_version_id" json:"source_version_id"`
+}
+
+func (q *Queries) CopyBobSettlementMethodDetail(ctx context.Context, arg CopyBobSettlementMethodDetailParams) error {
+	_, err := q.db.Exec(ctx, copyBobSettlementMethodDetail, arg.NewVersionID, arg.SourceVersionID)
+	return err
+}
+
 const copyBobSupplierDetail = `-- name: CopyBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id
 )
 SELECT $1, d.name, d.supplier_type, d.short_name, d.category_id,
-       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark
+       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
+       d.settlement_method_id
 FROM bob_supplier_versions d WHERE d.version_id = $2
 `
 
@@ -733,6 +783,18 @@ func (q *Queries) DeleteBobServiceDetail(ctx context.Context, versionID string) 
 	return result.RowsAffected(), nil
 }
 
+const deleteBobSettlementMethodDetail = `-- name: DeleteBobSettlementMethodDetail :execrows
+DELETE FROM bob_settlement_method_versions WHERE version_id = $1
+`
+
+func (q *Queries) DeleteBobSettlementMethodDetail(ctx context.Context, versionID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBobSettlementMethodDetail, versionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteBobSupplierDetail = `-- name: DeleteBobSupplierDetail :execrows
 DELETE FROM bob_supplier_versions WHERE version_id = $1
 `
@@ -789,7 +851,7 @@ func (q *Queries) FindBobObjectIDByCode(ctx context.Context, arg FindBobObjectID
 }
 
 const getBobVersionView = `-- name: GetBobVersionView :one
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id FROM bob_version_views
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset FROM bob_version_views
 WHERE object_id = $1 AND entity = $2
   AND version_id = COALESCE(NULLIF($3::text, ''), current_version_id)
 `
@@ -858,6 +920,13 @@ func (q *Queries) GetBobVersionView(ctx context.Context, arg GetBobVersionViewPa
 		&i.AccountNumber,
 		&i.TargetEntity,
 		&i.ParentID,
+		&i.SettlementMethodID,
+		&i.SalespersonID,
+		&i.SettlementMethodVersionID,
+		&i.SettlementRuleType,
+		&i.SettlementMonthOffset,
+		&i.SettlementDayOfMonth,
+		&i.SettlementDayOffset,
 	)
 	return i, err
 }
@@ -932,27 +1001,30 @@ func (q *Queries) InsertBobCategoryDetail(ctx context.Context, arg InsertBobCate
 const insertBobCustomerDetail = `-- name: InsertBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
 ) VALUES (
     $1, $2, $3,
     $4, $5, $6,
     $7, $8, $9,
-    $10, $11
+    $10, $11, $12,
+    $13
 )
 `
 
 type InsertBobCustomerDetailParams struct {
-	VersionID    string  `db:"version_id" json:"version_id"`
-	Name         string  `db:"name" json:"name"`
-	CustomerType string  `db:"customer_type" json:"customer_type"`
-	ShortName    *string `db:"short_name" json:"short_name"`
-	CategoryID   *string `db:"category_id" json:"category_id"`
-	TaxNumber    *string `db:"tax_number" json:"tax_number"`
-	ContactName  *string `db:"contact_name" json:"contact_name"`
-	ContactPhone *string `db:"contact_phone" json:"contact_phone"`
-	Email        *string `db:"email" json:"email"`
-	Address      *string `db:"address" json:"address"`
-	Remark       *string `db:"remark" json:"remark"`
+	VersionID          string  `db:"version_id" json:"version_id"`
+	Name               string  `db:"name" json:"name"`
+	CustomerType       string  `db:"customer_type" json:"customer_type"`
+	ShortName          *string `db:"short_name" json:"short_name"`
+	CategoryID         *string `db:"category_id" json:"category_id"`
+	TaxNumber          *string `db:"tax_number" json:"tax_number"`
+	ContactName        *string `db:"contact_name" json:"contact_name"`
+	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
+	Email              *string `db:"email" json:"email"`
+	Address            *string `db:"address" json:"address"`
+	Remark             *string `db:"remark" json:"remark"`
+	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SalespersonID      *string `db:"salesperson_id" json:"salesperson_id"`
 }
 
 func (q *Queries) InsertBobCustomerDetail(ctx context.Context, arg InsertBobCustomerDetailParams) error {
@@ -968,6 +1040,8 @@ func (q *Queries) InsertBobCustomerDetail(ctx context.Context, arg InsertBobCust
 		arg.Email,
 		arg.Address,
 		arg.Remark,
+		arg.SettlementMethodID,
+		arg.SalespersonID,
 	)
 	return err
 }
@@ -1187,30 +1261,63 @@ func (q *Queries) InsertBobServiceDetail(ctx context.Context, arg InsertBobServi
 	return err
 }
 
+const insertBobSettlementMethodDetail = `-- name: InsertBobSettlementMethodDetail :exec
+INSERT INTO bob_settlement_method_versions (
+    version_id, name, rule_type, month_offset, day_of_month, day_offset, description
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7
+)
+`
+
+type InsertBobSettlementMethodDetailParams struct {
+	VersionID   string  `db:"version_id" json:"version_id"`
+	Name        string  `db:"name" json:"name"`
+	RuleType    string  `db:"rule_type" json:"rule_type"`
+	MonthOffset int32   `db:"month_offset" json:"month_offset"`
+	DayOfMonth  *int32  `db:"day_of_month" json:"day_of_month"`
+	DayOffset   int32   `db:"day_offset" json:"day_offset"`
+	Description *string `db:"description" json:"description"`
+}
+
+func (q *Queries) InsertBobSettlementMethodDetail(ctx context.Context, arg InsertBobSettlementMethodDetailParams) error {
+	_, err := q.db.Exec(ctx, insertBobSettlementMethodDetail,
+		arg.VersionID,
+		arg.Name,
+		arg.RuleType,
+		arg.MonthOffset,
+		arg.DayOfMonth,
+		arg.DayOffset,
+		arg.Description,
+	)
+	return err
+}
+
 const insertBobSupplierDetail = `-- name: InsertBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id
 ) VALUES (
     $1, $2, $3,
     $4, $5, $6,
     $7, $8, $9,
-    $10, $11
+    $10, $11, $12
 )
 `
 
 type InsertBobSupplierDetailParams struct {
-	VersionID    string  `db:"version_id" json:"version_id"`
-	Name         string  `db:"name" json:"name"`
-	SupplierType string  `db:"supplier_type" json:"supplier_type"`
-	ShortName    *string `db:"short_name" json:"short_name"`
-	CategoryID   *string `db:"category_id" json:"category_id"`
-	TaxNumber    *string `db:"tax_number" json:"tax_number"`
-	ContactName  *string `db:"contact_name" json:"contact_name"`
-	ContactPhone *string `db:"contact_phone" json:"contact_phone"`
-	Email        *string `db:"email" json:"email"`
-	Address      *string `db:"address" json:"address"`
-	Remark       *string `db:"remark" json:"remark"`
+	VersionID          string  `db:"version_id" json:"version_id"`
+	Name               string  `db:"name" json:"name"`
+	SupplierType       string  `db:"supplier_type" json:"supplier_type"`
+	ShortName          *string `db:"short_name" json:"short_name"`
+	CategoryID         *string `db:"category_id" json:"category_id"`
+	TaxNumber          *string `db:"tax_number" json:"tax_number"`
+	ContactName        *string `db:"contact_name" json:"contact_name"`
+	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
+	Email              *string `db:"email" json:"email"`
+	Address            *string `db:"address" json:"address"`
+	Remark             *string `db:"remark" json:"remark"`
+	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
 }
 
 func (q *Queries) InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error {
@@ -1226,6 +1333,7 @@ func (q *Queries) InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupp
 		arg.Email,
 		arg.Address,
 		arg.Remark,
+		arg.SettlementMethodID,
 	)
 	return err
 }
@@ -1417,7 +1525,7 @@ func (q *Queries) ListBobAuditEvents(ctx context.Context, arg ListBobAuditEvents
 }
 
 const listBobObjects = `-- name: ListBobObjects :many
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset
 FROM bob_version_views
 WHERE entity = $1 AND version_id = current_version_id
   AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
@@ -1566,6 +1674,13 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 			&i.AccountNumber,
 			&i.TargetEntity,
 			&i.ParentID,
+			&i.SettlementMethodID,
+			&i.SalespersonID,
+			&i.SettlementMethodVersionID,
+			&i.SettlementRuleType,
+			&i.SettlementMonthOffset,
+			&i.SettlementDayOfMonth,
+			&i.SettlementDayOffset,
 		); err != nil {
 			return nil, err
 		}
@@ -1578,7 +1693,7 @@ func (q *Queries) ListBobObjects(ctx context.Context, arg ListBobObjectsParams) 
 }
 
 const listBobVersions = `-- name: ListBobVersions :many
-SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id FROM bob_version_views
+SELECT object_id, entity, code, current_version_id, effective_version_id, object_revision, object_updated_at, version_id, version_no, status, version_revision, created_at, created_by, updated_at, updated_by, submitted_at, submitted_by, reviewed_at, reviewed_by, review_comment, name, unit, currency, supplier_type, plate_number, vehicle_type, platform_object_id, customer_type, short_name, category_id, tax_number, contact_name, contact_phone, email, address, remark, department_id, position_id, phone, hire_date, specification, model, barcode, description, manager_employee_id, vin, engine_number, load_capacity_kg, account_name, bank_name, bank_branch, account_number, target_entity, parent_id, settlement_method_id, salesperson_id, settlement_method_version_id, settlement_rule_type, settlement_month_offset, settlement_day_of_month, settlement_day_offset FROM bob_version_views
 WHERE object_id = $1 AND entity = $2
 ORDER BY version_no DESC
 LIMIT $4 OFFSET $3
@@ -1660,6 +1775,13 @@ func (q *Queries) ListBobVersions(ctx context.Context, arg ListBobVersionsParams
 			&i.AccountNumber,
 			&i.TargetEntity,
 			&i.ParentID,
+			&i.SettlementMethodID,
+			&i.SalespersonID,
+			&i.SettlementMethodVersionID,
+			&i.SettlementRuleType,
+			&i.SettlementMonthOffset,
+			&i.SettlementDayOfMonth,
+			&i.SettlementDayOffset,
 		); err != nil {
 			return nil, err
 		}
@@ -1888,7 +2010,7 @@ func (q *Queries) RejectBobVersion(ctx context.Context, arg RejectBobVersionPara
 }
 
 const resolveBobEffectiveReference = `-- name: ResolveBobEffectiveReference :one
-SELECT view.object_id, view.entity, view.code, view.current_version_id, view.effective_version_id, view.object_revision, view.object_updated_at, view.version_id, view.version_no, view.status, view.version_revision, view.created_at, view.created_by, view.updated_at, view.updated_by, view.submitted_at, view.submitted_by, view.reviewed_at, view.reviewed_by, view.review_comment, view.name, view.unit, view.currency, view.supplier_type, view.plate_number, view.vehicle_type, view.platform_object_id, view.customer_type, view.short_name, view.category_id, view.tax_number, view.contact_name, view.contact_phone, view.email, view.address, view.remark, view.department_id, view.position_id, view.phone, view.hire_date, view.specification, view.model, view.barcode, view.description, view.manager_employee_id, view.vin, view.engine_number, view.load_capacity_kg, view.account_name, view.bank_name, view.bank_branch, view.account_number, view.target_entity, view.parent_id
+SELECT view.object_id, view.entity, view.code, view.current_version_id, view.effective_version_id, view.object_revision, view.object_updated_at, view.version_id, view.version_no, view.status, view.version_revision, view.created_at, view.created_by, view.updated_at, view.updated_by, view.submitted_at, view.submitted_by, view.reviewed_at, view.reviewed_by, view.review_comment, view.name, view.unit, view.currency, view.supplier_type, view.plate_number, view.vehicle_type, view.platform_object_id, view.customer_type, view.short_name, view.category_id, view.tax_number, view.contact_name, view.contact_phone, view.email, view.address, view.remark, view.department_id, view.position_id, view.phone, view.hire_date, view.specification, view.model, view.barcode, view.description, view.manager_employee_id, view.vin, view.engine_number, view.load_capacity_kg, view.account_name, view.bank_name, view.bank_branch, view.account_number, view.target_entity, view.parent_id, view.settlement_method_id, view.salesperson_id, view.settlement_method_version_id, view.settlement_rule_type, view.settlement_month_offset, view.settlement_day_of_month, view.settlement_day_offset
 FROM bob_version_views view
 JOIN bob_objects o ON o.id = view.object_id AND o.entity = view.entity
 WHERE view.object_id = $1 AND view.entity = $2
@@ -1962,6 +2084,13 @@ func (q *Queries) ResolveBobEffectiveReference(ctx context.Context, arg ResolveB
 		&i.AccountNumber,
 		&i.TargetEntity,
 		&i.ParentID,
+		&i.SettlementMethodID,
+		&i.SalespersonID,
+		&i.SettlementMethodVersionID,
+		&i.SettlementRuleType,
+		&i.SettlementMonthOffset,
+		&i.SettlementDayOfMonth,
+		&i.SettlementDayOffset,
 	)
 	return i, err
 }
@@ -2076,22 +2205,26 @@ SET name = $1, customer_type = $2,
     short_name = $3, category_id = $4,
     tax_number = $5, contact_name = $6,
     contact_phone = $7, email = $8,
-    address = $9, remark = $10
-WHERE version_id = $11
+    address = $9, remark = $10,
+    settlement_method_id = $11,
+    salesperson_id = $12
+WHERE version_id = $13
 `
 
 type UpdateBobCustomerDetailParams struct {
-	Name         string  `db:"name" json:"name"`
-	CustomerType string  `db:"customer_type" json:"customer_type"`
-	ShortName    *string `db:"short_name" json:"short_name"`
-	CategoryID   *string `db:"category_id" json:"category_id"`
-	TaxNumber    *string `db:"tax_number" json:"tax_number"`
-	ContactName  *string `db:"contact_name" json:"contact_name"`
-	ContactPhone *string `db:"contact_phone" json:"contact_phone"`
-	Email        *string `db:"email" json:"email"`
-	Address      *string `db:"address" json:"address"`
-	Remark       *string `db:"remark" json:"remark"`
-	VersionID    string  `db:"version_id" json:"version_id"`
+	Name               string  `db:"name" json:"name"`
+	CustomerType       string  `db:"customer_type" json:"customer_type"`
+	ShortName          *string `db:"short_name" json:"short_name"`
+	CategoryID         *string `db:"category_id" json:"category_id"`
+	TaxNumber          *string `db:"tax_number" json:"tax_number"`
+	ContactName        *string `db:"contact_name" json:"contact_name"`
+	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
+	Email              *string `db:"email" json:"email"`
+	Address            *string `db:"address" json:"address"`
+	Remark             *string `db:"remark" json:"remark"`
+	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
+	SalespersonID      *string `db:"salesperson_id" json:"salesperson_id"`
+	VersionID          string  `db:"version_id" json:"version_id"`
 }
 
 func (q *Queries) UpdateBobCustomerDetail(ctx context.Context, arg UpdateBobCustomerDetailParams) (int64, error) {
@@ -2106,6 +2239,8 @@ func (q *Queries) UpdateBobCustomerDetail(ctx context.Context, arg UpdateBobCust
 		arg.Email,
 		arg.Address,
 		arg.Remark,
+		arg.SettlementMethodID,
+		arg.SalespersonID,
 		arg.VersionID,
 	)
 	if err != nil {
@@ -2314,28 +2449,64 @@ func (q *Queries) UpdateBobServiceDetail(ctx context.Context, arg UpdateBobServi
 	return result.RowsAffected(), nil
 }
 
+const updateBobSettlementMethodDetail = `-- name: UpdateBobSettlementMethodDetail :execrows
+UPDATE bob_settlement_method_versions
+SET name = $1, rule_type = $2,
+    month_offset = $3, day_of_month = $4,
+    day_offset = $5, description = $6
+WHERE version_id = $7
+`
+
+type UpdateBobSettlementMethodDetailParams struct {
+	Name        string  `db:"name" json:"name"`
+	RuleType    string  `db:"rule_type" json:"rule_type"`
+	MonthOffset int32   `db:"month_offset" json:"month_offset"`
+	DayOfMonth  *int32  `db:"day_of_month" json:"day_of_month"`
+	DayOffset   int32   `db:"day_offset" json:"day_offset"`
+	Description *string `db:"description" json:"description"`
+	VersionID   string  `db:"version_id" json:"version_id"`
+}
+
+func (q *Queries) UpdateBobSettlementMethodDetail(ctx context.Context, arg UpdateBobSettlementMethodDetailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateBobSettlementMethodDetail,
+		arg.Name,
+		arg.RuleType,
+		arg.MonthOffset,
+		arg.DayOfMonth,
+		arg.DayOffset,
+		arg.Description,
+		arg.VersionID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateBobSupplierDetail = `-- name: UpdateBobSupplierDetail :execrows
 UPDATE bob_supplier_versions
 SET name = $1, supplier_type = $2,
     short_name = $3, category_id = $4,
     tax_number = $5, contact_name = $6,
     contact_phone = $7, email = $8,
-    address = $9, remark = $10
-WHERE version_id = $11
+    address = $9, remark = $10,
+    settlement_method_id = $11
+WHERE version_id = $12
 `
 
 type UpdateBobSupplierDetailParams struct {
-	Name         string  `db:"name" json:"name"`
-	SupplierType string  `db:"supplier_type" json:"supplier_type"`
-	ShortName    *string `db:"short_name" json:"short_name"`
-	CategoryID   *string `db:"category_id" json:"category_id"`
-	TaxNumber    *string `db:"tax_number" json:"tax_number"`
-	ContactName  *string `db:"contact_name" json:"contact_name"`
-	ContactPhone *string `db:"contact_phone" json:"contact_phone"`
-	Email        *string `db:"email" json:"email"`
-	Address      *string `db:"address" json:"address"`
-	Remark       *string `db:"remark" json:"remark"`
-	VersionID    string  `db:"version_id" json:"version_id"`
+	Name               string  `db:"name" json:"name"`
+	SupplierType       string  `db:"supplier_type" json:"supplier_type"`
+	ShortName          *string `db:"short_name" json:"short_name"`
+	CategoryID         *string `db:"category_id" json:"category_id"`
+	TaxNumber          *string `db:"tax_number" json:"tax_number"`
+	ContactName        *string `db:"contact_name" json:"contact_name"`
+	ContactPhone       *string `db:"contact_phone" json:"contact_phone"`
+	Email              *string `db:"email" json:"email"`
+	Address            *string `db:"address" json:"address"`
+	Remark             *string `db:"remark" json:"remark"`
+	SettlementMethodID *string `db:"settlement_method_id" json:"settlement_method_id"`
+	VersionID          string  `db:"version_id" json:"version_id"`
 }
 
 func (q *Queries) UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error) {
@@ -2350,6 +2521,7 @@ func (q *Queries) UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupp
 		arg.Email,
 		arg.Address,
 		arg.Remark,
+		arg.SettlementMethodID,
 		arg.VersionID,
 	)
 	if err != nil {

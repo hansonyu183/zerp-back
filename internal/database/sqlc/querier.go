@@ -28,6 +28,7 @@ type Querier interface {
 	CopyBobPositionDetail(ctx context.Context, arg CopyBobPositionDetailParams) error
 	CopyBobProductDetail(ctx context.Context, arg CopyBobProductDetailParams) error
 	CopyBobServiceDetail(ctx context.Context, arg CopyBobServiceDetailParams) error
+	CopyBobSettlementMethodDetail(ctx context.Context, arg CopyBobSettlementMethodDetailParams) error
 	CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplierDetailParams) error
 	CopyBobVehicleDetail(ctx context.Context, arg CopyBobVehicleDetailParams) error
 	CopyBobWarehouseDetail(ctx context.Context, arg CopyBobWarehouseDetailParams) error
@@ -64,6 +65,7 @@ type Querier interface {
 	DeleteBobPositionDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobProductDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobServiceDetail(ctx context.Context, versionID string) (int64, error)
+	DeleteBobSettlementMethodDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobSupplierDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobVehicleDetail(ctx context.Context, versionID string) (int64, error)
 	DeleteBobWarehouseDetail(ctx context.Context, versionID string) (int64, error)
@@ -108,6 +110,7 @@ type Querier interface {
 	InsertBobPositionDetail(ctx context.Context, arg InsertBobPositionDetailParams) error
 	InsertBobProductDetail(ctx context.Context, arg InsertBobProductDetailParams) error
 	InsertBobServiceDetail(ctx context.Context, arg InsertBobServiceDetailParams) error
+	InsertBobSettlementMethodDetail(ctx context.Context, arg InsertBobSettlementMethodDetailParams) error
 	InsertBobSupplierDetail(ctx context.Context, arg InsertBobSupplierDetailParams) error
 	InsertBobVehicleDetail(ctx context.Context, arg InsertBobVehicleDetailParams) error
 	InsertBobVersion(ctx context.Context, arg InsertBobVersionParams) error
@@ -189,6 +192,7 @@ type Querier interface {
 	UpdateBobPositionDetail(ctx context.Context, arg UpdateBobPositionDetailParams) (int64, error)
 	UpdateBobProductDetail(ctx context.Context, arg UpdateBobProductDetailParams) (int64, error)
 	UpdateBobServiceDetail(ctx context.Context, arg UpdateBobServiceDetailParams) (int64, error)
+	UpdateBobSettlementMethodDetail(ctx context.Context, arg UpdateBobSettlementMethodDetailParams) (int64, error)
 	UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error)
 	UpdateBobVehicleDetail(ctx context.Context, arg UpdateBobVehicleDetailParams) (int64, error)
 	UpdateBobWarehouseDetail(ctx context.Context, arg UpdateBobWarehouseDetailParams) (int64, error)

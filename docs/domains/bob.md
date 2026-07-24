@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文定义 ZERP 后端 **BOB（Business Object Base）** 领域的业务模型、状态机、数据约束、事务边界和 API 契约，作为客户、供应商、员工、产品、服务、仓库、车辆、资金账户、分类、部门和岗位等基础业务对象的统一实现规范。
+本文定义 ZERP 后端 **BOB（Business Object Base）** 领域的业务模型、状态机、数据约束、事务边界和 API 契约，作为客户、供应商、员工、产品、服务、仓库、车辆、资金账户、分类、部门、岗位和结算方式等基础业务对象的统一实现规范。
 
 BOB 使用固定领域标识 `bob`。所有外部业务接口遵循：
 
@@ -24,6 +24,7 @@ fund-account
 category
 department
 position
+settlement-method
 ```
 
 数据库内部名称可使用 `fund_account`，但 HTTP 路径、权限路径和对外 JSON 中必须始终使用 `fund-account`，不得混用。
@@ -49,12 +50,12 @@ BOB 不负责：
 
 ### 2.1 业务字段
 
-十一类实体使用类型化版本明细，不使用无约束 JSONB 保存正式业务数据。除创建后不可修改的 `code` 外，下表字段均随版本保存：
+十二类实体使用类型化版本明细，不使用无约束 JSONB 保存正式业务数据。除创建后不可修改的 `code` 外，下表字段均随版本保存：
 
 | 实体 | 版本字段 |
 | --- | --- |
-| `customer` | `name`、`customerType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark` |
-| `supplier` | `name`、`supplierType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark` |
+| `customer` | `name`、`customerType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark`、`settlementMethodId`、`salespersonId` |
+| `supplier` | `name`、`supplierType`、`shortName`、`categoryId`、`taxNumber`、`contactName`、`contactPhone`、`email`、`address`、`remark`、`settlementMethodId` |
 | `employee` | `name`、`categoryId`、`departmentId`、`positionId`、`phone`、`email`、`hireDate`、`remark` |
 | `product` | `name`、`unit`、`categoryId`、`specification`、`model`、`barcode`、`remark` |
 | `service` | `name`、`unit`、`categoryId`、`description`、`remark` |
@@ -64,8 +65,21 @@ BOB 不负责：
 | `category` | `name`、`targetEntity`、`parentId`、`description` |
 | `department` | `name`、`categoryId`、`parentId`、`description` |
 | `position` | `name`、`categoryId`、`description` |
+| `settlement-method` | `name`、`ruleType`、`monthOffset`、`dayOfMonth`、`dayOffset`、`description` |
 
 `customerType` 只能为 `END_USER` 或 `DEALER`，创建缺省为 `END_USER`；`supplierType` 只能为 `GENERAL` 或 `LOGISTICS_PLATFORM`，创建缺省为 `GENERAL`。保存时省略类型字段表示保持当前值。
+
+客户和供应商的 `settlementMethodId` 引用当前有效的结算方式，可选维护。结算方式的 `ruleType` 为 `RELATIVE_DAYS`、`MONTH_END` 或 `FIXED_DAY`，并由月份偏移、月内日期和天数偏移共同表达结算日期规则。
+
+客户的 `salespersonId` 引用任意当前有效的员工，可选维护，不附加岗位限制。
+
+结算规则约束如下：
+
+- `monthOffset` 取 `0–120`，`dayOffset` 取 `-3650–3650`；
+- `RELATIVE_DAYS` 不使用月份和月内日期，`monthOffset` 必须为 `0`，到期规则为业务日期加 `dayOffset`；
+- `MONTH_END` 不使用 `dayOfMonth`，到期规则为业务日期偏移月份后取月末，再加 `dayOffset`；
+- `FIXED_DAY` 要求 `dayOfMonth` 为 `1–31`，偏移月份没有该日时取月末，再加 `dayOffset`；
+- 全部按自然日计算。BOB 和 VOU 均不计算、保存或返回 `dueDate`。
 
 所有新增可选字段在 `save` 中采用补丁语义：省略字段保持当前值，显式传 `null` 或空字符串清空。`name`、`unit`、`currency`、车辆原有字段和 `platformObjectId` 保持既有完整保存契约。调用方不得传入不属于路径实体的字段。
 
@@ -100,11 +114,11 @@ BOB 不负责：
 
 物流平台发起编辑后，到新版本再次审核生效前没有有效版本。此期间相关车辆自身状态不变，但不能通过 `ResolveEffectiveReference` 被新的业务引用；平台重新生效后自动恢复可引用。
 
-### 2.4 分类、部门、岗位与通用引用
+### 2.4 分类、部门、岗位、结算方式与通用引用
 
 `category.targetEntity` 决定分类适用的实体，可取原八类实体以及 `department`、`position`，不允许取 `category`。引用分类的对象必须与其 `targetEntity` 一致。分类和部门通过 `parentId` 建立单父多级树；分类父子必须具有相同 `targetEntity`，两类树均禁止自引用和循环。岗位全局独立，不绑定部门。
 
-`categoryId`、`departmentId`、`positionId`、`managerEmployeeId` 和 `parentId` 是对象 ID 引用。创建、保存、提交和审核时，被引用对象必须存在当前有效版本且实体类型匹配。分类 `targetEntity` 仅在该分类的当前及历史版本均未被任何对象或子分类引用时允许修改。
+`categoryId`、`departmentId`、`positionId`、`managerEmployeeId`、`settlementMethodId`、`salespersonId` 和 `parentId` 是对象 ID 引用。创建、保存、提交和审核时，被引用对象必须存在当前有效版本且实体类型匹配。分类 `targetEntity` 仅在该分类的当前及历史版本均未被任何对象或子分类引用时允许修改。
 
 这些通用引用只在写入或审核引用方时校验，不递归改变已经生效对象的可引用性。例如分类进入编辑期时，已生效产品仍可被交易引用；但新的产品草稿不能选择该分类。车辆与物流平台的严格递归有效性规则仍按 2.3 节执行。
 
@@ -140,6 +154,7 @@ BusinessObject (稳定身份)
 | 分类版本明细 | `bob_category_versions` | 分类作用域和父级引用，与版本一对一 |
 | 部门版本明细 | `bob_department_versions` | 部门分类和父级引用，与版本一对一 |
 | 岗位版本明细 | `bob_position_versions` | 岗位分类和说明，与版本一对一 |
+| 结算方式版本明细 | `bob_settlement_method_versions` | 结算日期规则，与版本一对一 |
 
 业务字段尚未确定前，不应仅为追求通用性把全部正式字段长期存入无约束 JSONB。类型化明细表可以提供外键、唯一性、精度、长度和查询索引约束；共享表只承载所有实体一致的生命周期信息。
 
@@ -254,7 +269,7 @@ edit:    EFFECTIVE → INVALID，并创建新的 DRAFT
 
 ## 5. 领域动作与 API
 
-十一类实体提供相同的十一个动作，共定义 121 条业务 API：
+十二类实体提供相同的十一个动作，共定义 132 条业务 API：
 
 | 动作 | 路径 | 说明 |
 | --- | --- | --- |
@@ -270,7 +285,7 @@ edit:    EFFECTIVE → INVALID，并创建新的 DRAFT
 | 查看版本 | `/bob/{entity}/versions` | 查询对象全部历史版本 |
 | 审核记录 | `/bob/{entity}/audit-history` | 查询状态与审核事件 |
 
-每条路径都是独立 APP 权限。后端通过路由元数据绑定权限标识，禁止 Handler 自行用字符串前缀或角色名称判断权限。新增 `category`、`department`、`position` 的 33 条权限只登记到权限目录，不自动写入任何角色的逐项授权。
+每条路径都是独立 APP 权限。后端通过路由元数据绑定权限标识，禁止 Handler 自行用字符串前缀或角色名称判断权限。`category`、`department`、`position` 的 33 条权限只登记到权限目录；`settlement-method` 的 11 条权限登记后授予超级管理员，不自动授予普通角色。
 
 ## 6. 请求与响应契约
 
@@ -573,7 +588,7 @@ BOB 提供内部领域能力 `ResolveEffectiveReference(entity, objectId, versio
 24. 税号、条码、VIN 和资金账号经过规范化并满足当前版本唯一，历史版本释放后可复用；
 25. 旧请求保存时保留新增可选字段，显式 `null` 或空字符串能够清空；
 26. 资金账号只在详情和版本历史返回，查询、关键字搜索、有效引用、审计和日志不暴露完整账号；
-27. 11 类实体共注册 121 条路由，新增 33 条权限精确匹配且不自动授予普通角色。
+27. 12 类实体共注册 132 条路由，权限精确匹配且不自动授予普通角色。
 
 ## 13. 待决事项
 

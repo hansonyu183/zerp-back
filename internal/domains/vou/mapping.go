@@ -21,6 +21,23 @@ func (s *Service) loadData(
 			return data, err
 		}
 		data.Customer = reference(detail.CustomerObjectID, detail.CustomerVersionID, "customer", detail.CustomerCode, detail.CustomerName, "", "", "")
+		data.Salesperson = optionalReference(
+			detail.SalespersonObjectID, detail.SalespersonVersionID, "employee",
+			detail.SalespersonCode, detail.SalespersonName,
+		)
+		data.Warehouse = optionalReference(
+			detail.WarehouseObjectID, detail.WarehouseVersionID, "warehouse",
+			detail.WarehouseCode, detail.WarehouseName,
+		)
+		data.ContactName = deref(detail.ContactName)
+		data.ContactPhone = deref(detail.ContactPhone)
+		data.DeliveryAddress = deref(detail.DeliveryAddress)
+		data.SettlementMethod = settlementView(
+			detail.SettlementMethodObjectID, detail.SettlementMethodVersionID,
+			detail.SettlementMethodCode, detail.SettlementMethodName, detail.SettlementRuleType,
+			detail.SettlementMonthOffset, detail.SettlementDayOfMonth,
+			detail.SettlementDayOffset, detail.SettlementDescription,
+		)
 		setSaleExecutionView(&data, detail.OutboundDate, detail.SignoffDate,
 			detail.PlatformObjectID, detail.PlatformVersionID, detail.PlatformCode, detail.PlatformName,
 			detail.VehicleObjectID, detail.VehicleVersionID, detail.VehicleCode, detail.VehicleName,
@@ -33,6 +50,22 @@ func (s *Service) loadData(
 			return data, err
 		}
 		data.Supplier = reference(detail.SupplierObjectID, detail.SupplierVersionID, "supplier", detail.SupplierCode, detail.SupplierName, "", "", "")
+		data.Purchaser = optionalReference(
+			detail.PurchaserObjectID, detail.PurchaserVersionID, "employee",
+			detail.PurchaserCode, detail.PurchaserName,
+		)
+		data.Warehouse = optionalReference(
+			detail.WarehouseObjectID, detail.WarehouseVersionID, "warehouse",
+			detail.WarehouseCode, detail.WarehouseName,
+		)
+		data.ContactName = deref(detail.ContactName)
+		data.ContactPhone = deref(detail.ContactPhone)
+		data.SettlementMethod = settlementView(
+			detail.SettlementMethodObjectID, detail.SettlementMethodVersionID,
+			detail.SettlementMethodCode, detail.SettlementMethodName, detail.SettlementRuleType,
+			detail.SettlementMonthOffset, detail.SettlementDayOfMonth,
+			detail.SettlementDayOffset, detail.SettlementDescription,
+		)
 		data.InboundDate = formatDate(detail.InboundDate)
 		data.DifferenceReason = deref(detail.DifferenceReason)
 		data.ProductLines, err = loadProductLines(ctx, q, document.ID)
@@ -44,6 +77,31 @@ func (s *Service) loadData(
 		}
 		data.Customer = reference(detail.CustomerObjectID, detail.CustomerVersionID, "customer", detail.CustomerCode, detail.CustomerName, "", "", "")
 		data.Supplier = reference(detail.SupplierObjectID, detail.SupplierVersionID, "supplier", detail.SupplierCode, detail.SupplierName, "", "", "")
+		data.Salesperson = optionalReference(
+			detail.SalespersonObjectID, detail.SalespersonVersionID, "employee",
+			detail.SalespersonCode, detail.SalespersonName,
+		)
+		data.Purchaser = optionalReference(
+			detail.PurchaserObjectID, detail.PurchaserVersionID, "employee",
+			detail.PurchaserCode, detail.PurchaserName,
+		)
+		data.ContactName = deref(detail.ContactName)
+		data.ContactPhone = deref(detail.ContactPhone)
+		data.DeliveryAddress = deref(detail.DeliveryAddress)
+		data.CustomerSettlementMethod = settlementView(
+			detail.CustomerSettlementMethodObjectID, detail.CustomerSettlementMethodVersionID,
+			detail.CustomerSettlementMethodCode, detail.CustomerSettlementMethodName,
+			detail.CustomerSettlementRuleType, detail.CustomerSettlementMonthOffset,
+			detail.CustomerSettlementDayOfMonth, detail.CustomerSettlementDayOffset,
+			detail.CustomerSettlementDescription,
+		)
+		data.SupplierSettlementMethod = settlementView(
+			detail.SupplierSettlementMethodObjectID, detail.SupplierSettlementMethodVersionID,
+			detail.SupplierSettlementMethodCode, detail.SupplierSettlementMethodName,
+			detail.SupplierSettlementRuleType, detail.SupplierSettlementMonthOffset,
+			detail.SupplierSettlementDayOfMonth, detail.SupplierSettlementDayOffset,
+			detail.SupplierSettlementDescription,
+		)
 		setSaleExecutionView(&data, detail.OutboundDate, detail.SignoffDate,
 			detail.PlatformObjectID, detail.PlatformVersionID, detail.PlatformCode, detail.PlatformName,
 			detail.VehicleObjectID, detail.VehicleVersionID, detail.VehicleCode, detail.VehicleName,
@@ -59,6 +117,10 @@ func (s *Service) loadData(
 			detail.CounterpartyCode, detail.CounterpartyName, "", "", "")
 		data.FundAccount = reference(detail.FundAccountObjectID, detail.FundAccountVersionID, "fund-account",
 			detail.FundAccountCode, detail.FundAccountName, "", document.Currency, "")
+		data.Handler = optionalReference(
+			detail.HandlerObjectID, detail.HandlerVersionID, "employee",
+			detail.HandlerCode, detail.HandlerName,
+		)
 	case EntityPayment:
 		detail, err := q.GetVouPaymentDetail(ctx, document.ID)
 		if err != nil {
@@ -68,6 +130,10 @@ func (s *Service) loadData(
 			detail.CounterpartyCode, detail.CounterpartyName, "", "", "")
 		data.FundAccount = reference(detail.FundAccountObjectID, detail.FundAccountVersionID, "fund-account",
 			detail.FundAccountCode, detail.FundAccountName, "", document.Currency, "")
+		data.Handler = optionalReference(
+			detail.HandlerObjectID, detail.HandlerVersionID, "employee",
+			detail.HandlerCode, detail.HandlerName,
+		)
 	case EntityExpenseReimbursement:
 		detail, err := q.GetVouExpenseReimbursementDetail(ctx, document.ID)
 		if err != nil {
@@ -85,7 +151,7 @@ func (s *Service) loadData(
 		for _, row := range rows {
 			data.ExpenseLines = append(data.ExpenseLines, ExpenseLineView{
 				LineID: row.ID, LineNo: row.LineNo, Category: row.Category,
-				Description: row.Description, Amount: formatMoney(row.AmountCents),
+				Description: row.Description, Amount: formatMoney(row.AmountCents), Remark: deref(row.Remark),
 			})
 		}
 	case EntityOtherIncome:
@@ -100,6 +166,10 @@ func (s *Service) loadData(
 		}
 		data.FundAccount = reference(detail.FundAccountObjectID, detail.FundAccountVersionID, "fund-account",
 			detail.FundAccountCode, detail.FundAccountName, "", document.Currency, "")
+		data.Handler = optionalReference(
+			detail.HandlerObjectID, detail.HandlerVersionID, "employee",
+			detail.HandlerCode, detail.HandlerName,
+		)
 	}
 	return data, nil
 }
@@ -117,6 +187,7 @@ func loadProductLines(ctx context.Context, q *dbsqlc.Queries, documentID string)
 				row.ProductCode, row.ProductName, row.ProductUnit, "", ""),
 			OrderedQuantity: formatQuantity(row.OrderedQtyMicros),
 			UnitPrice:       formatMoney(row.UnitPriceCents), LineAmount: formatMoney(row.LineAmountCents),
+			Remark: deref(row.Remark),
 		}
 		item.OutboundQuantity = formatOptionalQuantity(row.OutboundQtyMicros)
 		item.SignedQuantity = formatOptionalQuantity(row.SignedQtyMicros)
@@ -152,6 +223,41 @@ func reference(objectID, versionID, entity, code, name, unit, currency, plate st
 		ObjectID: objectID, VersionID: versionID, Entity: entity, Code: code, Name: name,
 		Unit: unit, Currency: currency, PlateNumber: plate,
 	}
+}
+
+func optionalReference(
+	objectID, versionID *string,
+	entity string,
+	code, name *string,
+) *ReferenceView {
+	if objectID == nil {
+		return nil
+	}
+	return reference(
+		deref(objectID), deref(versionID), entity, deref(code), deref(name), "", "", "",
+	)
+}
+
+func settlementView(
+	objectID, versionID, code, name, ruleType *string,
+	monthOffset, dayOfMonth, dayOffset *int32,
+	description *string,
+) *SettlementMethodSnapshotView {
+	if objectID == nil {
+		return nil
+	}
+	return &SettlementMethodSnapshotView{
+		ObjectID: deref(objectID), VersionID: deref(versionID), Code: deref(code), Name: deref(name),
+		RuleType: deref(ruleType), MonthOffset: derefInt32(monthOffset),
+		DayOfMonth: dayOfMonth, DayOffset: derefInt32(dayOffset), Description: deref(description),
+	}
+}
+
+func derefInt32(value *int32) int32 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func documentView(document dbsqlc.VouDocument, data DocumentDataView, attachments []AttachmentView) DocumentView {

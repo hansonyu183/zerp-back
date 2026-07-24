@@ -51,7 +51,7 @@ func createApprovedReceipt(
 	created, err := service.Create(t.Context(), EntityReceipt, CreateInput{Data: DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY",
 		CounterpartyType: bobdomain.EntityCustomer, Counterparty: &refs.customer,
-		FundAccount: &refs.fundAccount, Amount: "100.00",
+		FundAccount: &refs.fundAccount, Handler: &refs.employee, Amount: "100.00",
 	}}, integrationActorOne, "event-receipt-create")
 	if err != nil {
 		t.Fatalf("create receipt: %v", err)
@@ -293,6 +293,7 @@ func TestVOUUnexecutedSubscriberFailureRestoresExecutionIntegration(t *testing.T
 
 	created, err := service.Create(t.Context(), EntityPurchaseOrder, CreateInput{Data: DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", Supplier: &refs.supplier,
+		Purchaser: &refs.employee, Warehouse: &refs.warehouse,
 		ProductLines: []ProductLineInput{{
 			Product: refs.product, OrderedQuantity: "2", UnitPrice: "50.00",
 		}},

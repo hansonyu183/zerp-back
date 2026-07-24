@@ -687,6 +687,8 @@ func (s *Service) validateDetailReferences(
 	add(EntityDepartment, data.DepartmentID)
 	add(EntityPosition, data.PositionID)
 	add(EntityEmployee, data.ManagerEmployeeID)
+	add(EntitySettlementMethod, data.SettlementMethodID)
+	add(EntityEmployee, data.SalespersonID)
 	if entity == EntityDepartment {
 		add(EntityDepartment, data.ParentID)
 	}

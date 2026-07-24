@@ -21,11 +21,13 @@ type fixedProductLine struct {
 	Quantity   int64
 	UnitPrice  int64
 	LineAmount int64
+	Remark     *string
 }
 
 type fixedExpenseLine struct {
 	Category, Description string
 	Amount                int64
+	Remark                *string
 }
 
 type validatedDraft struct {
@@ -33,6 +35,7 @@ type validatedDraft struct {
 	Currency                                                string
 	Remark                                                  *string
 	Customer, Supplier, Counterparty, Employee, FundAccount *ReferenceInput
+	Salesperson, Purchaser, Handler, Warehouse              *ReferenceInput
 	CounterpartyType                                        string
 	SourceName                                              string
 	ProductLines                                            []fixedProductLine
@@ -117,29 +120,43 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		BusinessDate: businessDate, Currency: currency, Remark: remark,
 		Customer: input.Customer, Supplier: input.Supplier, Counterparty: input.Counterparty,
 		Employee: input.Employee, FundAccount: input.FundAccount,
+		Salesperson: input.Salesperson, Purchaser: input.Purchaser,
+		Handler: input.Handler, Warehouse: input.Warehouse,
 		CounterpartyType: strings.ToLower(strings.TrimSpace(input.CounterpartyType)),
 		SourceName:       strings.TrimSpace(input.SourceName),
 	}
 
 	switch entity {
 	case EntitySaleOrder:
-		if err = requireOnlyDraftRefs(input, true, false, false, false, false, false); err != nil {
+		if err = requireOnlyDraftRefs(input, true, false, false, false, true, false, false, true, false, false); err != nil {
 			return validatedDraft{}, err
 		}
 		if err = validateReference(input.Customer, "customer", true); err != nil {
+			return validatedDraft{}, err
+		}
+		if err = validateReference(input.Salesperson, "salesperson", true); err != nil {
+			return validatedDraft{}, err
+		}
+		if err = validateReference(input.Warehouse, "warehouse", true); err != nil {
 			return validatedDraft{}, err
 		}
 		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)
 	case EntityPurchaseOrder:
-		if err = requireOnlyDraftRefs(input, false, true, false, false, false, false); err != nil {
+		if err = requireOnlyDraftRefs(input, false, true, false, false, false, true, false, true, false, false); err != nil {
 			return validatedDraft{}, err
 		}
 		if err = validateReference(input.Supplier, "supplier", true); err != nil {
 			return validatedDraft{}, err
 		}
+		if err = validateReference(input.Purchaser, "purchaser", true); err != nil {
+			return validatedDraft{}, err
+		}
+		if err = validateReference(input.Warehouse, "warehouse", true); err != nil {
+			return validatedDraft{}, err
+		}
 		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)
 	case EntityIntermediarySaleOrder:
-		if err = requireOnlyDraftRefs(input, true, true, false, false, false, false); err != nil {
+		if err = requireOnlyDraftRefs(input, true, true, false, false, true, true, false, false, false, false); err != nil {
 			return validatedDraft{}, err
 		}
 		if err = validateReference(input.Customer, "customer", true); err != nil {
@@ -148,9 +165,15 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.Supplier, "supplier", true); err != nil {
 			return validatedDraft{}, err
 		}
+		if err = validateReference(input.Salesperson, "salesperson", true); err != nil {
+			return validatedDraft{}, err
+		}
+		if err = validateReference(input.Purchaser, "purchaser", true); err != nil {
+			return validatedDraft{}, err
+		}
 		result.ProductLines, result.TotalAmount, err = validateProductLines(input.ProductLines)
 	case EntityReceipt, EntityPayment:
-		if err = requireOnlyDraftRefs(input, false, false, true, false, true, false); err != nil {
+		if err = requireOnlyDraftRefs(input, false, false, true, false, false, false, true, false, true, false); err != nil {
 			return validatedDraft{}, err
 		}
 		if result.CounterpartyType != "customer" && result.CounterpartyType != "supplier" {
@@ -162,9 +185,12 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.FundAccount, "fundAccount", true); err != nil {
 			return validatedDraft{}, err
 		}
+		if err = validateReference(input.Handler, "handler", true); err != nil {
+			return validatedDraft{}, err
+		}
 		result.TotalAmount, err = moneyCents(input.Amount)
 	case EntityExpenseReimbursement:
-		if err = requireOnlyDraftRefs(input, false, false, false, true, true, false); err != nil {
+		if err = requireOnlyDraftRefs(input, false, false, false, true, false, false, false, false, true, false); err != nil {
 			return validatedDraft{}, err
 		}
 		if err = validateReference(input.Employee, "employee", true); err != nil {
@@ -175,7 +201,7 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		}
 		result.ExpenseLines, result.TotalAmount, err = validateExpenseLines(input.ExpenseLines)
 	case EntityOtherIncome:
-		if err = requireOnlyDraftRefs(input, false, false, input.Counterparty != nil, false, true, true); err != nil {
+		if err = requireOnlyDraftRefs(input, false, false, input.Counterparty != nil, false, false, false, true, false, true, true); err != nil {
 			return validatedDraft{}, err
 		}
 		if input.Counterparty != nil {
@@ -191,6 +217,9 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 		if err = validateReference(input.FundAccount, "fundAccount", true); err != nil {
 			return validatedDraft{}, err
 		}
+		if err = validateReference(input.Handler, "handler", true); err != nil {
+			return validatedDraft{}, err
+		}
 		if result.SourceName == "" || utf8.RuneCountInString(result.SourceName) > 200 {
 			return validatedDraft{}, domainError(ErrorValidation, "invalid sourceName", nil, nil)
 		}
@@ -202,10 +231,15 @@ func validateDraft(entity string, input DraftInput) (validatedDraft, error) {
 	return result, nil
 }
 
-func requireOnlyDraftRefs(input DraftInput, customer, supplier, counterparty, employee, fundAccount, source bool) error {
+func requireOnlyDraftRefs(
+	input DraftInput,
+	customer, supplier, counterparty, employee, salesperson, purchaser, handler, warehouse, fundAccount, source bool,
+) error {
 	if (!customer && input.Customer != nil) || (!supplier && input.Supplier != nil) ||
 		(!counterparty && (input.Counterparty != nil || strings.TrimSpace(input.CounterpartyType) != "")) ||
-		(!employee && input.Employee != nil) || (!fundAccount && input.FundAccount != nil) ||
+		(!employee && input.Employee != nil) || (!salesperson && input.Salesperson != nil) ||
+		(!purchaser && input.Purchaser != nil) || (!handler && input.Handler != nil) ||
+		(!warehouse && input.Warehouse != nil) || (!fundAccount && input.FundAccount != nil) ||
 		(!source && strings.TrimSpace(input.SourceName) != "") {
 		return domainError(ErrorValidation, "fields do not match entity", nil, nil)
 	}
@@ -250,8 +284,12 @@ func validateProductLines(lines []ProductLineInput) ([]fixedProductLine, int64, 
 			return nil, 0, domainError(ErrorValidation, "amount out of range", nil, err)
 		}
 		total += amount
+		remark, err := lineRemark(line.Remark)
+		if err != nil {
+			return nil, 0, err
+		}
 		result = append(result, fixedProductLine{
-			Product: line.Product, Quantity: quantity, UnitPrice: price, LineAmount: amount,
+			Product: line.Product, Quantity: quantity, UnitPrice: price, LineAmount: amount, Remark: remark,
 		})
 	}
 	return result, total, nil
@@ -275,9 +313,23 @@ func validateExpenseLines(lines []ExpenseLineInput) ([]fixedExpenseLine, int64, 
 			return nil, 0, domainError(ErrorValidation, "amount out of range", nil, err)
 		}
 		total += amount
-		result = append(result, fixedExpenseLine{Category: category, Description: description, Amount: amount})
+		remark, err := lineRemark(line.Remark)
+		if err != nil {
+			return nil, 0, err
+		}
+		result = append(result, fixedExpenseLine{
+			Category: category, Description: description, Amount: amount, Remark: remark,
+		})
 	}
 	return result, total, nil
+}
+
+func lineRemark(value string) (*string, error) {
+	remark := optionalText(value)
+	if remark != nil && utf8.RuneCountInString(*remark) > 1000 {
+		return nil, domainError(ErrorValidation, "line remark is too long", nil, nil)
+	}
+	return remark, nil
 }
 
 func validateDocumentRevision(documentID string, revision int64) error {

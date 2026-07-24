@@ -17,6 +17,8 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			TaxNumber: nilIfEmpty(data.TaxNumber), ContactName: nilIfEmpty(data.ContactName),
 			ContactPhone: nilIfEmpty(data.ContactPhone), Email: nilIfEmpty(data.Email),
 			Address: nilIfEmpty(data.Address), Remark: nilIfEmpty(data.Remark),
+			SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
+			SalespersonID:      nilIfEmpty(data.SalespersonID),
 		})
 	case EntitySupplier:
 		return q.InsertBobSupplierDetail(ctx, dbsqlc.InsertBobSupplierDetailParams{
@@ -25,6 +27,7 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			TaxNumber: nilIfEmpty(data.TaxNumber), ContactName: nilIfEmpty(data.ContactName),
 			ContactPhone: nilIfEmpty(data.ContactPhone), Email: nilIfEmpty(data.Email),
 			Address: nilIfEmpty(data.Address), Remark: nilIfEmpty(data.Remark),
+			SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
 		})
 	case EntityEmployee:
 		return q.InsertBobEmployeeDetail(ctx, dbsqlc.InsertBobEmployeeDetailParams{
@@ -81,6 +84,12 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			VersionID: versionID, Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
 			Description: nilIfEmpty(data.Description),
 		})
+	case EntitySettlementMethod:
+		return q.InsertBobSettlementMethodDetail(ctx, dbsqlc.InsertBobSettlementMethodDetailParams{
+			VersionID: versionID, Name: data.Name, RuleType: data.RuleType,
+			MonthOffset: data.MonthOffset, DayOfMonth: data.DayOfMonth,
+			DayOffset: data.DayOffset, Description: nilIfEmpty(data.Description),
+		})
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -96,7 +105,9 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			CategoryID: nilIfEmpty(data.CategoryID), TaxNumber: nilIfEmpty(data.TaxNumber),
 			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
 			Email: nilIfEmpty(data.Email), Address: nilIfEmpty(data.Address),
-			Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+			Remark: nilIfEmpty(data.Remark), SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
+			SalespersonID: nilIfEmpty(data.SalespersonID),
+			VersionID:     versionID,
 		})
 	case EntitySupplier:
 		rows, err = q.UpdateBobSupplierDetail(ctx, dbsqlc.UpdateBobSupplierDetailParams{
@@ -104,7 +115,8 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			CategoryID: nilIfEmpty(data.CategoryID), TaxNumber: nilIfEmpty(data.TaxNumber),
 			ContactName: nilIfEmpty(data.ContactName), ContactPhone: nilIfEmpty(data.ContactPhone),
 			Email: nilIfEmpty(data.Email), Address: nilIfEmpty(data.Address),
-			Remark: nilIfEmpty(data.Remark), VersionID: versionID,
+			Remark: nilIfEmpty(data.Remark), SettlementMethodID: nilIfEmpty(data.SettlementMethodID),
+			VersionID: versionID,
 		})
 	case EntityEmployee:
 		rows, err = q.UpdateBobEmployeeDetail(ctx, dbsqlc.UpdateBobEmployeeDetailParams{
@@ -161,6 +173,12 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 			Name: data.Name, CategoryID: nilIfEmpty(data.CategoryID),
 			Description: nilIfEmpty(data.Description), VersionID: versionID,
 		})
+	case EntitySettlementMethod:
+		rows, err = q.UpdateBobSettlementMethodDetail(ctx, dbsqlc.UpdateBobSettlementMethodDetailParams{
+			Name: data.Name, RuleType: data.RuleType, MonthOffset: data.MonthOffset,
+			DayOfMonth: data.DayOfMonth, DayOffset: data.DayOffset,
+			Description: nilIfEmpty(data.Description), VersionID: versionID,
+		})
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -194,6 +212,8 @@ func copyDetail(ctx context.Context, q *dbsqlc.Queries, entity, newVersionID, so
 		return q.CopyBobDepartmentDetail(ctx, dbsqlc.CopyBobDepartmentDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	case EntityPosition:
 		return q.CopyBobPositionDetail(ctx, dbsqlc.CopyBobPositionDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
+	case EntitySettlementMethod:
+		return q.CopyBobSettlementMethodDetail(ctx, dbsqlc.CopyBobSettlementMethodDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -223,6 +243,8 @@ func deleteDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 		return q.DeleteBobDepartmentDetail(ctx, versionID)
 	case EntityPosition:
 		return q.DeleteBobPositionDetail(ctx, versionID)
+	case EntitySettlementMethod:
+		return q.DeleteBobSettlementMethodDetail(ctx, versionID)
 	default:
 		return 0, domainError(ErrorValidation, "invalid entity", nil, nil)
 	}

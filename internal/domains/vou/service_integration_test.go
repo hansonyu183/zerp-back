@@ -28,7 +28,8 @@ const (
 )
 
 type integrationReferences struct {
-	customer, supplier, employee, product, fundAccount, platform, vehicle ReferenceInput
+	customer, supplier, employee, product, warehouse, fundAccount ReferenceInput
+	settlement, platform, vehicle                                 ReferenceInput
 }
 
 func vouIntegrationPool(t *testing.T) *pgxpool.Pool {
@@ -92,21 +93,32 @@ func createApprovedBOB(
 	return ReferenceInput{ObjectID: approved.ObjectID, VersionID: approved.VersionID}
 }
 
+func int32IntegrationPointer(value int32) *int32 { return &value }
+
 func prepareReferences(t *testing.T, pool *pgxpool.Pool) integrationReferences {
 	t.Helper()
 	service := bobdomain.NewService(pool)
 	suffix := newID()
 	general := bobdomain.SupplierTypeGeneral
 	logistics := bobdomain.SupplierTypeLogisticsPlatform
+	settlement := createApprovedBOB(t, service, bobdomain.EntitySettlementMethod, bobdomain.CreateDetailInput{
+		Code: "VSM" + suffix, Name: "次月十五日", RuleType: bobdomain.SettlementRuleFixedDay,
+		MonthOffset: 1, DayOfMonth: int32IntegrationPointer(15), DayOffset: 0,
+		Description: "按自然日计算",
+	})
 	platform := createApprovedBOB(t, service, bobdomain.EntitySupplier, bobdomain.CreateDetailInput{
 		Code: "VLP" + suffix, Name: "VOU 物流平台", SupplierType: &logistics,
 	})
 	return integrationReferences{
 		customer: createApprovedBOB(t, service, bobdomain.EntityCustomer, bobdomain.CreateDetailInput{
-			Code: "VC" + suffix, Name: "VOU 客户",
+			Code: "VC" + suffix, Name: "VOU 客户", ContactName: "客户联系人",
+			ContactPhone: "13800000000", Address: "深圳市测试路 1 号",
+			SettlementMethodID: settlement.ObjectID,
 		}),
 		supplier: createApprovedBOB(t, service, bobdomain.EntitySupplier, bobdomain.CreateDetailInput{
 			Code: "VS" + suffix, Name: "VOU 供应商", SupplierType: &general,
+			ContactName: "供应商联系人", ContactPhone: "13900000000",
+			SettlementMethodID: settlement.ObjectID,
 		}),
 		employee: createApprovedBOB(t, service, bobdomain.EntityEmployee, bobdomain.CreateDetailInput{
 			Code: "VE" + suffix, Name: "VOU 员工",
@@ -114,10 +126,13 @@ func prepareReferences(t *testing.T, pool *pgxpool.Pool) integrationReferences {
 		product: createApprovedBOB(t, service, bobdomain.EntityProduct, bobdomain.CreateDetailInput{
 			Code: "VP" + suffix, Name: "VOU 产品", Unit: "吨",
 		}),
+		warehouse: createApprovedBOB(t, service, bobdomain.EntityWarehouse, bobdomain.CreateDetailInput{
+			Code: "VW" + suffix, Name: "VOU 仓库",
+		}),
 		fundAccount: createApprovedBOB(t, service, bobdomain.EntityFundAccount, bobdomain.CreateDetailInput{
 			Code: "VF" + suffix, Name: "VOU 资金账户", Currency: "CNY",
 		}),
-		platform: platform,
+		settlement: settlement, platform: platform,
 		vehicle: createApprovedBOB(t, service, bobdomain.EntityVehicle, bobdomain.CreateDetailInput{
 			Code: "VV" + suffix, Name: "VOU 车辆", PlateNumber: "粤V" + suffix[len(suffix)-6:],
 			VehicleType: "厢式货车", PlatformObjectID: platform.ObjectID,
@@ -143,6 +158,7 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 	service := newIntegrationService(t, pool)
 	productLine := []ProductLineInput{{
 		Product: refs.product, OrderedQuantity: "10.5", UnitPrice: "12.34",
+		Remark: "商品明细备注",
 	}}
 	tests := []struct {
 		entity string
@@ -150,38 +166,44 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 	}{
 		{EntitySaleOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer, ProductLines: productLine,
+			Salesperson: &refs.employee, Warehouse: &refs.warehouse,
 		}},
 		{EntityPurchaseOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Supplier: &refs.supplier, ProductLines: productLine,
+			Purchaser: &refs.employee, Warehouse: &refs.warehouse,
 		}},
 		{EntityIntermediarySaleOrder, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer,
 			Supplier: &refs.supplier, ProductLines: productLine,
+			Salesperson: &refs.employee, Purchaser: &refs.employee,
 		}},
 		{EntityReceipt, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",
-			Counterparty: &refs.customer, FundAccount: &refs.fundAccount, Amount: "100.00",
+			Counterparty: &refs.customer, FundAccount: &refs.fundAccount,
+			Handler: &refs.employee, Amount: "100.00",
 		}},
 		{EntityPayment, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "supplier",
-			Counterparty: &refs.supplier, FundAccount: &refs.fundAccount, Amount: "80.00",
+			Counterparty: &refs.supplier, FundAccount: &refs.fundAccount,
+			Handler: &refs.employee, Amount: "80.00",
 		}},
 		{EntityExpenseReimbursement, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", Employee: &refs.employee, FundAccount: &refs.fundAccount,
 			ExpenseLines: []ExpenseLineInput{
-				{Category: "交通", Description: "出租车", Amount: "20.00"},
+				{Category: "交通", Description: "出租车", Amount: "20.00", Remark: "费用明细备注"},
 				{Category: "住宿", Description: "酒店", Amount: "200.00"},
 			},
 		}},
 		{EntityOtherIncome, DraftInput{
 			BusinessDate: "2026-07-24", Currency: "CNY", SourceName: "废料收入",
 			CounterpartyType: "customer", Counterparty: &refs.customer,
-			FundAccount: &refs.fundAccount, Amount: "60.00",
+			FundAccount: &refs.fundAccount, Handler: &refs.employee, Amount: "60.00",
 		}},
 	}
 
 	for _, test := range tests {
 		t.Run(test.entity, func(t *testing.T) {
+			test.draft.Remark = "单据备注"
 			created, err := service.Create(t.Context(), test.entity, CreateInput{Data: test.draft},
 				integrationActorOne, "vou-create")
 			if err != nil {
@@ -239,6 +261,48 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 			if err != nil || view.Status != StatusExecuted || view.Amount == "" {
 				t.Fatalf("executed view=%+v err=%v", view, err)
 			}
+			if view.Data.Remark != "单据备注" {
+				t.Fatalf("header remark = %q", view.Data.Remark)
+			}
+			switch test.entity {
+			case EntitySaleOrder:
+				if view.Data.Salesperson == nil || view.Data.Warehouse == nil ||
+					view.Data.ContactName != "客户联系人" ||
+					view.Data.ContactPhone != "13800000000" ||
+					view.Data.DeliveryAddress != "深圳市测试路 1 号" ||
+					view.Data.SettlementMethod == nil ||
+					view.Data.SettlementMethod.RuleType != bobdomain.SettlementRuleFixedDay ||
+					view.Data.SettlementMethod.DayOfMonth == nil ||
+					*view.Data.SettlementMethod.DayOfMonth != 15 ||
+					view.Data.ProductLines[0].Remark != "商品明细备注" {
+					t.Fatalf("sale attribute snapshots = %+v", view.Data)
+				}
+			case EntityPurchaseOrder:
+				if view.Data.Purchaser == nil || view.Data.Warehouse == nil ||
+					view.Data.ContactName != "供应商联系人" ||
+					view.Data.ContactPhone != "13900000000" ||
+					view.Data.SettlementMethod == nil ||
+					view.Data.ProductLines[0].Remark != "商品明细备注" {
+					t.Fatalf("purchase attribute snapshots = %+v", view.Data)
+				}
+			case EntityIntermediarySaleOrder:
+				if view.Data.Salesperson == nil || view.Data.Purchaser == nil ||
+					view.Data.Warehouse != nil ||
+					view.Data.CustomerSettlementMethod == nil ||
+					view.Data.SupplierSettlementMethod == nil ||
+					view.Data.ProductLines[0].Remark != "商品明细备注" {
+					t.Fatalf("intermediary attribute snapshots = %+v", view.Data)
+				}
+			case EntityReceipt, EntityPayment, EntityOtherIncome:
+				if view.Data.Handler == nil {
+					t.Fatalf("handler snapshot = %+v", view.Data)
+				}
+			case EntityExpenseReimbursement:
+				if view.Data.Employee == nil || view.Data.Handler != nil ||
+					view.Data.ExpenseLines[0].Remark != "费用明细备注" {
+					t.Fatalf("expense attributes = %+v", view.Data)
+				}
+			}
 			page, queryErr := service.Query(t.Context(), test.entity, QueryInput{
 				Page: 1, PageSize: 20,
 				Filters: QueryFilters{
@@ -280,6 +344,179 @@ func TestVOUIntegrationAllEntitiesAndReverseLifecycle(t *testing.T) {
 	}
 }
 
+func TestVOUIntegrationSnapshotsSettlementGapsAndLegacyRows(t *testing.T) {
+	pool := vouIntegrationPool(t)
+	truncateVOU(t, pool)
+	t.Cleanup(func() { truncateVOU(t, pool) })
+	refs := prepareReferences(t, pool)
+	service := newIntegrationService(t, pool)
+	bobService := bobdomain.NewService(pool)
+	saleDraft := DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer,
+		Salesperson: &refs.employee, Warehouse: &refs.warehouse,
+		ProductLines: []ProductLineInput{{
+			Product: refs.product, OrderedQuantity: "1", UnitPrice: "10.00", Remark: "制单快照",
+		}},
+	}
+	sale, err := service.Create(t.Context(), EntitySaleOrder, CreateInput{Data: saleDraft},
+		integrationActorOne, "snapshot-sale-create")
+	if err != nil {
+		t.Fatalf("create snapshot sale: %v", err)
+	}
+
+	customerView, err := bobService.Get(t.Context(), bobdomain.EntityCustomer,
+		bobdomain.GetInput{ObjectID: refs.customer.ObjectID})
+	if err != nil {
+		t.Fatalf("get customer before edit: %v", err)
+	}
+	customerEdit, err := bobService.Edit(t.Context(), bobdomain.EntityCustomer,
+		bobdomain.ObjectRevisionInput{
+			ObjectID: refs.customer.ObjectID, ObjectRevision: customerView.ObjectRevision,
+		}, integrationActorOne, "snapshot-customer-edit")
+	if err != nil {
+		t.Fatalf("edit customer: %v", err)
+	}
+	if _, err = service.Create(t.Context(), EntitySaleOrder, CreateInput{Data: saleDraft},
+		integrationActorOne, "snapshot-customer-gap"); err == nil {
+		t.Fatal("sale was created while customer had no effective version")
+	}
+	customerSaved, err := bobService.Save(t.Context(), bobdomain.EntityCustomer, bobdomain.SaveInput{
+		ObjectID: refs.customer.ObjectID, VersionID: customerEdit.VersionID, Revision: customerEdit.Revision,
+		Data: bobdomain.DetailInput{
+			Name: "VOU 客户更新", ContactName: bobdomain.Optional("新联系人"),
+			ContactPhone: bobdomain.Optional("13700000000"),
+			Address:      bobdomain.Optional("深圳市新地址"),
+		},
+	}, integrationActorOne, "snapshot-customer-save")
+	if err != nil {
+		t.Fatalf("save customer edit: %v", err)
+	}
+	customerSubmitted, err := bobService.Submit(t.Context(), bobdomain.EntityCustomer,
+		bobdomain.VersionRevisionInput{
+			ObjectID: refs.customer.ObjectID, VersionID: customerEdit.VersionID,
+			Revision: customerSaved.Revision,
+		}, integrationActorOne, "snapshot-customer-submit")
+	if err != nil {
+		t.Fatalf("submit customer edit: %v", err)
+	}
+	customerApproved, err := bobService.Approve(t.Context(), bobdomain.EntityCustomer,
+		bobdomain.ReviewInput{
+			ObjectID: refs.customer.ObjectID, VersionID: customerEdit.VersionID,
+			Revision: customerSubmitted.Revision,
+		}, integrationActorTwo, "snapshot-customer-approve")
+	if err != nil {
+		t.Fatalf("approve customer edit: %v", err)
+	}
+	refs.customer.VersionID = customerApproved.VersionID
+	saleDraft.Customer = &refs.customer
+
+	settlementView, err := bobService.Get(t.Context(), bobdomain.EntitySettlementMethod,
+		bobdomain.GetInput{ObjectID: refs.settlement.ObjectID})
+	if err != nil {
+		t.Fatalf("get settlement before edit: %v", err)
+	}
+	settlementEdit, err := bobService.Edit(t.Context(), bobdomain.EntitySettlementMethod,
+		bobdomain.ObjectRevisionInput{
+			ObjectID: refs.settlement.ObjectID, ObjectRevision: settlementView.ObjectRevision,
+		}, integrationActorOne, "snapshot-settlement-edit")
+	if err != nil {
+		t.Fatalf("edit settlement: %v", err)
+	}
+	if _, err = service.Create(t.Context(), EntitySaleOrder, CreateInput{Data: saleDraft},
+		integrationActorOne, "snapshot-settlement-gap"); err == nil {
+		t.Fatal("sale was created while settlement method had no effective version")
+	}
+	day20 := int32(20)
+	settlementSaved, err := bobService.Save(t.Context(), bobdomain.EntitySettlementMethod, bobdomain.SaveInput{
+		ObjectID: refs.settlement.ObjectID, VersionID: settlementEdit.VersionID, Revision: settlementEdit.Revision,
+		Data: bobdomain.DetailInput{
+			Name: "次月二十日", RuleType: bobdomain.SettlementRuleFixedDay,
+			MonthOffset: 1, DayOfMonth: &day20, DayOffset: 0,
+		},
+	}, integrationActorOne, "snapshot-settlement-save")
+	if err != nil {
+		t.Fatalf("save settlement edit: %v", err)
+	}
+	settlementSubmitted, err := bobService.Submit(t.Context(), bobdomain.EntitySettlementMethod,
+		bobdomain.VersionRevisionInput{
+			ObjectID: refs.settlement.ObjectID, VersionID: settlementEdit.VersionID,
+			Revision: settlementSaved.Revision,
+		}, integrationActorOne, "snapshot-settlement-submit")
+	if err != nil {
+		t.Fatalf("submit settlement edit: %v", err)
+	}
+	if _, err = bobService.Approve(t.Context(), bobdomain.EntitySettlementMethod,
+		bobdomain.ReviewInput{
+			ObjectID: refs.settlement.ObjectID, VersionID: settlementEdit.VersionID,
+			Revision: settlementSubmitted.Revision,
+		}, integrationActorTwo, "snapshot-settlement-approve"); err != nil {
+		t.Fatalf("approve settlement edit: %v", err)
+	}
+
+	snapshot, err := service.Get(t.Context(), EntitySaleOrder, GetInput{DocumentID: sale.DocumentID})
+	if err != nil {
+		t.Fatalf("get historical sale snapshot: %v", err)
+	}
+	if snapshot.Data.ContactName != "客户联系人" ||
+		snapshot.Data.ContactPhone != "13800000000" ||
+		snapshot.Data.DeliveryAddress != "深圳市测试路 1 号" ||
+		snapshot.Data.SettlementMethod == nil ||
+		snapshot.Data.SettlementMethod.Name != "次月十五日" ||
+		snapshot.Data.SettlementMethod.DayOfMonth == nil ||
+		*snapshot.Data.SettlementMethod.DayOfMonth != 15 {
+		t.Fatalf("historical sale snapshot changed with BOB: %+v", snapshot.Data)
+	}
+
+	withoutSettlement := createApprovedBOB(t, bobService, bobdomain.EntityCustomer,
+		bobdomain.CreateDetailInput{Code: "NS" + newID(), Name: "未配置结算客户"})
+	missingSettlementDraft := saleDraft
+	missingSettlementDraft.Customer = &withoutSettlement
+	if _, err = service.Create(t.Context(), EntitySaleOrder,
+		CreateInput{Data: missingSettlementDraft}, integrationActorOne,
+		"missing-settlement-create"); err == nil {
+		t.Fatal("sale accepted a customer without settlement method")
+	}
+
+	receiptDraft := DraftInput{
+		BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",
+		Counterparty: &refs.customer, FundAccount: &refs.fundAccount,
+		Handler: &refs.employee, Amount: "10.00",
+	}
+	receipt, err := service.Create(t.Context(), EntityReceipt, CreateInput{Data: receiptDraft},
+		integrationActorOne, "legacy-receipt-create")
+	if err != nil {
+		t.Fatalf("create receipt for legacy compatibility: %v", err)
+	}
+	if _, err = pool.Exec(t.Context(), `
+		UPDATE vou_receipt_details
+		SET handler_object_id = NULL, handler_version_id = NULL,
+		    handler_code = NULL, handler_name = NULL
+		WHERE document_id = $1
+	`, receipt.DocumentID); err != nil {
+		t.Fatalf("simulate legacy receipt: %v", err)
+	}
+	legacy, err := service.Get(t.Context(), EntityReceipt, GetInput{DocumentID: receipt.DocumentID})
+	if err != nil || legacy.Data.Handler != nil {
+		t.Fatalf("read legacy receipt view=%+v err=%v", legacy, err)
+	}
+	if _, err = service.Review(t.Context(), EntityReceipt, DocumentRevisionInput{
+		DocumentID: receipt.DocumentID, Revision: receipt.Revision,
+	}, integrationActorOne, "legacy-receipt-review"); err == nil {
+		t.Fatal("legacy receipt with missing handler advanced")
+	}
+	saved, err := service.Save(t.Context(), EntityReceipt, SaveInput{
+		DocumentID: receipt.DocumentID, Revision: receipt.Revision, Data: receiptDraft,
+	}, integrationActorOne, "legacy-receipt-save")
+	if err != nil {
+		t.Fatalf("complete legacy receipt: %v", err)
+	}
+	if _, err = service.Review(t.Context(), EntityReceipt, DocumentRevisionInput{
+		DocumentID: receipt.DocumentID, Revision: saved.Revision,
+	}, integrationActorOne, "legacy-receipt-reviewed"); err != nil {
+		t.Fatalf("review completed legacy receipt: %v", err)
+	}
+}
+
 func TestVOUIntegrationAttachmentRoundTrip(t *testing.T) {
 	pool := vouIntegrationPool(t)
 	truncateVOU(t, pool)
@@ -288,7 +525,8 @@ func TestVOUIntegrationAttachmentRoundTrip(t *testing.T) {
 	service := newIntegrationService(t, pool)
 	created, err := service.Create(t.Context(), EntityReceipt, CreateInput{Data: DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",
-		Counterparty: &refs.customer, FundAccount: &refs.fundAccount, Amount: "10.00",
+		Counterparty: &refs.customer, FundAccount: &refs.fundAccount,
+		Handler: &refs.employee, Amount: "10.00",
 	}}, integrationActorOne, "attachment-create")
 	if err != nil {
 		t.Fatalf("create receipt: %v", err)
@@ -363,7 +601,8 @@ func TestVOUIntegrationConcurrentNumberingAndPermissions(t *testing.T) {
 			defer group.Done()
 			result, err := service.Create(context.Background(), EntityReceipt, CreateInput{Data: DraftInput{
 				BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",
-				Counterparty: &refs.customer, FundAccount: &refs.fundAccount, Amount: "1.00",
+				Counterparty: &refs.customer, FundAccount: &refs.fundAccount,
+				Handler: &refs.employee, Amount: "1.00",
 			}}, integrationActorOne, "concurrent-number")
 			if err != nil {
 				errorsChannel <- err
@@ -406,6 +645,7 @@ func TestVOUIntegrationRejectsInvalidReferencesAndDatabaseContracts(t *testing.T
 
 	_, err := service.Create(t.Context(), EntityPurchaseOrder, CreateInput{Data: DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", Supplier: &refs.platform,
+		Purchaser: &refs.employee, Warehouse: &refs.warehouse,
 		ProductLines: []ProductLineInput{{
 			Product: refs.product, OrderedQuantity: "1", UnitPrice: "1.00",
 		}},
@@ -418,7 +658,8 @@ func TestVOUIntegrationRejectsInvalidReferencesAndDatabaseContracts(t *testing.T
 		bobdomain.CreateDetailInput{Code: "USD" + newID(), Name: "美元账户", Currency: "USD"})
 	_, err = service.Create(t.Context(), EntityReceipt, CreateInput{Data: DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", CounterpartyType: "customer",
-		Counterparty: &refs.customer, FundAccount: &usdAccount, Amount: "1.00",
+		Counterparty: &refs.customer, FundAccount: &usdAccount,
+		Handler: &refs.employee, Amount: "1.00",
 	}}, integrationActorOne, "currency-mismatch")
 	if err == nil {
 		t.Fatal("receipt accepted mismatched fund account currency")
@@ -426,6 +667,7 @@ func TestVOUIntegrationRejectsInvalidReferencesAndDatabaseContracts(t *testing.T
 
 	created, err := service.Create(t.Context(), EntitySaleOrder, CreateInput{Data: DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", Customer: &refs.customer,
+		Salesperson: &refs.employee, Warehouse: &refs.warehouse,
 		ProductLines: []ProductLineInput{{
 			Product: refs.product, OrderedQuantity: "1", UnitPrice: "1.00",
 		}},

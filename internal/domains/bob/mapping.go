@@ -31,9 +31,9 @@ func conflictData(object dbsqlc.LockBobObjectRow, version dbsqlc.LockBobVersionR
 func detailFields(entity string) []string {
 	switch entity {
 	case EntityCustomer:
-		return []string{"name", "customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark"}
+		return []string{"name", "customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonId"}
 	case EntitySupplier:
-		return []string{"name", "supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark"}
+		return []string{"name", "supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId"}
 	case EntityEmployee:
 		return []string{"name", "categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark"}
 	case EntityProduct:
@@ -52,6 +52,8 @@ func detailFields(entity string) []string {
 		return []string{"name", "categoryId", "parentId", "description"}
 	case EntityPosition:
 		return []string{"name", "categoryId", "description"}
+	case EntitySettlementMethod:
+		return []string{"name", "ruleType", "monthOffset", "dayOfMonth", "dayOffset", "description"}
 	default:
 		return []string{"name"}
 	}
@@ -102,7 +104,7 @@ func objectView(row dbsqlc.BobVersionView) ObjectView {
 }
 
 func detailView(row dbsqlc.BobVersionView) DetailView {
-	return DetailView{
+	result := DetailView{
 		Name: row.Name, Unit: row.Unit, Currency: deref(row.Currency),
 		SupplierType: deref(row.SupplierType), PlateNumber: deref(row.PlateNumber),
 		VehicleType: deref(row.VehicleType), PlatformObjectID: deref(row.PlatformObjectID),
@@ -116,7 +118,17 @@ func detailView(row dbsqlc.BobVersionView) DetailView {
 		LoadCapacityKG: row.LoadCapacityKg, AccountName: row.AccountName, BankName: row.BankName,
 		BankBranch: row.BankBranch, AccountNumber: row.AccountNumber,
 		TargetEntity: row.TargetEntity, ParentID: row.ParentID,
+		SettlementMethodID:        row.SettlementMethodID,
+		SalespersonID:             row.SalespersonID,
+		SettlementMethodVersionID: row.SettlementMethodVersionID,
+		RuleType:                  row.SettlementRuleType,
+		MonthOffset:               row.SettlementMonthOffset, DayOffset: row.SettlementDayOffset,
 	}
+	if row.SettlementRuleType == SettlementRuleFixedDay {
+		day := row.SettlementDayOfMonth
+		result.DayOfMonth = &day
+	}
+	return result
 }
 
 func auditEventView(row dbsqlc.BobAuditEvent) AuditEventView {

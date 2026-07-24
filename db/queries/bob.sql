@@ -15,23 +15,24 @@ INSERT INTO bob_versions (
 -- name: InsertBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
 ) VALUES (
     sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(customer_type),
     sqlc.narg(short_name), sqlc.narg(category_id), sqlc.narg(tax_number),
     sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(email),
-    sqlc.narg(address), sqlc.narg(remark)
+    sqlc.narg(address), sqlc.narg(remark), sqlc.narg(settlement_method_id),
+    sqlc.narg(salesperson_id)
 );
 
 -- name: InsertBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id
 ) VALUES (
     sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(supplier_type),
     sqlc.narg(short_name), sqlc.narg(category_id), sqlc.narg(tax_number),
     sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(email),
-    sqlc.narg(address), sqlc.narg(remark)
+    sqlc.narg(address), sqlc.narg(remark), sqlc.narg(settlement_method_id)
 );
 
 -- name: InsertBobEmployeeDetail :exec
@@ -107,22 +108,32 @@ VALUES (
     sqlc.arg(version_id), sqlc.arg(name), sqlc.narg(category_id), sqlc.narg(description)
 );
 
+-- name: InsertBobSettlementMethodDetail :exec
+INSERT INTO bob_settlement_method_versions (
+    version_id, name, rule_type, month_offset, day_of_month, day_offset, description
+) VALUES (
+    sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(rule_type), sqlc.arg(month_offset),
+    sqlc.narg(day_of_month), sqlc.arg(day_offset), sqlc.narg(description)
+);
+
 -- name: CopyBobCustomerDetail :exec
 INSERT INTO bob_customer_versions (
     version_id, name, customer_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id, salesperson_id
 )
 SELECT sqlc.arg(new_version_id), d.name, d.customer_type, d.short_name, d.category_id,
-       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark
+       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
+       d.settlement_method_id, d.salesperson_id
 FROM bob_customer_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobSupplierDetail :exec
 INSERT INTO bob_supplier_versions (
     version_id, name, supplier_type, short_name, category_id, tax_number,
-    contact_name, contact_phone, email, address, remark
+    contact_name, contact_phone, email, address, remark, settlement_method_id
 )
 SELECT sqlc.arg(new_version_id), d.name, d.supplier_type, d.short_name, d.category_id,
-       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark
+       d.tax_number, d.contact_name, d.contact_phone, d.email, d.address, d.remark,
+       d.settlement_method_id
 FROM bob_supplier_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
 -- name: CopyBobEmployeeDetail :exec
@@ -186,13 +197,23 @@ INSERT INTO bob_position_versions (version_id, name, category_id, description)
 SELECT sqlc.arg(new_version_id), d.name, d.category_id, d.description
 FROM bob_position_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
+-- name: CopyBobSettlementMethodDetail :exec
+INSERT INTO bob_settlement_method_versions (
+    version_id, name, rule_type, month_offset, day_of_month, day_offset, description
+)
+SELECT sqlc.arg(new_version_id), d.name, d.rule_type, d.month_offset,
+       d.day_of_month, d.day_offset, d.description
+FROM bob_settlement_method_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+
 -- name: UpdateBobCustomerDetail :execrows
 UPDATE bob_customer_versions
 SET name = sqlc.arg(name), customer_type = sqlc.arg(customer_type),
     short_name = sqlc.narg(short_name), category_id = sqlc.narg(category_id),
     tax_number = sqlc.narg(tax_number), contact_name = sqlc.narg(contact_name),
     contact_phone = sqlc.narg(contact_phone), email = sqlc.narg(email),
-    address = sqlc.narg(address), remark = sqlc.narg(remark)
+    address = sqlc.narg(address), remark = sqlc.narg(remark),
+    settlement_method_id = sqlc.narg(settlement_method_id),
+    salesperson_id = sqlc.narg(salesperson_id)
 WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobSupplierDetail :execrows
@@ -201,7 +222,8 @@ SET name = sqlc.arg(name), supplier_type = sqlc.arg(supplier_type),
     short_name = sqlc.narg(short_name), category_id = sqlc.narg(category_id),
     tax_number = sqlc.narg(tax_number), contact_name = sqlc.narg(contact_name),
     contact_phone = sqlc.narg(contact_phone), email = sqlc.narg(email),
-    address = sqlc.narg(address), remark = sqlc.narg(remark)
+    address = sqlc.narg(address), remark = sqlc.narg(remark),
+    settlement_method_id = sqlc.narg(settlement_method_id)
 WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobEmployeeDetail :execrows
@@ -267,6 +289,13 @@ UPDATE bob_position_versions
 SET name = sqlc.arg(name), category_id = sqlc.narg(category_id), description = sqlc.narg(description)
 WHERE version_id = sqlc.arg(version_id);
 
+-- name: UpdateBobSettlementMethodDetail :execrows
+UPDATE bob_settlement_method_versions
+SET name = sqlc.arg(name), rule_type = sqlc.arg(rule_type),
+    month_offset = sqlc.arg(month_offset), day_of_month = sqlc.narg(day_of_month),
+    day_offset = sqlc.arg(day_offset), description = sqlc.narg(description)
+WHERE version_id = sqlc.arg(version_id);
+
 -- name: LockBobObject :one
 SELECT id, entity, code, current_version_id, effective_version_id, next_version_no, revision, updated_at
 FROM bob_objects
@@ -306,11 +335,14 @@ SELECT EXISTS (
 
     SELECT 1 FROM bob_customer_versions
     WHERE category_id = sqlc.arg(target_object_id)
+       OR settlement_method_id = sqlc.arg(target_object_id)
+       OR salesperson_id = sqlc.arg(target_object_id)
 
     UNION ALL
 
     SELECT 1 FROM bob_supplier_versions
     WHERE category_id = sqlc.arg(target_object_id)
+       OR settlement_method_id = sqlc.arg(target_object_id)
 
     UNION ALL
 
@@ -362,6 +394,12 @@ SELECT EXISTS (
     FROM vou_sale_order_details sale_order
     WHERE sale_order.customer_object_id = sqlc.arg(target_object_id)
        OR sale_order.customer_version_id = sqlc.arg(target_version_id)
+       OR sale_order.salesperson_object_id = sqlc.arg(target_object_id)
+       OR sale_order.salesperson_version_id = sqlc.arg(target_version_id)
+       OR sale_order.warehouse_object_id = sqlc.arg(target_object_id)
+       OR sale_order.warehouse_version_id = sqlc.arg(target_version_id)
+       OR sale_order.settlement_method_object_id = sqlc.arg(target_object_id)
+       OR sale_order.settlement_method_version_id = sqlc.arg(target_version_id)
        OR sale_order.platform_object_id = sqlc.arg(target_object_id)
        OR sale_order.platform_version_id = sqlc.arg(target_version_id)
        OR sale_order.vehicle_object_id = sqlc.arg(target_object_id)
@@ -373,6 +411,12 @@ SELECT EXISTS (
     FROM vou_purchase_order_details purchase_order
     WHERE purchase_order.supplier_object_id = sqlc.arg(target_object_id)
        OR purchase_order.supplier_version_id = sqlc.arg(target_version_id)
+       OR purchase_order.purchaser_object_id = sqlc.arg(target_object_id)
+       OR purchase_order.purchaser_version_id = sqlc.arg(target_version_id)
+       OR purchase_order.warehouse_object_id = sqlc.arg(target_object_id)
+       OR purchase_order.warehouse_version_id = sqlc.arg(target_version_id)
+       OR purchase_order.settlement_method_object_id = sqlc.arg(target_object_id)
+       OR purchase_order.settlement_method_version_id = sqlc.arg(target_version_id)
 
     UNION ALL
 
@@ -382,6 +426,14 @@ SELECT EXISTS (
        OR intermediary.customer_version_id = sqlc.arg(target_version_id)
        OR intermediary.supplier_object_id = sqlc.arg(target_object_id)
        OR intermediary.supplier_version_id = sqlc.arg(target_version_id)
+       OR intermediary.salesperson_object_id = sqlc.arg(target_object_id)
+       OR intermediary.salesperson_version_id = sqlc.arg(target_version_id)
+       OR intermediary.purchaser_object_id = sqlc.arg(target_object_id)
+       OR intermediary.purchaser_version_id = sqlc.arg(target_version_id)
+       OR intermediary.customer_settlement_method_object_id = sqlc.arg(target_object_id)
+       OR intermediary.customer_settlement_method_version_id = sqlc.arg(target_version_id)
+       OR intermediary.supplier_settlement_method_object_id = sqlc.arg(target_object_id)
+       OR intermediary.supplier_settlement_method_version_id = sqlc.arg(target_version_id)
        OR intermediary.platform_object_id = sqlc.arg(target_object_id)
        OR intermediary.platform_version_id = sqlc.arg(target_version_id)
        OR intermediary.vehicle_object_id = sqlc.arg(target_object_id)
@@ -395,6 +447,8 @@ SELECT EXISTS (
        OR receipt.counterparty_version_id = sqlc.arg(target_version_id)
        OR receipt.fund_account_object_id = sqlc.arg(target_object_id)
        OR receipt.fund_account_version_id = sqlc.arg(target_version_id)
+       OR receipt.handler_object_id = sqlc.arg(target_object_id)
+       OR receipt.handler_version_id = sqlc.arg(target_version_id)
 
     UNION ALL
 
@@ -404,6 +458,8 @@ SELECT EXISTS (
        OR payment.counterparty_version_id = sqlc.arg(target_version_id)
        OR payment.fund_account_object_id = sqlc.arg(target_object_id)
        OR payment.fund_account_version_id = sqlc.arg(target_version_id)
+       OR payment.handler_object_id = sqlc.arg(target_object_id)
+       OR payment.handler_version_id = sqlc.arg(target_version_id)
 
     UNION ALL
 
@@ -422,6 +478,8 @@ SELECT EXISTS (
        OR other_income.counterparty_version_id = sqlc.arg(target_version_id)
        OR other_income.fund_account_object_id = sqlc.arg(target_object_id)
        OR other_income.fund_account_version_id = sqlc.arg(target_version_id)
+       OR other_income.handler_object_id = sqlc.arg(target_object_id)
+       OR other_income.handler_version_id = sqlc.arg(target_version_id)
 
     UNION ALL
 
@@ -470,6 +528,9 @@ DELETE FROM bob_department_versions WHERE version_id = sqlc.arg(version_id);
 
 -- name: DeleteBobPositionDetail :execrows
 DELETE FROM bob_position_versions WHERE version_id = sqlc.arg(version_id);
+
+-- name: DeleteBobSettlementMethodDetail :execrows
+DELETE FROM bob_settlement_method_versions WHERE version_id = sqlc.arg(version_id);
 
 -- name: DeleteBobFirstVersion :execrows
 DELETE FROM bob_versions

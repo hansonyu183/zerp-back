@@ -172,16 +172,50 @@ LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(page_offset);
 
 -- name: InsertVouSaleOrderDetail :exec
 INSERT INTO vou_sale_order_details (
-    document_id, customer_object_id, customer_version_id, customer_code, customer_name
+    document_id, customer_object_id, customer_version_id, customer_code, customer_name,
+    salesperson_object_id, salesperson_version_id, salesperson_code, salesperson_name,
+    warehouse_object_id, warehouse_version_id, warehouse_code, warehouse_name,
+    contact_name, contact_phone, delivery_address,
+    settlement_method_object_id, settlement_method_version_id,
+    settlement_method_code, settlement_method_name, settlement_rule_type,
+    settlement_month_offset, settlement_day_of_month, settlement_day_offset,
+    settlement_description
 ) VALUES (
     sqlc.arg(document_id), sqlc.arg(customer_object_id), sqlc.arg(customer_version_id),
-    sqlc.arg(customer_code), sqlc.arg(customer_name)
+    sqlc.arg(customer_code), sqlc.arg(customer_name),
+    sqlc.arg(salesperson_object_id), sqlc.arg(salesperson_version_id),
+    sqlc.arg(salesperson_code), sqlc.arg(salesperson_name),
+    sqlc.arg(warehouse_object_id), sqlc.arg(warehouse_version_id),
+    sqlc.arg(warehouse_code), sqlc.arg(warehouse_name),
+    sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(delivery_address),
+    sqlc.arg(settlement_method_object_id), sqlc.arg(settlement_method_version_id),
+    sqlc.arg(settlement_method_code), sqlc.arg(settlement_method_name),
+    sqlc.arg(settlement_rule_type), sqlc.arg(settlement_month_offset),
+    sqlc.narg(settlement_day_of_month), sqlc.arg(settlement_day_offset),
+    sqlc.narg(settlement_description)
 );
 
 -- name: UpdateVouSaleOrderDetail :execrows
 UPDATE vou_sale_order_details
 SET customer_object_id = sqlc.arg(customer_object_id), customer_version_id = sqlc.arg(customer_version_id),
-    customer_code = sqlc.arg(customer_code), customer_name = sqlc.arg(customer_name)
+    customer_code = sqlc.arg(customer_code), customer_name = sqlc.arg(customer_name),
+    salesperson_object_id = sqlc.arg(salesperson_object_id),
+    salesperson_version_id = sqlc.arg(salesperson_version_id),
+    salesperson_code = sqlc.arg(salesperson_code), salesperson_name = sqlc.arg(salesperson_name),
+    warehouse_object_id = sqlc.arg(warehouse_object_id),
+    warehouse_version_id = sqlc.arg(warehouse_version_id),
+    warehouse_code = sqlc.arg(warehouse_code), warehouse_name = sqlc.arg(warehouse_name),
+    contact_name = sqlc.narg(contact_name), contact_phone = sqlc.narg(contact_phone),
+    delivery_address = sqlc.narg(delivery_address),
+    settlement_method_object_id = sqlc.arg(settlement_method_object_id),
+    settlement_method_version_id = sqlc.arg(settlement_method_version_id),
+    settlement_method_code = sqlc.arg(settlement_method_code),
+    settlement_method_name = sqlc.arg(settlement_method_name),
+    settlement_rule_type = sqlc.arg(settlement_rule_type),
+    settlement_month_offset = sqlc.arg(settlement_month_offset),
+    settlement_day_of_month = sqlc.narg(settlement_day_of_month),
+    settlement_day_offset = sqlc.arg(settlement_day_offset),
+    settlement_description = sqlc.narg(settlement_description)
 WHERE document_id = sqlc.arg(document_id);
 
 -- name: GetVouSaleOrderDetail :one
@@ -207,16 +241,49 @@ WHERE document_id = sqlc.arg(document_id);
 
 -- name: InsertVouPurchaseOrderDetail :exec
 INSERT INTO vou_purchase_order_details (
-    document_id, supplier_object_id, supplier_version_id, supplier_code, supplier_name
+    document_id, supplier_object_id, supplier_version_id, supplier_code, supplier_name,
+    purchaser_object_id, purchaser_version_id, purchaser_code, purchaser_name,
+    warehouse_object_id, warehouse_version_id, warehouse_code, warehouse_name,
+    contact_name, contact_phone,
+    settlement_method_object_id, settlement_method_version_id,
+    settlement_method_code, settlement_method_name, settlement_rule_type,
+    settlement_month_offset, settlement_day_of_month, settlement_day_offset,
+    settlement_description
 ) VALUES (
     sqlc.arg(document_id), sqlc.arg(supplier_object_id), sqlc.arg(supplier_version_id),
-    sqlc.arg(supplier_code), sqlc.arg(supplier_name)
+    sqlc.arg(supplier_code), sqlc.arg(supplier_name),
+    sqlc.arg(purchaser_object_id), sqlc.arg(purchaser_version_id),
+    sqlc.arg(purchaser_code), sqlc.arg(purchaser_name),
+    sqlc.arg(warehouse_object_id), sqlc.arg(warehouse_version_id),
+    sqlc.arg(warehouse_code), sqlc.arg(warehouse_name),
+    sqlc.narg(contact_name), sqlc.narg(contact_phone),
+    sqlc.arg(settlement_method_object_id), sqlc.arg(settlement_method_version_id),
+    sqlc.arg(settlement_method_code), sqlc.arg(settlement_method_name),
+    sqlc.arg(settlement_rule_type), sqlc.arg(settlement_month_offset),
+    sqlc.narg(settlement_day_of_month), sqlc.arg(settlement_day_offset),
+    sqlc.narg(settlement_description)
 );
 
 -- name: UpdateVouPurchaseOrderDetail :execrows
 UPDATE vou_purchase_order_details
 SET supplier_object_id = sqlc.arg(supplier_object_id), supplier_version_id = sqlc.arg(supplier_version_id),
-    supplier_code = sqlc.arg(supplier_code), supplier_name = sqlc.arg(supplier_name)
+    supplier_code = sqlc.arg(supplier_code), supplier_name = sqlc.arg(supplier_name),
+    purchaser_object_id = sqlc.arg(purchaser_object_id),
+    purchaser_version_id = sqlc.arg(purchaser_version_id),
+    purchaser_code = sqlc.arg(purchaser_code), purchaser_name = sqlc.arg(purchaser_name),
+    warehouse_object_id = sqlc.arg(warehouse_object_id),
+    warehouse_version_id = sqlc.arg(warehouse_version_id),
+    warehouse_code = sqlc.arg(warehouse_code), warehouse_name = sqlc.arg(warehouse_name),
+    contact_name = sqlc.narg(contact_name), contact_phone = sqlc.narg(contact_phone),
+    settlement_method_object_id = sqlc.arg(settlement_method_object_id),
+    settlement_method_version_id = sqlc.arg(settlement_method_version_id),
+    settlement_method_code = sqlc.arg(settlement_method_code),
+    settlement_method_name = sqlc.arg(settlement_method_name),
+    settlement_rule_type = sqlc.arg(settlement_rule_type),
+    settlement_month_offset = sqlc.arg(settlement_month_offset),
+    settlement_day_of_month = sqlc.narg(settlement_day_of_month),
+    settlement_day_offset = sqlc.arg(settlement_day_offset),
+    settlement_description = sqlc.narg(settlement_description)
 WHERE document_id = sqlc.arg(document_id);
 
 -- name: GetVouPurchaseOrderDetail :one
@@ -234,11 +301,41 @@ WHERE document_id = sqlc.arg(document_id);
 -- name: InsertVouIntermediarySaleOrderDetail :exec
 INSERT INTO vou_intermediary_sale_order_details (
     document_id, customer_object_id, customer_version_id, customer_code, customer_name,
-    supplier_object_id, supplier_version_id, supplier_code, supplier_name
+    supplier_object_id, supplier_version_id, supplier_code, supplier_name,
+    salesperson_object_id, salesperson_version_id, salesperson_code, salesperson_name,
+    purchaser_object_id, purchaser_version_id, purchaser_code, purchaser_name,
+    contact_name, contact_phone, delivery_address,
+    customer_settlement_method_object_id, customer_settlement_method_version_id,
+    customer_settlement_method_code, customer_settlement_method_name,
+    customer_settlement_rule_type, customer_settlement_month_offset,
+    customer_settlement_day_of_month, customer_settlement_day_offset,
+    customer_settlement_description,
+    supplier_settlement_method_object_id, supplier_settlement_method_version_id,
+    supplier_settlement_method_code, supplier_settlement_method_name,
+    supplier_settlement_rule_type, supplier_settlement_month_offset,
+    supplier_settlement_day_of_month, supplier_settlement_day_offset,
+    supplier_settlement_description
 ) VALUES (
     sqlc.arg(document_id), sqlc.arg(customer_object_id), sqlc.arg(customer_version_id),
     sqlc.arg(customer_code), sqlc.arg(customer_name), sqlc.arg(supplier_object_id),
-    sqlc.arg(supplier_version_id), sqlc.arg(supplier_code), sqlc.arg(supplier_name)
+    sqlc.arg(supplier_version_id), sqlc.arg(supplier_code), sqlc.arg(supplier_name),
+    sqlc.arg(salesperson_object_id), sqlc.arg(salesperson_version_id),
+    sqlc.arg(salesperson_code), sqlc.arg(salesperson_name),
+    sqlc.arg(purchaser_object_id), sqlc.arg(purchaser_version_id),
+    sqlc.arg(purchaser_code), sqlc.arg(purchaser_name),
+    sqlc.narg(contact_name), sqlc.narg(contact_phone), sqlc.narg(delivery_address),
+    sqlc.arg(customer_settlement_method_object_id),
+    sqlc.arg(customer_settlement_method_version_id),
+    sqlc.arg(customer_settlement_method_code), sqlc.arg(customer_settlement_method_name),
+    sqlc.arg(customer_settlement_rule_type), sqlc.arg(customer_settlement_month_offset),
+    sqlc.narg(customer_settlement_day_of_month), sqlc.arg(customer_settlement_day_offset),
+    sqlc.narg(customer_settlement_description),
+    sqlc.arg(supplier_settlement_method_object_id),
+    sqlc.arg(supplier_settlement_method_version_id),
+    sqlc.arg(supplier_settlement_method_code), sqlc.arg(supplier_settlement_method_name),
+    sqlc.arg(supplier_settlement_rule_type), sqlc.arg(supplier_settlement_month_offset),
+    sqlc.narg(supplier_settlement_day_of_month), sqlc.arg(supplier_settlement_day_offset),
+    sqlc.narg(supplier_settlement_description)
 );
 
 -- name: UpdateVouIntermediarySaleOrderDetail :execrows
@@ -246,7 +343,33 @@ UPDATE vou_intermediary_sale_order_details
 SET customer_object_id = sqlc.arg(customer_object_id), customer_version_id = sqlc.arg(customer_version_id),
     customer_code = sqlc.arg(customer_code), customer_name = sqlc.arg(customer_name),
     supplier_object_id = sqlc.arg(supplier_object_id), supplier_version_id = sqlc.arg(supplier_version_id),
-    supplier_code = sqlc.arg(supplier_code), supplier_name = sqlc.arg(supplier_name)
+    supplier_code = sqlc.arg(supplier_code), supplier_name = sqlc.arg(supplier_name),
+    salesperson_object_id = sqlc.arg(salesperson_object_id),
+    salesperson_version_id = sqlc.arg(salesperson_version_id),
+    salesperson_code = sqlc.arg(salesperson_code), salesperson_name = sqlc.arg(salesperson_name),
+    purchaser_object_id = sqlc.arg(purchaser_object_id),
+    purchaser_version_id = sqlc.arg(purchaser_version_id),
+    purchaser_code = sqlc.arg(purchaser_code), purchaser_name = sqlc.arg(purchaser_name),
+    contact_name = sqlc.narg(contact_name), contact_phone = sqlc.narg(contact_phone),
+    delivery_address = sqlc.narg(delivery_address),
+    customer_settlement_method_object_id = sqlc.arg(customer_settlement_method_object_id),
+    customer_settlement_method_version_id = sqlc.arg(customer_settlement_method_version_id),
+    customer_settlement_method_code = sqlc.arg(customer_settlement_method_code),
+    customer_settlement_method_name = sqlc.arg(customer_settlement_method_name),
+    customer_settlement_rule_type = sqlc.arg(customer_settlement_rule_type),
+    customer_settlement_month_offset = sqlc.arg(customer_settlement_month_offset),
+    customer_settlement_day_of_month = sqlc.narg(customer_settlement_day_of_month),
+    customer_settlement_day_offset = sqlc.arg(customer_settlement_day_offset),
+    customer_settlement_description = sqlc.narg(customer_settlement_description),
+    supplier_settlement_method_object_id = sqlc.arg(supplier_settlement_method_object_id),
+    supplier_settlement_method_version_id = sqlc.arg(supplier_settlement_method_version_id),
+    supplier_settlement_method_code = sqlc.arg(supplier_settlement_method_code),
+    supplier_settlement_method_name = sqlc.arg(supplier_settlement_method_name),
+    supplier_settlement_rule_type = sqlc.arg(supplier_settlement_rule_type),
+    supplier_settlement_month_offset = sqlc.arg(supplier_settlement_month_offset),
+    supplier_settlement_day_of_month = sqlc.narg(supplier_settlement_day_of_month),
+    supplier_settlement_day_offset = sqlc.arg(supplier_settlement_day_offset),
+    supplier_settlement_description = sqlc.narg(supplier_settlement_description)
 WHERE document_id = sqlc.arg(document_id);
 
 -- name: GetVouIntermediarySaleOrderDetail :one
@@ -274,12 +397,15 @@ WHERE document_id = sqlc.arg(document_id);
 INSERT INTO vou_receipt_details (
     document_id, counterparty_entity, counterparty_object_id, counterparty_version_id,
     counterparty_code, counterparty_name, fund_account_object_id, fund_account_version_id,
-    fund_account_code, fund_account_name
+    fund_account_code, fund_account_name,
+    handler_object_id, handler_version_id, handler_code, handler_name
 ) VALUES (
     sqlc.arg(document_id), sqlc.arg(counterparty_entity), sqlc.arg(counterparty_object_id),
     sqlc.arg(counterparty_version_id), sqlc.arg(counterparty_code), sqlc.arg(counterparty_name),
     sqlc.arg(fund_account_object_id), sqlc.arg(fund_account_version_id),
-    sqlc.arg(fund_account_code), sqlc.arg(fund_account_name)
+    sqlc.arg(fund_account_code), sqlc.arg(fund_account_name),
+    sqlc.arg(handler_object_id), sqlc.arg(handler_version_id),
+    sqlc.arg(handler_code), sqlc.arg(handler_name)
 );
 
 -- name: UpdateVouReceiptDetail :execrows
@@ -288,7 +414,9 @@ SET counterparty_entity = sqlc.arg(counterparty_entity), counterparty_object_id 
     counterparty_version_id = sqlc.arg(counterparty_version_id), counterparty_code = sqlc.arg(counterparty_code),
     counterparty_name = sqlc.arg(counterparty_name), fund_account_object_id = sqlc.arg(fund_account_object_id),
     fund_account_version_id = sqlc.arg(fund_account_version_id), fund_account_code = sqlc.arg(fund_account_code),
-    fund_account_name = sqlc.arg(fund_account_name)
+    fund_account_name = sqlc.arg(fund_account_name),
+    handler_object_id = sqlc.arg(handler_object_id), handler_version_id = sqlc.arg(handler_version_id),
+    handler_code = sqlc.arg(handler_code), handler_name = sqlc.arg(handler_name)
 WHERE document_id = sqlc.arg(document_id);
 
 -- name: GetVouReceiptDetail :one
@@ -298,12 +426,15 @@ SELECT * FROM vou_receipt_details WHERE document_id = sqlc.arg(document_id);
 INSERT INTO vou_payment_details (
     document_id, counterparty_entity, counterparty_object_id, counterparty_version_id,
     counterparty_code, counterparty_name, fund_account_object_id, fund_account_version_id,
-    fund_account_code, fund_account_name
+    fund_account_code, fund_account_name,
+    handler_object_id, handler_version_id, handler_code, handler_name
 ) VALUES (
     sqlc.arg(document_id), sqlc.arg(counterparty_entity), sqlc.arg(counterparty_object_id),
     sqlc.arg(counterparty_version_id), sqlc.arg(counterparty_code), sqlc.arg(counterparty_name),
     sqlc.arg(fund_account_object_id), sqlc.arg(fund_account_version_id),
-    sqlc.arg(fund_account_code), sqlc.arg(fund_account_name)
+    sqlc.arg(fund_account_code), sqlc.arg(fund_account_name),
+    sqlc.arg(handler_object_id), sqlc.arg(handler_version_id),
+    sqlc.arg(handler_code), sqlc.arg(handler_name)
 );
 
 -- name: UpdateVouPaymentDetail :execrows
@@ -312,7 +443,9 @@ SET counterparty_entity = sqlc.arg(counterparty_entity), counterparty_object_id 
     counterparty_version_id = sqlc.arg(counterparty_version_id), counterparty_code = sqlc.arg(counterparty_code),
     counterparty_name = sqlc.arg(counterparty_name), fund_account_object_id = sqlc.arg(fund_account_object_id),
     fund_account_version_id = sqlc.arg(fund_account_version_id), fund_account_code = sqlc.arg(fund_account_code),
-    fund_account_name = sqlc.arg(fund_account_name)
+    fund_account_name = sqlc.arg(fund_account_name),
+    handler_object_id = sqlc.arg(handler_object_id), handler_version_id = sqlc.arg(handler_version_id),
+    handler_code = sqlc.arg(handler_code), handler_name = sqlc.arg(handler_name)
 WHERE document_id = sqlc.arg(document_id);
 
 -- name: GetVouPaymentDetail :one
@@ -344,13 +477,16 @@ SELECT * FROM vou_expense_reimbursement_details WHERE document_id = sqlc.arg(doc
 INSERT INTO vou_other_income_details (
     document_id, source_name, counterparty_entity, counterparty_object_id, counterparty_version_id,
     counterparty_code, counterparty_name, fund_account_object_id, fund_account_version_id,
-    fund_account_code, fund_account_name
+    fund_account_code, fund_account_name,
+    handler_object_id, handler_version_id, handler_code, handler_name
 ) VALUES (
     sqlc.arg(document_id), sqlc.arg(source_name), sqlc.narg(counterparty_entity),
     sqlc.narg(counterparty_object_id), sqlc.narg(counterparty_version_id),
     sqlc.narg(counterparty_code), sqlc.narg(counterparty_name),
     sqlc.arg(fund_account_object_id), sqlc.arg(fund_account_version_id),
-    sqlc.arg(fund_account_code), sqlc.arg(fund_account_name)
+    sqlc.arg(fund_account_code), sqlc.arg(fund_account_name),
+    sqlc.arg(handler_object_id), sqlc.arg(handler_version_id),
+    sqlc.arg(handler_code), sqlc.arg(handler_name)
 );
 
 -- name: UpdateVouOtherIncomeDetail :execrows
@@ -361,7 +497,9 @@ SET source_name = sqlc.arg(source_name), counterparty_entity = sqlc.narg(counter
     counterparty_code = sqlc.narg(counterparty_code), counterparty_name = sqlc.narg(counterparty_name),
     fund_account_object_id = sqlc.arg(fund_account_object_id),
     fund_account_version_id = sqlc.arg(fund_account_version_id),
-    fund_account_code = sqlc.arg(fund_account_code), fund_account_name = sqlc.arg(fund_account_name)
+    fund_account_code = sqlc.arg(fund_account_code), fund_account_name = sqlc.arg(fund_account_name),
+    handler_object_id = sqlc.arg(handler_object_id), handler_version_id = sqlc.arg(handler_version_id),
+    handler_code = sqlc.arg(handler_code), handler_name = sqlc.arg(handler_name)
 WHERE document_id = sqlc.arg(document_id);
 
 -- name: GetVouOtherIncomeDetail :one
@@ -373,12 +511,13 @@ DELETE FROM vou_product_lines WHERE document_id = sqlc.arg(document_id);
 -- name: InsertVouProductLine :exec
 INSERT INTO vou_product_lines (
     id, document_id, document_entity, line_no, product_object_id, product_version_id,
-    product_code, product_name, product_unit, ordered_qty_micros, unit_price_cents, line_amount_cents
+    product_code, product_name, product_unit, ordered_qty_micros, unit_price_cents,
+    line_amount_cents, remark
 ) VALUES (
     sqlc.arg(id), sqlc.arg(document_id), sqlc.arg(document_entity), sqlc.arg(line_no),
     sqlc.arg(product_object_id), sqlc.arg(product_version_id), sqlc.arg(product_code),
     sqlc.arg(product_name), sqlc.arg(product_unit), sqlc.arg(ordered_qty_micros),
-    sqlc.arg(unit_price_cents), sqlc.arg(line_amount_cents)
+    sqlc.arg(unit_price_cents), sqlc.arg(line_amount_cents), sqlc.narg(remark)
 );
 
 -- name: ListVouProductLines :many
@@ -410,10 +549,10 @@ DELETE FROM vou_expense_lines WHERE document_id = sqlc.arg(document_id);
 
 -- name: InsertVouExpenseLine :exec
 INSERT INTO vou_expense_lines (
-    id, document_id, line_no, category, description, amount_cents
+    id, document_id, line_no, category, description, amount_cents, remark
 ) VALUES (
     sqlc.arg(id), sqlc.arg(document_id), sqlc.arg(line_no),
-    sqlc.arg(category), sqlc.arg(description), sqlc.arg(amount_cents)
+    sqlc.arg(category), sqlc.arg(description), sqlc.arg(amount_cents), sqlc.narg(remark)
 );
 
 -- name: ListVouExpenseLines :many

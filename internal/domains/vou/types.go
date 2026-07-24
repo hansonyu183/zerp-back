@@ -61,12 +61,14 @@ type ProductLineInput struct {
 	Product         ReferenceInput `json:"product"`
 	OrderedQuantity string         `json:"orderedQuantity"`
 	UnitPrice       string         `json:"unitPrice"`
+	Remark          string         `json:"remark,omitempty"`
 }
 
 type ExpenseLineInput struct {
 	Category    string `json:"category"`
 	Description string `json:"description"`
 	Amount      string `json:"amount"`
+	Remark      string `json:"remark,omitempty"`
 }
 
 type DraftInput struct {
@@ -78,6 +80,10 @@ type DraftInput struct {
 	CounterpartyType string             `json:"counterpartyType,omitempty"`
 	Counterparty     *ReferenceInput    `json:"counterparty,omitempty"`
 	Employee         *ReferenceInput    `json:"employee,omitempty"`
+	Salesperson      *ReferenceInput    `json:"salesperson,omitempty"`
+	Purchaser        *ReferenceInput    `json:"purchaser,omitempty"`
+	Handler          *ReferenceInput    `json:"handler,omitempty"`
+	Warehouse        *ReferenceInput    `json:"warehouse,omitempty"`
 	FundAccount      *ReferenceInput    `json:"fundAccount,omitempty"`
 	SourceName       string             `json:"sourceName,omitempty"`
 	Amount           string             `json:"amount,omitempty"`
@@ -200,6 +206,7 @@ type ProductLineView struct {
 	OrderedQuantity  string        `json:"orderedQuantity"`
 	UnitPrice        string        `json:"unitPrice"`
 	LineAmount       string        `json:"lineAmount"`
+	Remark           string        `json:"remark,omitempty"`
 	OutboundQuantity string        `json:"outboundQuantity,omitempty"`
 	SignedQuantity   string        `json:"signedQuantity,omitempty"`
 	RejectedQuantity string        `json:"rejectedQuantity,omitempty"`
@@ -213,6 +220,19 @@ type ExpenseLineView struct {
 	Category    string `json:"category"`
 	Description string `json:"description"`
 	Amount      string `json:"amount"`
+	Remark      string `json:"remark,omitempty"`
+}
+
+type SettlementMethodSnapshotView struct {
+	ObjectID    string `json:"objectId"`
+	VersionID   string `json:"versionId"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	RuleType    string `json:"ruleType"`
+	MonthOffset int32  `json:"monthOffset"`
+	DayOfMonth  *int32 `json:"dayOfMonth,omitempty"`
+	DayOffset   int32  `json:"dayOffset"`
+	Description string `json:"description,omitempty"`
 }
 
 type AttachmentView struct {
@@ -228,23 +248,33 @@ type AttachmentView struct {
 }
 
 type DocumentDataView struct {
-	BusinessDate     string            `json:"businessDate"`
-	Currency         string            `json:"currency"`
-	Remark           string            `json:"remark,omitempty"`
-	Customer         *ReferenceView    `json:"customer,omitempty"`
-	Supplier         *ReferenceView    `json:"supplier,omitempty"`
-	Counterparty     *ReferenceView    `json:"counterparty,omitempty"`
-	Employee         *ReferenceView    `json:"employee,omitempty"`
-	FundAccount      *ReferenceView    `json:"fundAccount,omitempty"`
-	SourceName       string            `json:"sourceName,omitempty"`
-	ProductLines     []ProductLineView `json:"productLines,omitempty"`
-	ExpenseLines     []ExpenseLineView `json:"expenseLines,omitempty"`
-	OutboundDate     string            `json:"outboundDate,omitempty"`
-	SignoffDate      string            `json:"signoffDate,omitempty"`
-	InboundDate      string            `json:"inboundDate,omitempty"`
-	Platform         *ReferenceView    `json:"platform,omitempty"`
-	Vehicle          *ReferenceView    `json:"vehicle,omitempty"`
-	DifferenceReason string            `json:"differenceReason,omitempty"`
+	BusinessDate             string                        `json:"businessDate"`
+	Currency                 string                        `json:"currency"`
+	Remark                   string                        `json:"remark,omitempty"`
+	Customer                 *ReferenceView                `json:"customer,omitempty"`
+	Supplier                 *ReferenceView                `json:"supplier,omitempty"`
+	Counterparty             *ReferenceView                `json:"counterparty,omitempty"`
+	Employee                 *ReferenceView                `json:"employee,omitempty"`
+	Salesperson              *ReferenceView                `json:"salesperson,omitempty"`
+	Purchaser                *ReferenceView                `json:"purchaser,omitempty"`
+	Handler                  *ReferenceView                `json:"handler,omitempty"`
+	Warehouse                *ReferenceView                `json:"warehouse,omitempty"`
+	FundAccount              *ReferenceView                `json:"fundAccount,omitempty"`
+	ContactName              string                        `json:"contactName,omitempty"`
+	ContactPhone             string                        `json:"contactPhone,omitempty"`
+	DeliveryAddress          string                        `json:"deliveryAddress,omitempty"`
+	SettlementMethod         *SettlementMethodSnapshotView `json:"settlementMethod,omitempty"`
+	CustomerSettlementMethod *SettlementMethodSnapshotView `json:"customerSettlementMethod,omitempty"`
+	SupplierSettlementMethod *SettlementMethodSnapshotView `json:"supplierSettlementMethod,omitempty"`
+	SourceName               string                        `json:"sourceName,omitempty"`
+	ProductLines             []ProductLineView             `json:"productLines,omitempty"`
+	ExpenseLines             []ExpenseLineView             `json:"expenseLines,omitempty"`
+	OutboundDate             string                        `json:"outboundDate,omitempty"`
+	SignoffDate              string                        `json:"signoffDate,omitempty"`
+	InboundDate              string                        `json:"inboundDate,omitempty"`
+	Platform                 *ReferenceView                `json:"platform,omitempty"`
+	Vehicle                  *ReferenceView                `json:"vehicle,omitempty"`
+	DifferenceReason         string                        `json:"differenceReason,omitempty"`
 }
 
 type DocumentView struct {

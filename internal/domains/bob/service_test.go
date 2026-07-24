@@ -33,6 +33,10 @@ func TestValidateCreateNormalizesCodeAndEntityFields(t *testing.T) {
 		{EntityCategory, CreateDetailInput{Code: "cat01", Name: "产品分类", TargetEntity: EntityProduct}},
 		{EntityDepartment, CreateDetailInput{Code: "dept01", Name: "运营部"}},
 		{EntityPosition, CreateDetailInput{Code: "pos01", Name: "主管"}},
+		{EntitySettlementMethod, CreateDetailInput{
+			Code: "sm01", Name: "月结 30 天", RuleType: SettlementRuleRelativeDays,
+			DayOffset: 30,
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.entity, func(t *testing.T) {
@@ -77,6 +81,37 @@ func TestValidateSupplierTypeCompatibility(t *testing.T) {
 	invalid := "OTHER"
 	if _, err = validateDetail(EntitySupplier, DetailInput{Name: "错误类型", SupplierType: &invalid}); !errorIsKind(err, ErrorValidation) {
 		t.Fatalf("invalid supplier type error = %v", err)
+	}
+}
+
+func TestValidateSettlementMethodRules(t *testing.T) {
+	day15 := int32(15)
+	valid := []CreateDetailInput{
+		{Code: "SM-REL", Name: "相对天数", RuleType: SettlementRuleRelativeDays, DayOffset: -30},
+		{Code: "SM-EOM", Name: "月末", RuleType: SettlementRuleMonthEnd, MonthOffset: 120, DayOffset: 3650},
+		{Code: "SM-FIX", Name: "固定日", RuleType: SettlementRuleFixedDay, MonthOffset: 1, DayOfMonth: &day15},
+	}
+	for _, input := range valid {
+		if _, _, err := validateCreate(EntitySettlementMethod, input); err != nil {
+			t.Fatalf("valid settlement rule %+v rejected: %v", input, err)
+		}
+	}
+
+	day0, day32 := int32(0), int32(32)
+	invalid := []CreateDetailInput{
+		{Code: "SM-BAD-1", Name: "缺少类型"},
+		{Code: "SM-BAD-2", Name: "相对天数带月份", RuleType: SettlementRuleRelativeDays, MonthOffset: 1},
+		{Code: "SM-BAD-3", Name: "月末带日期", RuleType: SettlementRuleMonthEnd, DayOfMonth: &day15},
+		{Code: "SM-BAD-4", Name: "固定日缺日期", RuleType: SettlementRuleFixedDay},
+		{Code: "SM-BAD-5", Name: "固定日为零", RuleType: SettlementRuleFixedDay, DayOfMonth: &day0},
+		{Code: "SM-BAD-6", Name: "固定日越界", RuleType: SettlementRuleFixedDay, DayOfMonth: &day32},
+		{Code: "SM-BAD-7", Name: "月份越界", RuleType: SettlementRuleMonthEnd, MonthOffset: 121},
+		{Code: "SM-BAD-8", Name: "天数越界", RuleType: SettlementRuleRelativeDays, DayOffset: -3651},
+	}
+	for _, input := range invalid {
+		if _, _, err := validateCreate(EntitySettlementMethod, input); !errorIsKind(err, ErrorValidation) {
+			t.Fatalf("invalid settlement rule %+v error = %v", input, err)
+		}
 	}
 }
 
@@ -235,6 +270,9 @@ func TestCommonAttributesNormalizeAndValidate(t *testing.T) {
 		{"long remark", EntityService, CreateDetailInput{
 			Code: "SERVICE-2", Name: "服务", Unit: "次", Remark: strings.Repeat("注", 1001),
 		}},
+		{"invalid customer salesperson id", EntityCustomer, CreateDetailInput{
+			Code: "CUSTOMER-4", Name: "客户", SalespersonID: "not-an-object-id",
+		}},
 	}
 	for _, test := range invalidCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -249,22 +287,28 @@ func TestCommonAttributeSaveOmissionAndExplicitClear(t *testing.T) {
 	current := DetailView{
 		Name: "客户", CustomerType: CustomerTypeDealer, ShortName: "简称",
 		TaxNumber: "TAX001", CategoryID: "01J00000000000000000000020",
+		SettlementMethodID: "01J00000000000000000000021",
+		SalespersonID:      "01J00000000000000000000022",
 	}
 	var omitted DetailInput
 	if err := json.Unmarshal([]byte(`{"name":"更新客户"}`), &omitted); err != nil {
 		t.Fatalf("decode omitted input: %v", err)
 	}
 	merged := mergeDetailInput(current, omitted)
-	if merged.ShortName != "简称" || merged.TaxNumber != "TAX001" || merged.CategoryID == "" {
+	if merged.ShortName != "简称" || merged.TaxNumber != "TAX001" || merged.CategoryID == "" ||
+		merged.SettlementMethodID == "" || merged.SalespersonID == "" {
 		t.Fatalf("omitted fields were not preserved: %+v", merged)
 	}
 
 	var cleared DetailInput
-	if err := json.Unmarshal([]byte(`{"name":"更新客户","shortName":null,"taxNumber":""}`), &cleared); err != nil {
+	if err := json.Unmarshal([]byte(
+		`{"name":"更新客户","shortName":null,"taxNumber":"","settlementMethodId":null,"salespersonId":""}`,
+	), &cleared); err != nil {
 		t.Fatalf("decode clear input: %v", err)
 	}
 	merged = mergeDetailInput(current, cleared)
-	if merged.ShortName != "" || merged.TaxNumber != "" || merged.CategoryID == "" {
+	if merged.ShortName != "" || merged.TaxNumber != "" || merged.CategoryID == "" ||
+		merged.SettlementMethodID != "" || merged.SalespersonID != "" {
 		t.Fatalf("explicit clear failed: %+v", merged)
 	}
 }
@@ -288,6 +332,9 @@ func TestCategoryAndQueryFilterValidation(t *testing.T) {
 	}
 	if _, err := validateQueryFilters(EntityProduct, QueryFilters{CustomerType: CustomerTypeDealer}); !errorIsKind(err, ErrorValidation) {
 		t.Fatalf("cross-entity filter error = %v", err)
+	}
+	if _, err := validateQueryFilters(EntitySettlementMethod, QueryFilters{}); err != nil {
+		t.Fatalf("settlement method query rejected: %v", err)
 	}
 	if _, err := validateQueryFilters(EntityCategory, QueryFilters{
 		ParentID: "01J00000000000000000000020", RootOnly: true,

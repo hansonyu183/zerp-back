@@ -19,6 +19,7 @@ func TestValidateDraftByEntity(t *testing.T) {
 	product := *refInput()
 	sale, err := validateDraft(EntitySaleOrder, DraftInput{
 		BusinessDate: "2026-07-24", Currency: "cny", Customer: refInput(),
+		Salesperson: refInput(), Warehouse: refInput(),
 		ProductLines: []ProductLineInput{{Product: product, OrderedQuantity: "2.5", UnitPrice: "10.00"}},
 	})
 	if err != nil {
@@ -39,11 +40,35 @@ func TestValidateDraftByEntity(t *testing.T) {
 	}
 }
 
+func TestValidateLineRemarkBoundaries(t *testing.T) {
+	t.Parallel()
+	product := *refInput()
+	if _, _, err := validateProductLines([]ProductLineInput{{
+		Product: product, OrderedQuantity: "1", UnitPrice: "1.00",
+		Remark: strings.Repeat("注", 1000),
+	}}); err != nil {
+		t.Fatalf("1000-character product remark rejected: %v", err)
+	}
+	if _, _, err := validateProductLines([]ProductLineInput{{
+		Product: product, OrderedQuantity: "1", UnitPrice: "1.00",
+		Remark: strings.Repeat("注", 1001),
+	}}); err == nil {
+		t.Fatalf("1001-character product remark error = %v", err)
+	}
+	if _, _, err := validateExpenseLines([]ExpenseLineInput{{
+		Category: "交通", Description: "出租车", Amount: "1.00",
+		Remark: strings.Repeat("注", 1001),
+	}}); err == nil {
+		t.Fatalf("1001-character expense remark error = %v", err)
+	}
+}
+
 func TestValidateDraftRejectsCrossEntityAndDuplicateProduct(t *testing.T) {
 	t.Parallel()
 	product := *refInput()
 	_, err := validateDraft(EntitySaleOrder, DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", Customer: refInput(), FundAccount: refInput(),
+		Salesperson: refInput(), Warehouse: refInput(),
 		ProductLines: []ProductLineInput{{Product: product, OrderedQuantity: "1", UnitPrice: "1.00"}},
 	})
 	if err == nil {
@@ -51,6 +76,7 @@ func TestValidateDraftRejectsCrossEntityAndDuplicateProduct(t *testing.T) {
 	}
 	_, err = validateDraft(EntityPurchaseOrder, DraftInput{
 		BusinessDate: "2026-07-24", Currency: "CNY", Supplier: refInput(),
+		Purchaser: refInput(), Warehouse: refInput(),
 		ProductLines: []ProductLineInput{
 			{Product: product, OrderedQuantity: "1", UnitPrice: "1.00"},
 			{Product: product, OrderedQuantity: "2", UnitPrice: "1.00"},

@@ -74,6 +74,8 @@ func NewService(
 
 type resolvedDraft struct {
 	Customer, Supplier, Counterparty, Employee, FundAccount *bobdomain.EffectiveReference
+	Salesperson, Purchaser, Handler, Warehouse              *bobdomain.EffectiveReference
+	CustomerSettlement, SupplierSettlement                  *bobdomain.EffectiveReference
 	Products                                                []bobdomain.EffectiveReference
 }
 
@@ -204,6 +206,9 @@ func (s *Service) Review(
 	if err = documentWriteConflict(err, document.Revision, input.Revision, document.Status, StatusDraft); err != nil {
 		return MutationResult{}, err
 	}
+	if err = s.validateStoredAttributes(ctx, q, entity, input.DocumentID); err != nil {
+		return MutationResult{}, err
+	}
 	pending, err := q.CountPendingVouAttachments(ctx, input.DocumentID)
 	if err != nil {
 		return MutationResult{}, s.internal("count pending attachments", err)
@@ -264,6 +269,9 @@ func (s *Service) forwardTransition(
 	q := s.queries.WithTx(tx)
 	document, err := q.LockVouDocument(ctx, dbsqlc.LockVouDocumentParams{ID: input.DocumentID, Entity: entity})
 	if err = documentWriteConflict(err, document.Revision, input.Revision, document.Status, from); err != nil {
+		return MutationResult{}, err
+	}
+	if err = s.validateStoredAttributes(ctx, q, entity, input.DocumentID); err != nil {
 		return MutationResult{}, err
 	}
 	var revision int64
@@ -356,6 +364,9 @@ func (s *Service) Execute(
 	q := s.queries.WithTx(tx)
 	document, err := q.LockVouDocument(ctx, dbsqlc.LockVouDocumentParams{ID: input.DocumentID, Entity: entity})
 	if err = documentWriteConflict(err, document.Revision, input.Revision, document.Status, StatusApproved); err != nil {
+		return MutationResult{}, err
+	}
+	if err = s.validateStoredAttributes(ctx, q, entity, input.DocumentID); err != nil {
 		return MutationResult{}, err
 	}
 	var summary map[string]any
@@ -594,11 +605,47 @@ func (s *Service) resolveDraft(
 	if result.Employee, err = resolve(bobdomain.EntityEmployee, draft.Employee); err != nil {
 		return result, err
 	}
+	if result.Salesperson, err = resolve(bobdomain.EntityEmployee, draft.Salesperson); err != nil {
+		return result, err
+	}
+	if result.Purchaser, err = resolve(bobdomain.EntityEmployee, draft.Purchaser); err != nil {
+		return result, err
+	}
+	if result.Handler, err = resolve(bobdomain.EntityEmployee, draft.Handler); err != nil {
+		return result, err
+	}
+	if result.Warehouse, err = resolve(bobdomain.EntityWarehouse, draft.Warehouse); err != nil {
+		return result, err
+	}
 	if result.FundAccount, err = resolve(bobdomain.EntityFundAccount, draft.FundAccount); err != nil {
 		return result, err
 	}
 	if result.FundAccount != nil && result.FundAccount.Data.Currency != draft.Currency {
 		return result, domainError(ErrorConflict, "fund account currency does not match document currency", nil, nil)
+	}
+	resolveSettlement := func(
+		party *bobdomain.EffectiveReference, label string,
+	) (*bobdomain.EffectiveReference, error) {
+		if party == nil || party.Data.SettlementMethodID == "" ||
+			party.Data.SettlementMethodVersionID == "" {
+			return nil, domainError(ErrorConflict, label+" settlement method is not configured", nil, nil)
+		}
+		return resolve(bobdomain.EntitySettlementMethod, &ReferenceInput{
+			ObjectID: party.Data.SettlementMethodID, VersionID: party.Data.SettlementMethodVersionID,
+		})
+	}
+	switch entity {
+	case EntitySaleOrder:
+		result.CustomerSettlement, err = resolveSettlement(result.Customer, "customer")
+	case EntityPurchaseOrder:
+		result.SupplierSettlement, err = resolveSettlement(result.Supplier, "supplier")
+	case EntityIntermediarySaleOrder:
+		if result.CustomerSettlement, err = resolveSettlement(result.Customer, "customer"); err == nil {
+			result.SupplierSettlement, err = resolveSettlement(result.Supplier, "supplier")
+		}
+	}
+	if err != nil {
+		return result, err
 	}
 	for _, line := range draft.ProductLines {
 		product, resolveErr := resolve(bobdomain.EntityProduct, &line.Product)
@@ -633,44 +680,150 @@ func (s *Service) writeDetail(
 ) error {
 	switch entity {
 	case EntitySaleOrder:
+		settlement := settlementSnapshot(refs.CustomerSettlement)
 		params := dbsqlc.InsertVouSaleOrderDetailParams{
 			DocumentID: documentID, CustomerObjectID: refs.Customer.ObjectID,
 			CustomerVersionID: refs.Customer.VersionID, CustomerCode: refs.Customer.Code, CustomerName: refs.Customer.Data.Name,
+			SalespersonObjectID:  stringPtr(refs.Salesperson.ObjectID),
+			SalespersonVersionID: stringPtr(refs.Salesperson.VersionID),
+			SalespersonCode:      stringPtr(refs.Salesperson.Code), SalespersonName: stringPtr(refs.Salesperson.Data.Name),
+			WarehouseObjectID:  stringPtr(refs.Warehouse.ObjectID),
+			WarehouseVersionID: stringPtr(refs.Warehouse.VersionID),
+			WarehouseCode:      stringPtr(refs.Warehouse.Code), WarehouseName: stringPtr(refs.Warehouse.Data.Name),
+			ContactName:              optionalText(refs.Customer.Data.ContactName),
+			ContactPhone:             optionalText(refs.Customer.Data.ContactPhone),
+			DeliveryAddress:          optionalText(refs.Customer.Data.Address),
+			SettlementMethodObjectID: settlement.ObjectID, SettlementMethodVersionID: settlement.VersionID,
+			SettlementMethodCode: settlement.Code, SettlementMethodName: settlement.Name,
+			SettlementRuleType: settlement.RuleType, SettlementMonthOffset: settlement.MonthOffset,
+			SettlementDayOfMonth: settlement.DayOfMonth, SettlementDayOffset: settlement.DayOffset,
+			SettlementDescription: settlement.Description,
 		}
 		if update {
 			rows, err := q.UpdateVouSaleOrderDetail(ctx, dbsqlc.UpdateVouSaleOrderDetailParams{
 				CustomerObjectID: params.CustomerObjectID, CustomerVersionID: params.CustomerVersionID,
-				CustomerCode: params.CustomerCode, CustomerName: params.CustomerName, DocumentID: documentID,
+				CustomerCode: params.CustomerCode, CustomerName: params.CustomerName,
+				SalespersonObjectID: params.SalespersonObjectID, SalespersonVersionID: params.SalespersonVersionID,
+				SalespersonCode: params.SalespersonCode, SalespersonName: params.SalespersonName,
+				WarehouseObjectID: params.WarehouseObjectID, WarehouseVersionID: params.WarehouseVersionID,
+				WarehouseCode: params.WarehouseCode, WarehouseName: params.WarehouseName,
+				ContactName: params.ContactName, ContactPhone: params.ContactPhone,
+				DeliveryAddress:           params.DeliveryAddress,
+				SettlementMethodObjectID:  params.SettlementMethodObjectID,
+				SettlementMethodVersionID: params.SettlementMethodVersionID,
+				SettlementMethodCode:      params.SettlementMethodCode, SettlementMethodName: params.SettlementMethodName,
+				SettlementRuleType: params.SettlementRuleType, SettlementMonthOffset: params.SettlementMonthOffset,
+				SettlementDayOfMonth: params.SettlementDayOfMonth, SettlementDayOffset: params.SettlementDayOffset,
+				SettlementDescription: params.SettlementDescription, DocumentID: documentID,
 			})
 			return oneRow(rows, err)
 		}
 		return q.InsertVouSaleOrderDetail(ctx, params)
 	case EntityPurchaseOrder:
+		settlement := settlementSnapshot(refs.SupplierSettlement)
 		params := dbsqlc.InsertVouPurchaseOrderDetailParams{
 			DocumentID: documentID, SupplierObjectID: refs.Supplier.ObjectID,
 			SupplierVersionID: refs.Supplier.VersionID, SupplierCode: refs.Supplier.Code, SupplierName: refs.Supplier.Data.Name,
+			PurchaserObjectID:  stringPtr(refs.Purchaser.ObjectID),
+			PurchaserVersionID: stringPtr(refs.Purchaser.VersionID),
+			PurchaserCode:      stringPtr(refs.Purchaser.Code), PurchaserName: stringPtr(refs.Purchaser.Data.Name),
+			WarehouseObjectID:  stringPtr(refs.Warehouse.ObjectID),
+			WarehouseVersionID: stringPtr(refs.Warehouse.VersionID),
+			WarehouseCode:      stringPtr(refs.Warehouse.Code), WarehouseName: stringPtr(refs.Warehouse.Data.Name),
+			ContactName:              optionalText(refs.Supplier.Data.ContactName),
+			ContactPhone:             optionalText(refs.Supplier.Data.ContactPhone),
+			SettlementMethodObjectID: settlement.ObjectID, SettlementMethodVersionID: settlement.VersionID,
+			SettlementMethodCode: settlement.Code, SettlementMethodName: settlement.Name,
+			SettlementRuleType: settlement.RuleType, SettlementMonthOffset: settlement.MonthOffset,
+			SettlementDayOfMonth: settlement.DayOfMonth, SettlementDayOffset: settlement.DayOffset,
+			SettlementDescription: settlement.Description,
 		}
 		if update {
 			rows, err := q.UpdateVouPurchaseOrderDetail(ctx, dbsqlc.UpdateVouPurchaseOrderDetailParams{
 				SupplierObjectID: params.SupplierObjectID, SupplierVersionID: params.SupplierVersionID,
-				SupplierCode: params.SupplierCode, SupplierName: params.SupplierName, DocumentID: documentID,
+				SupplierCode: params.SupplierCode, SupplierName: params.SupplierName,
+				PurchaserObjectID: params.PurchaserObjectID, PurchaserVersionID: params.PurchaserVersionID,
+				PurchaserCode: params.PurchaserCode, PurchaserName: params.PurchaserName,
+				WarehouseObjectID: params.WarehouseObjectID, WarehouseVersionID: params.WarehouseVersionID,
+				WarehouseCode: params.WarehouseCode, WarehouseName: params.WarehouseName,
+				ContactName: params.ContactName, ContactPhone: params.ContactPhone,
+				SettlementMethodObjectID:  params.SettlementMethodObjectID,
+				SettlementMethodVersionID: params.SettlementMethodVersionID,
+				SettlementMethodCode:      params.SettlementMethodCode, SettlementMethodName: params.SettlementMethodName,
+				SettlementRuleType: params.SettlementRuleType, SettlementMonthOffset: params.SettlementMonthOffset,
+				SettlementDayOfMonth: params.SettlementDayOfMonth, SettlementDayOffset: params.SettlementDayOffset,
+				SettlementDescription: params.SettlementDescription, DocumentID: documentID,
 			})
 			return oneRow(rows, err)
 		}
 		return q.InsertVouPurchaseOrderDetail(ctx, params)
 	case EntityIntermediarySaleOrder:
+		customerSettlement := settlementSnapshot(refs.CustomerSettlement)
+		supplierSettlement := settlementSnapshot(refs.SupplierSettlement)
 		params := dbsqlc.InsertVouIntermediarySaleOrderDetailParams{
 			DocumentID: documentID, CustomerObjectID: refs.Customer.ObjectID,
 			CustomerVersionID: refs.Customer.VersionID, CustomerCode: refs.Customer.Code, CustomerName: refs.Customer.Data.Name,
 			SupplierObjectID: refs.Supplier.ObjectID, SupplierVersionID: refs.Supplier.VersionID,
 			SupplierCode: refs.Supplier.Code, SupplierName: refs.Supplier.Data.Name,
+			SalespersonObjectID:  stringPtr(refs.Salesperson.ObjectID),
+			SalespersonVersionID: stringPtr(refs.Salesperson.VersionID),
+			SalespersonCode:      stringPtr(refs.Salesperson.Code), SalespersonName: stringPtr(refs.Salesperson.Data.Name),
+			PurchaserObjectID:  stringPtr(refs.Purchaser.ObjectID),
+			PurchaserVersionID: stringPtr(refs.Purchaser.VersionID),
+			PurchaserCode:      stringPtr(refs.Purchaser.Code), PurchaserName: stringPtr(refs.Purchaser.Data.Name),
+			ContactName:                       optionalText(refs.Customer.Data.ContactName),
+			ContactPhone:                      optionalText(refs.Customer.Data.ContactPhone),
+			DeliveryAddress:                   optionalText(refs.Customer.Data.Address),
+			CustomerSettlementMethodObjectID:  customerSettlement.ObjectID,
+			CustomerSettlementMethodVersionID: customerSettlement.VersionID,
+			CustomerSettlementMethodCode:      customerSettlement.Code,
+			CustomerSettlementMethodName:      customerSettlement.Name,
+			CustomerSettlementRuleType:        customerSettlement.RuleType,
+			CustomerSettlementMonthOffset:     customerSettlement.MonthOffset,
+			CustomerSettlementDayOfMonth:      customerSettlement.DayOfMonth,
+			CustomerSettlementDayOffset:       customerSettlement.DayOffset,
+			CustomerSettlementDescription:     customerSettlement.Description,
+			SupplierSettlementMethodObjectID:  supplierSettlement.ObjectID,
+			SupplierSettlementMethodVersionID: supplierSettlement.VersionID,
+			SupplierSettlementMethodCode:      supplierSettlement.Code,
+			SupplierSettlementMethodName:      supplierSettlement.Name,
+			SupplierSettlementRuleType:        supplierSettlement.RuleType,
+			SupplierSettlementMonthOffset:     supplierSettlement.MonthOffset,
+			SupplierSettlementDayOfMonth:      supplierSettlement.DayOfMonth,
+			SupplierSettlementDayOffset:       supplierSettlement.DayOffset,
+			SupplierSettlementDescription:     supplierSettlement.Description,
 		}
 		if update {
 			rows, err := q.UpdateVouIntermediarySaleOrderDetail(ctx, dbsqlc.UpdateVouIntermediarySaleOrderDetailParams{
 				CustomerObjectID: params.CustomerObjectID, CustomerVersionID: params.CustomerVersionID,
 				CustomerCode: params.CustomerCode, CustomerName: params.CustomerName,
 				SupplierObjectID: params.SupplierObjectID, SupplierVersionID: params.SupplierVersionID,
-				SupplierCode: params.SupplierCode, SupplierName: params.SupplierName, DocumentID: documentID,
+				SupplierCode: params.SupplierCode, SupplierName: params.SupplierName,
+				SalespersonObjectID: params.SalespersonObjectID, SalespersonVersionID: params.SalespersonVersionID,
+				SalespersonCode: params.SalespersonCode, SalespersonName: params.SalespersonName,
+				PurchaserObjectID: params.PurchaserObjectID, PurchaserVersionID: params.PurchaserVersionID,
+				PurchaserCode: params.PurchaserCode, PurchaserName: params.PurchaserName,
+				ContactName: params.ContactName, ContactPhone: params.ContactPhone,
+				DeliveryAddress:                   params.DeliveryAddress,
+				CustomerSettlementMethodObjectID:  params.CustomerSettlementMethodObjectID,
+				CustomerSettlementMethodVersionID: params.CustomerSettlementMethodVersionID,
+				CustomerSettlementMethodCode:      params.CustomerSettlementMethodCode,
+				CustomerSettlementMethodName:      params.CustomerSettlementMethodName,
+				CustomerSettlementRuleType:        params.CustomerSettlementRuleType,
+				CustomerSettlementMonthOffset:     params.CustomerSettlementMonthOffset,
+				CustomerSettlementDayOfMonth:      params.CustomerSettlementDayOfMonth,
+				CustomerSettlementDayOffset:       params.CustomerSettlementDayOffset,
+				CustomerSettlementDescription:     params.CustomerSettlementDescription,
+				SupplierSettlementMethodObjectID:  params.SupplierSettlementMethodObjectID,
+				SupplierSettlementMethodVersionID: params.SupplierSettlementMethodVersionID,
+				SupplierSettlementMethodCode:      params.SupplierSettlementMethodCode,
+				SupplierSettlementMethodName:      params.SupplierSettlementMethodName,
+				SupplierSettlementRuleType:        params.SupplierSettlementRuleType,
+				SupplierSettlementMonthOffset:     params.SupplierSettlementMonthOffset,
+				SupplierSettlementDayOfMonth:      params.SupplierSettlementDayOfMonth,
+				SupplierSettlementDayOffset:       params.SupplierSettlementDayOffset,
+				SupplierSettlementDescription:     params.SupplierSettlementDescription,
+				DocumentID:                        documentID,
 			})
 			return oneRow(rows, err)
 		}
@@ -684,6 +837,8 @@ func (s *Service) writeDetail(
 				CounterpartyCode: counterparty.Code, CounterpartyName: counterparty.Data.Name,
 				FundAccountObjectID: refs.FundAccount.ObjectID, FundAccountVersionID: refs.FundAccount.VersionID,
 				FundAccountCode: refs.FundAccount.Code, FundAccountName: refs.FundAccount.Data.Name,
+				HandlerObjectID: stringPtr(refs.Handler.ObjectID), HandlerVersionID: stringPtr(refs.Handler.VersionID),
+				HandlerCode: stringPtr(refs.Handler.Code), HandlerName: stringPtr(refs.Handler.Data.Name),
 			}
 			if update {
 				rows, err := q.UpdateVouReceiptDetail(ctx, dbsqlc.UpdateVouReceiptDetailParams{
@@ -691,7 +846,9 @@ func (s *Service) writeDetail(
 					CounterpartyVersionID: params.CounterpartyVersionID, CounterpartyCode: params.CounterpartyCode,
 					CounterpartyName: params.CounterpartyName, FundAccountObjectID: params.FundAccountObjectID,
 					FundAccountVersionID: params.FundAccountVersionID, FundAccountCode: params.FundAccountCode,
-					FundAccountName: params.FundAccountName, DocumentID: documentID,
+					FundAccountName: params.FundAccountName,
+					HandlerObjectID: params.HandlerObjectID, HandlerVersionID: params.HandlerVersionID,
+					HandlerCode: params.HandlerCode, HandlerName: params.HandlerName, DocumentID: documentID,
 				})
 				return oneRow(rows, err)
 			}
@@ -703,6 +860,8 @@ func (s *Service) writeDetail(
 			CounterpartyCode: counterparty.Code, CounterpartyName: counterparty.Data.Name,
 			FundAccountObjectID: refs.FundAccount.ObjectID, FundAccountVersionID: refs.FundAccount.VersionID,
 			FundAccountCode: refs.FundAccount.Code, FundAccountName: refs.FundAccount.Data.Name,
+			HandlerObjectID: stringPtr(refs.Handler.ObjectID), HandlerVersionID: stringPtr(refs.Handler.VersionID),
+			HandlerCode: stringPtr(refs.Handler.Code), HandlerName: stringPtr(refs.Handler.Data.Name),
 		}
 		if update {
 			rows, err := q.UpdateVouPaymentDetail(ctx, dbsqlc.UpdateVouPaymentDetailParams{
@@ -710,7 +869,9 @@ func (s *Service) writeDetail(
 				CounterpartyVersionID: params.CounterpartyVersionID, CounterpartyCode: params.CounterpartyCode,
 				CounterpartyName: params.CounterpartyName, FundAccountObjectID: params.FundAccountObjectID,
 				FundAccountVersionID: params.FundAccountVersionID, FundAccountCode: params.FundAccountCode,
-				FundAccountName: params.FundAccountName, DocumentID: documentID,
+				FundAccountName: params.FundAccountName,
+				HandlerObjectID: params.HandlerObjectID, HandlerVersionID: params.HandlerVersionID,
+				HandlerCode: params.HandlerCode, HandlerName: params.HandlerName, DocumentID: documentID,
 			})
 			return oneRow(rows, err)
 		}
@@ -744,13 +905,17 @@ func (s *Service) writeDetail(
 			CounterpartyObjectID: co, CounterpartyVersionID: cv, CounterpartyCode: cc, CounterpartyName: cn,
 			FundAccountObjectID: refs.FundAccount.ObjectID, FundAccountVersionID: refs.FundAccount.VersionID,
 			FundAccountCode: refs.FundAccount.Code, FundAccountName: refs.FundAccount.Data.Name,
+			HandlerObjectID: stringPtr(refs.Handler.ObjectID), HandlerVersionID: stringPtr(refs.Handler.VersionID),
+			HandlerCode: stringPtr(refs.Handler.Code), HandlerName: stringPtr(refs.Handler.Data.Name),
 		}
 		if update {
 			rows, err := q.UpdateVouOtherIncomeDetail(ctx, dbsqlc.UpdateVouOtherIncomeDetailParams{
 				SourceName: params.SourceName, CounterpartyEntity: ce, CounterpartyObjectID: co,
 				CounterpartyVersionID: cv, CounterpartyCode: cc, CounterpartyName: cn,
 				FundAccountObjectID: params.FundAccountObjectID, FundAccountVersionID: params.FundAccountVersionID,
-				FundAccountCode: params.FundAccountCode, FundAccountName: params.FundAccountName, DocumentID: documentID,
+				FundAccountCode: params.FundAccountCode, FundAccountName: params.FundAccountName,
+				HandlerObjectID: params.HandlerObjectID, HandlerVersionID: params.HandlerVersionID,
+				HandlerCode: params.HandlerCode, HandlerName: params.HandlerName, DocumentID: documentID,
 			})
 			return oneRow(rows, err)
 		}
@@ -773,6 +938,7 @@ func (s *Service) replaceLines(
 				ProductObjectID: ref.ObjectID, ProductVersionID: ref.VersionID,
 				ProductCode: ref.Code, ProductName: ref.Data.Name, ProductUnit: ref.Data.Unit,
 				OrderedQtyMicros: line.Quantity, UnitPriceCents: line.UnitPrice, LineAmountCents: line.LineAmount,
+				Remark: line.Remark,
 			}); err != nil {
 				return err
 			}
@@ -786,10 +952,72 @@ func (s *Service) replaceLines(
 			if err := q.InsertVouExpenseLine(ctx, dbsqlc.InsertVouExpenseLineParams{
 				ID: newID(), DocumentID: documentID, LineNo: int32(index + 1),
 				Category: line.Category, Description: line.Description, AmountCents: line.Amount,
+				Remark: line.Remark,
 			}); err != nil {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (s *Service) validateStoredAttributes(
+	ctx context.Context, q *dbsqlc.Queries, entity, documentID string,
+) error {
+	missing := false
+	switch entity {
+	case EntitySaleOrder:
+		detail, err := q.GetVouSaleOrderDetail(ctx, documentID)
+		if err != nil {
+			return s.internal("read sale order attributes", err)
+		}
+		missing = detail.SalespersonObjectID == nil || detail.WarehouseObjectID == nil ||
+			detail.SettlementMethodObjectID == nil
+	case EntityPurchaseOrder:
+		detail, err := q.GetVouPurchaseOrderDetail(ctx, documentID)
+		if err != nil {
+			return s.internal("read purchase order attributes", err)
+		}
+		missing = detail.PurchaserObjectID == nil || detail.WarehouseObjectID == nil ||
+			detail.SettlementMethodObjectID == nil
+	case EntityIntermediarySaleOrder:
+		detail, err := q.GetVouIntermediarySaleOrderDetail(ctx, documentID)
+		if err != nil {
+			return s.internal("read intermediary order attributes", err)
+		}
+		missing = detail.SalespersonObjectID == nil || detail.PurchaserObjectID == nil ||
+			detail.CustomerSettlementMethodObjectID == nil ||
+			detail.SupplierSettlementMethodObjectID == nil
+	case EntityReceipt:
+		detail, err := q.GetVouReceiptDetail(ctx, documentID)
+		if err != nil {
+			return s.internal("read receipt attributes", err)
+		}
+		missing = detail.HandlerObjectID == nil
+	case EntityPayment:
+		detail, err := q.GetVouPaymentDetail(ctx, documentID)
+		if err != nil {
+			return s.internal("read payment attributes", err)
+		}
+		missing = detail.HandlerObjectID == nil
+	case EntityOtherIncome:
+		detail, err := q.GetVouOtherIncomeDetail(ctx, documentID)
+		if err != nil {
+			return s.internal("read other income attributes", err)
+		}
+		missing = detail.HandlerObjectID == nil
+	case EntityExpenseReimbursement:
+		return nil
+	default:
+		return domainError(ErrorValidation, "invalid entity", nil, nil)
+	}
+	if missing {
+		return domainError(
+			ErrorConflict,
+			"document attributes are incomplete; return to draft and save before continuing",
+			nil,
+			nil,
+		)
 	}
 	return nil
 }
@@ -1020,7 +1248,29 @@ func formatDate(value pgtype.Date) string {
 
 func stringPtr(value string) *string { return &value }
 func int64Ptr(value int64) *int64    { return &value }
-func newID() string                  { return ulid.Make().String() }
+
+type settlementSnapshotFields struct {
+	ObjectID, VersionID, Code, Name, RuleType, Description *string
+	MonthOffset, DayOfMonth, DayOffset                     *int32
+}
+
+func settlementSnapshot(reference *bobdomain.EffectiveReference) settlementSnapshotFields {
+	if reference == nil {
+		return settlementSnapshotFields{}
+	}
+	return settlementSnapshotFields{
+		ObjectID: stringPtr(reference.ObjectID), VersionID: stringPtr(reference.VersionID),
+		Code: stringPtr(reference.Code), Name: stringPtr(reference.Data.Name),
+		RuleType:    stringPtr(reference.Data.RuleType),
+		MonthOffset: int32Ptr(reference.Data.MonthOffset),
+		DayOfMonth:  reference.Data.DayOfMonth,
+		DayOffset:   int32Ptr(reference.Data.DayOffset),
+		Description: optionalText(reference.Data.Description),
+	}
+}
+
+func int32Ptr(value int32) *int32 { return &value }
+func newID() string               { return ulid.Make().String() }
 
 func oneRow(rows int64, err error) error {
 	if err != nil {

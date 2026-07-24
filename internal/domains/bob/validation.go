@@ -52,6 +52,9 @@ func validateCreate(entity string, input CreateDetailInput) (DetailView, string,
 		VIN: input.VIN, EngineNumber: input.EngineNumber, LoadCapacityKG: input.LoadCapacityKG,
 		AccountName: input.AccountName, BankName: input.BankName, BankBranch: input.BankBranch,
 		AccountNumber: input.AccountNumber, ParentID: input.ParentID,
+		SettlementMethodID: input.SettlementMethodID, SalespersonID: input.SalespersonID,
+		RuleType:    input.RuleType,
+		MonthOffset: input.MonthOffset, DayOfMonth: input.DayOfMonth, DayOffset: input.DayOffset,
 	}
 	data, err := validateDetailData(entity, data)
 	return data, code, err
@@ -65,6 +68,10 @@ func mergeDetailInput(current DetailView, input DetailInput) DetailView {
 	result.PlateNumber = input.PlateNumber
 	result.VehicleType = input.VehicleType
 	result.PlatformObjectID = input.PlatformObjectID
+	result.RuleType = input.RuleType
+	result.MonthOffset = input.MonthOffset
+	result.DayOfMonth = input.DayOfMonth
+	result.DayOffset = input.DayOffset
 	if input.SupplierType != nil {
 		result.SupplierType = *input.SupplierType
 	}
@@ -104,6 +111,8 @@ func mergeDetailInput(current DetailView, input DetailInput) DetailView {
 	mergeOptional(input.BankBranch, &result.BankBranch)
 	mergeOptional(input.AccountNumber, &result.AccountNumber)
 	mergeOptional(input.ParentID, &result.ParentID)
+	mergeOptional(input.SettlementMethodID, &result.SettlementMethodID)
+	mergeOptional(input.SalespersonID, &result.SalespersonID)
 	return result
 }
 
@@ -132,9 +141,9 @@ func validateDetailInputFields(entity string, input DetailInput) error {
 	}
 	switch entity {
 	case EntityCustomer:
-		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonId")
 	case EntitySupplier:
-		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+		allow("shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId")
 	case EntityEmployee:
 		allow("categoryId", "departmentId", "positionId", "phone", "email", "hireDate", "remark")
 	case EntityProduct:
@@ -153,6 +162,8 @@ func validateDetailInputFields(entity string, input DetailInput) error {
 		allow("categoryId", "parentId", "description")
 	case EntityPosition:
 		allow("categoryId", "description")
+	case EntitySettlementMethod:
+		allow("description")
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -169,7 +180,8 @@ func validateDetailInputFields(entity string, input DetailInput) error {
 		"engineNumber": input.EngineNumber.Set, "loadCapacityKg": input.LoadCapacityKG.Set,
 		"accountName": input.AccountName.Set, "bankName": input.BankName.Set,
 		"bankBranch": input.BankBranch.Set, "accountNumber": input.AccountNumber.Set,
-		"parentId": input.ParentID.Set,
+		"parentId": input.ParentID.Set, "settlementMethodId": input.SettlementMethodID.Set,
+		"salespersonId": input.SalespersonID.Set,
 	}
 	for field, present := range provided {
 		if present && !allowed[field] {
@@ -209,13 +221,13 @@ func normalizeDetail(input *DetailView) {
 	}
 	for _, value := range []*string{
 		&input.Currency, &input.SupplierType, &input.CustomerType, &input.PlateNumber,
-		&input.TaxNumber, &input.Barcode, &input.VIN,
+		&input.TaxNumber, &input.Barcode, &input.VIN, &input.RuleType,
 	} {
 		*value = strings.ToUpper(strings.TrimSpace(*value))
 	}
 	for _, value := range []*string{
 		&input.PlatformObjectID, &input.CategoryID, &input.DepartmentID, &input.PositionID,
-		&input.ManagerEmployeeID, &input.ParentID,
+		&input.ManagerEmployeeID, &input.ParentID, &input.SettlementMethodID, &input.SalespersonID,
 	} {
 		trim(value)
 	}
@@ -288,12 +300,12 @@ func validateEntityFields(entity string, input DetailView) error {
 	}
 	switch entity {
 	case EntityCustomer:
-		allow("customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+		allow("customerType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId", "salespersonId")
 		if !validCustomerType(input.CustomerType) {
 			return domainError(ErrorValidation, "invalid customer type", nil, nil)
 		}
 	case EntitySupplier:
-		allow("supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark")
+		allow("supplierType", "shortName", "categoryId", "taxNumber", "contactName", "contactPhone", "email", "address", "remark", "settlementMethodId")
 		if !validSupplierType(input.SupplierType) {
 			return domainError(ErrorValidation, "invalid supplier type", nil, nil)
 		}
@@ -332,6 +344,11 @@ func validateEntityFields(entity string, input DetailView) error {
 		allow("categoryId", "parentId", "description")
 	case EntityPosition:
 		allow("categoryId", "description")
+	case EntitySettlementMethod:
+		allow("ruleType", "monthOffset", "dayOfMonth", "dayOffset", "description")
+		if err := validateSettlementRule(input); err != nil {
+			return err
+		}
 	default:
 		return domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
@@ -342,7 +359,8 @@ func validateEntityFields(entity string, input DetailView) error {
 		}
 	}
 	for _, id := range []string{
-		input.CategoryID, input.DepartmentID, input.PositionID, input.ManagerEmployeeID, input.ParentID,
+		input.CategoryID, input.DepartmentID, input.PositionID, input.ManagerEmployeeID,
+		input.ParentID, input.SettlementMethodID, input.SalespersonID,
 	} {
 		if id != "" && !validID(id) {
 			return domainError(ErrorValidation, "invalid reference id", nil, nil)
@@ -366,7 +384,50 @@ func detailFieldValues(input DetailView) map[string]string {
 		"engineNumber": input.EngineNumber, "loadCapacityKg": input.LoadCapacityKG,
 		"accountName": input.AccountName, "bankName": input.BankName, "bankBranch": input.BankBranch,
 		"accountNumber": input.AccountNumber, "parentId": input.ParentID,
+		"settlementMethodId": input.SettlementMethodID,
+		"salespersonId":      input.SalespersonID,
+		"ruleType":           input.RuleType,
+		"monthOffset":        numericField(input.MonthOffset), "dayOfMonth": optionalNumericField(input.DayOfMonth),
+		"dayOffset": numericField(input.DayOffset),
 	}
+}
+
+func validateSettlementRule(input DetailView) error {
+	if !slices.Contains([]string{
+		SettlementRuleRelativeDays, SettlementRuleMonthEnd, SettlementRuleFixedDay,
+	}, input.RuleType) || input.MonthOffset < 0 || input.MonthOffset > 120 ||
+		input.DayOffset < -3650 || input.DayOffset > 3650 {
+		return domainError(ErrorValidation, "invalid settlement rule", nil, nil)
+	}
+	switch input.RuleType {
+	case SettlementRuleRelativeDays:
+		if input.MonthOffset != 0 || input.DayOfMonth != nil {
+			return domainError(ErrorValidation, "invalid relative settlement rule", nil, nil)
+		}
+	case SettlementRuleMonthEnd:
+		if input.DayOfMonth != nil {
+			return domainError(ErrorValidation, "invalid month-end settlement rule", nil, nil)
+		}
+	case SettlementRuleFixedDay:
+		if input.DayOfMonth == nil || *input.DayOfMonth < 1 || *input.DayOfMonth > 31 {
+			return domainError(ErrorValidation, "invalid fixed-day settlement rule", nil, nil)
+		}
+	}
+	return nil
+}
+
+func numericField(value int32) string {
+	if value == 0 {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
+func optionalNumericField(value *int32) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprint(*value)
 }
 
 func normalizeAccountNumber(value string) string {
@@ -404,7 +465,7 @@ func validCustomerType(value string) bool {
 }
 
 func validCategoryTarget(value string) bool {
-	return value != EntityCategory && slices.Contains(entities[:], value)
+	return value != EntityCategory && value != EntitySettlementMethod && slices.Contains(entities[:], value)
 }
 
 func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, error) {
@@ -471,6 +532,8 @@ func validateQueryFilters(entity string, input QueryFilters) (QueryFilters, erro
 		unexpected = hasUnexpected("categoryId", "parentId", "rootOnly")
 	case EntityPosition:
 		unexpected = hasUnexpected("categoryId")
+	case EntitySettlementMethod:
+		unexpected = hasUnexpected()
 	default:
 		unexpected = true
 	}

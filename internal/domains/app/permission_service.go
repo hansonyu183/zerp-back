@@ -44,7 +44,7 @@ func (s *Service) QueryPermissions(ctx context.Context, request PageRequest) (Pa
 }
 
 func (s *Service) GetPermission(ctx context.Context, id string) (PermissionView, error) {
-	if !validID(id) {
+	if !validPermissionID(id) {
 		return PermissionView{}, domainError(ErrorValidation, "invalid permission id", nil)
 	}
 	permission, err := s.queries.GetAppPermissionByID(ctx, id)

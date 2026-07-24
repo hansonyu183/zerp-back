@@ -395,18 +395,42 @@ func TestManagementContractsIntegration(t *testing.T) {
 	if _, err := service.SetUserStatus(t.Context(), admin.ID, admin.Revision, StatusDisabled, admin.ID, "disable-last-admin"); !errorIsKind(err, ErrorConflict) {
 		t.Fatalf("disable last admin error = %v", err)
 	}
+	if _, err := service.CreateRole(t.Context(), CreateRoleInput{
+		Code: "missing-query", Name: "缺少查询权限",
+		PermissionIDs: permissionIDsByPath(t, pool, signoutPath, "/app/user/get"),
+	}, admin.ID, "reject-role-without-query"); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("missing companion query error = %v", err)
+	}
+	if _, err := service.CreateRole(t.Context(), CreateRoleInput{
+		Code: "missing-opening-get", Name: "缺少账簿期初查看权限",
+		PermissionIDs: permissionIDsByPath(t, pool, signoutPath, "/led/opening/activate"),
+	}, admin.ID, "reject-led-role-without-opening-get"); !errorIsKind(err, ErrorValidation) {
+		t.Fatalf("missing LED opening get error = %v", err)
+	}
 	role := RoleView{}
 	role, err := service.CreateRole(t.Context(), CreateRoleInput{
 		Code: "user-reader", Name: "用户查看",
-		PermissionIDs: permissionIDsByPath(t, pool, signoutPath, "/app/user/query", "/app/user/get"),
+		PermissionIDs: permissionIDsByPath(
+			t, pool, signoutPath, "/app/user/query", "/app/user/get",
+			"/led/opening/get", "/led/opening/activate",
+		),
 	}, admin.ID, "create-role")
 	if err != nil {
 		t.Fatalf("create role: %v", err)
 	}
-	expectedPermissionIDs := permissionIDsByPath(t, pool, "/app/user/get", "/app/user/query", signoutPath)
+	expectedPermissionIDs := permissionIDsByPath(
+		t, pool, "/app/user/get", "/app/user/query", signoutPath,
+		"/led/opening/activate", "/led/opening/get",
+	)
 	gotRole, err := service.GetRole(t.Context(), role.ID)
 	if err != nil || !slices.Equal(gotRole.PermissionIDs, expectedPermissionIDs) {
 		t.Fatalf("role permissions = %v, want %v, err=%v", gotRole.PermissionIDs, expectedPermissionIDs, err)
+	}
+	role, err = service.SaveRole(t.Context(), SaveRoleInput{
+		ID: role.ID, Name: "用户与账簿查看", PermissionIDs: expectedPermissionIDs, Revision: gotRole.Revision,
+	}, admin.ID, "save-role-with-led-permission")
+	if err != nil {
+		t.Fatalf("save role with LED permission: %v", err)
 	}
 	user, err := service.CreateUser(t.Context(), CreateUserInput{
 		Username: "managed", DisplayName: "初始名称", Password: integrationUserPassword, RoleIDs: []string{role.ID},
@@ -542,6 +566,11 @@ func TestQueryAndPermissionCatalogIntegration(t *testing.T) {
 	}
 	if !slices.Equal(actual, expectedProtected) {
 		t.Fatalf("APP permission catalog = %v, want %v", actual, expectedProtected)
+	}
+	ledPermissionID := permissionIDsByPath(t, pool, "/led/opening/get")[0]
+	ledPermission, err := service.GetPermission(t.Context(), ledPermissionID)
+	if err != nil || ledPermission.ID != ledPermissionID || ledPermission.Path != "/led/opening/get" {
+		t.Fatalf("get LED permission = %+v, err=%v", ledPermission, err)
 	}
 }
 

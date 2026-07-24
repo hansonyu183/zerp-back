@@ -134,12 +134,19 @@ func validRoleIDs(values []string) bool {
 
 func validPermissionIDs(values []string) bool {
 	return len(values) > 0 && !slices.ContainsFunc(values, func(value string) bool {
-		return !validID(value) && !validSeededPermissionID(value)
+		return !validPermissionID(value)
 	})
 }
 
+func validPermissionID(value string) bool {
+	return validID(value) || validSeededPermissionID(value)
+}
+
 func validSeededPermissionID(value string) bool {
-	if len(value) != 26 || (!strings.HasPrefix(value, "01JAPP") && !strings.HasPrefix(value, "01JBOB")) {
+	if len(value) != 26 ||
+		(!strings.HasPrefix(value, "01JAPP") &&
+			!strings.HasPrefix(value, "01JBOB") &&
+			!strings.HasPrefix(value, "01JLED")) {
 		return false
 	}
 	for _, character := range value {

@@ -81,12 +81,20 @@ func validatePermissions(ctx context.Context, q *dbsqlc.Queries, ids []string) e
 	}
 	for _, path := range paths {
 		parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
-		if len(parts) != 3 || parts[2] == "query" || path == signoutPath || path == "/app/user/profile" || path == "/app/user/change-password" {
+		if len(parts) != 3 || path == signoutPath ||
+			path == "/app/user/profile" || path == "/app/user/change-password" {
 			continue
 		}
-		queryPath := "/" + parts[0] + "/" + parts[1] + "/query"
-		if !pathSet[queryPath] {
-			return domainError(ErrorValidation, fmt.Sprintf("permission %s requires %s", path, queryPath), nil)
+		readAction := "query"
+		if parts[0] == "led" && parts[1] == "opening" {
+			readAction = "get"
+		}
+		if parts[2] == readAction {
+			continue
+		}
+		readPath := "/" + parts[0] + "/" + parts[1] + "/" + readAction
+		if !pathSet[readPath] {
+			return domainError(ErrorValidation, fmt.Sprintf("permission %s requires %s", path, readPath), nil)
 		}
 	}
 	return nil

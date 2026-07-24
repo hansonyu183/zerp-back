@@ -29,9 +29,11 @@ func TestStrictIDsAndUnicodeLengths(t *testing.T) {
 	if !validID("01J00000000000000000000000") || validID("user-1") || validID(strings.ToLower("01J00000000000000000000000")) {
 		t.Fatal("validID() did not enforce canonical ULID")
 	}
-	if !validSeededPermissionID("01JAPP00000000000000000001") || !validSeededPermissionID("01JBOB00000000000000000001") ||
+	if !validSeededPermissionID("01JAPP00000000000000000001") ||
+		!validSeededPermissionID("01JBOB00000000000000000001") ||
+		!validSeededPermissionID("01JLED00000000000000000001") ||
 		validSeededPermissionID("01JOTHER000000000000000001") {
-		t.Fatal("validSeededPermissionID() did not limit legacy catalog identifiers")
+		t.Fatal("validSeededPermissionID() did not limit controlled catalog identifiers")
 	}
 	displayName := strings.Repeat("中", 128)
 	if !runeLengthBetween(displayName, 1, 128) || runeLengthBetween(displayName+"文", 1, 128) {

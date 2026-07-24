@@ -49,6 +49,8 @@ END
 $$;
 -- +goose StatementEnd
 
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE bob_customer_versions
     ALTER COLUMN salesperson_employee_id SET NOT NULL;
 

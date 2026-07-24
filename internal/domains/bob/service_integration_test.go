@@ -5,6 +5,7 @@ package bob
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -186,6 +187,7 @@ func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 		{EntityEmployee, CreateDetailInput{Name: "Employee"}},
 		{EntityProduct, CreateDetailInput{Name: "Product", Unit: "piece"}},
 		{EntityService, CreateDetailInput{Name: "Service", Unit: "hour"}},
+		{EntityWarehouse, CreateDetailInput{Name: "主仓"}},
 		{EntityFundAccount, CreateDetailInput{Name: "Cash", Currency: "CNY"}},
 	}
 	for _, test := range tests {
@@ -216,8 +218,12 @@ func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("begin resolve: %v", err)
 			}
-			if _, err = service.ResolveEffectiveReference(t.Context(), tx, test.entity, created.ObjectID, created.VersionID); err != nil {
+			reference, err := service.ResolveEffectiveReference(t.Context(), tx, test.entity, created.ObjectID, created.VersionID)
+			if err != nil {
 				t.Fatalf("resolve: %v", err)
+			}
+			if reference.Data.Name != test.data.Name {
+				t.Fatalf("reference name = %q, want %q", reference.Data.Name, test.data.Name)
 			}
 			if err = tx.Commit(t.Context()); err != nil {
 				t.Fatalf("commit resolve: %v", err)
@@ -233,6 +239,84 @@ func TestEveryEntityUsesTheLifecycleContractIntegration(t *testing.T) {
 				t.Fatalf("invalidated version: view=%+v err=%v", oldVersion, err)
 			}
 		})
+	}
+}
+
+func TestWarehouseSchemaAndPermissionsIntegration(t *testing.T) {
+	pool := integrationPool(t)
+
+	var warehouseTable *string
+	if err := pool.QueryRow(t.Context(), "select to_regclass('bob_warehouse_versions')::text").Scan(&warehouseTable); err != nil {
+		t.Fatalf("read warehouse table: %v", err)
+	}
+	if warehouseTable == nil || *warehouseTable != "bob_warehouse_versions" {
+		t.Fatalf("warehouse table = %v", warehouseTable)
+	}
+
+	expectedSequence := map[string]int{
+		"approve":       61,
+		"audit-history": 62,
+		"create":        63,
+		"edit":          64,
+		"get":           65,
+		"query":         66,
+		"reject":        67,
+		"save":          68,
+		"submit":        69,
+		"versions":      70,
+	}
+	rows, err := pool.Query(t.Context(), `
+		SELECT id, path, action, status
+		FROM app_permissions
+		WHERE domain = 'bob' AND entity = 'warehouse'
+	`)
+	if err != nil {
+		t.Fatalf("query warehouse permissions: %v", err)
+	}
+	defer rows.Close()
+	seen := make(map[string]bool, len(expectedSequence))
+	for rows.Next() {
+		var id, path, action, status string
+		if err = rows.Scan(&id, &path, &action, &status); err != nil {
+			t.Fatalf("scan warehouse permission: %v", err)
+		}
+		sequence, exists := expectedSequence[action]
+		if !exists {
+			t.Fatalf("unexpected warehouse action %q", action)
+		}
+		if id != fmt.Sprintf("01JBOB%020d", sequence) {
+			t.Fatalf("permission %s id = %q", action, id)
+		}
+		if path != "/bob/warehouse/"+action || status != "ENABLED" {
+			t.Fatalf("permission %s path=%q status=%q", action, path, status)
+		}
+		seen[action] = true
+	}
+	if err = rows.Err(); err != nil {
+		t.Fatalf("iterate warehouse permissions: %v", err)
+	}
+	if len(seen) != len(expectedSequence) {
+		t.Fatalf("warehouse permission actions = %v", seen)
+	}
+
+	var superadminCount int
+	if err = pool.QueryRow(t.Context(), "SELECT count(*) FROM app_roles WHERE code = 'superadmin'").Scan(&superadminCount); err != nil {
+		t.Fatalf("count superadmin roles: %v", err)
+	}
+	if superadminCount > 0 {
+		var grantCount int
+		if err = pool.QueryRow(t.Context(), `
+			SELECT count(*)
+			FROM app_role_permissions rp
+			JOIN app_roles r ON r.id = rp.role_id
+			JOIN app_permissions p ON p.id = rp.permission_id
+			WHERE r.code = 'superadmin' AND p.domain = 'bob' AND p.entity = 'warehouse'
+		`).Scan(&grantCount); err != nil {
+			t.Fatalf("count superadmin warehouse grants: %v", err)
+		}
+		if grantCount != superadminCount*len(expectedSequence) {
+			t.Fatalf("superadmin warehouse grants = %d, want %d", grantCount, superadminCount*len(expectedSequence))
+		}
 	}
 }
 

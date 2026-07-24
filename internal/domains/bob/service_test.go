@@ -22,6 +22,7 @@ func TestValidateCreateNormalizesCodeAndEntityFields(t *testing.T) {
 		{EntityEmployee, CreateDetailInput{Code: "emp_01", Name: "Employee"}},
 		{EntityProduct, CreateDetailInput{Code: "prd01", Name: "Product", Unit: "piece"}},
 		{EntityService, CreateDetailInput{Code: "svc01", Name: "Service", Unit: "hour"}},
+		{EntityWarehouse, CreateDetailInput{Code: "wh01", Name: "主仓"}},
 		{EntityFundAccount, CreateDetailInput{Code: "cash01", Name: "Cash", Currency: "cny"}},
 	}
 	for _, test := range tests {
@@ -52,6 +53,8 @@ func TestValidateDetailRejectsCrossEntityFields(t *testing.T) {
 		{"customer unit", EntityCustomer, DetailInput{Name: "Customer", Unit: "piece"}},
 		{"product missing unit", EntityProduct, DetailInput{Name: "Product"}},
 		{"product currency", EntityProduct, DetailInput{Name: "Product", Unit: "piece", Currency: "CNY"}},
+		{"warehouse unit", EntityWarehouse, DetailInput{Name: "Warehouse", Unit: "piece"}},
+		{"warehouse currency", EntityWarehouse, DetailInput{Name: "Warehouse", Currency: "CNY"}},
 		{"fund account missing currency", EntityFundAccount, DetailInput{Name: "Cash"}},
 		{"fund account malformed currency", EntityFundAccount, DetailInput{Name: "Cash", Currency: "CN"}},
 	}

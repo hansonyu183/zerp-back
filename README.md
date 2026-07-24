@@ -166,7 +166,7 @@ unset APP_BOOTSTRAP_PASSWORD
 | 领域 | 标识 | 范围 | 文档 |
 | --- | --- | --- | --- |
 | 应用访问与权限 | `app` | 用户认证、Cookie 会话、CSRF、角色与 API 权限 | [APP 后端业务域](docs/domains/app.md) |
-| 基础业务对象 | `bob` | 客户、供应商、员工、产品、服务、资金账户及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
+| 基础业务对象 | `bob` | 客户、供应商、员工、产品、服务、仓库、资金账户及其版本审核 | [BOB 后端业务域](docs/domains/bob.md) |
 
 Cloudflare Pages、本地 Vite、Cookie、CSRF 和请求封装见 [前端 API 配置说明](docs/frontend-api-configuration.md)。
 
@@ -336,7 +336,7 @@ POST /app/user/signout  # 注销并清理会话 Cookie
 首期先实现已经完成领域定界的 APP 与 BOB：
 
 - APP 建立登录会话、恢复会话、退出登录、用户、角色和精确 API 路径权限能力；
-- BOB 建立客户、供应商、员工、产品、服务和资金账户的对象版本及审核能力；
+- BOB 建立客户、供应商、员工、产品、服务、仓库和资金账户的对象版本及审核能力；
 - 其他交易、库存、财务和报表领域在业务规则明确并形成独立领域文档后接入。
 
 新增领域、实体和动作编码必须先进入领域文档与后端路由权限目录，不能只在前端注册菜单或临时扩展接口。

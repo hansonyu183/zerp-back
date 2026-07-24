@@ -203,3 +203,9 @@ type BobVersionView struct {
 	Unit               string             `db:"unit" json:"unit"`
 	Currency           *string            `db:"currency" json:"currency"`
 }
+
+type BobWarehouseVersion struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Entity    string `db:"entity" json:"entity"`
+	Name      string `db:"name" json:"name"`
+}

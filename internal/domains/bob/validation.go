@@ -40,10 +40,12 @@ func validateDetail(entity string, input DetailInput) (DetailInput, error) {
 		if input.Unit != "" || !currencyPattern.MatchString(input.Currency) {
 			return DetailInput{}, domainError(ErrorValidation, "invalid currency or unexpected unit", nil, nil)
 		}
-	default:
+	case EntityCustomer, EntitySupplier, EntityEmployee, EntityWarehouse:
 		if input.Unit != "" || input.Currency != "" {
 			return DetailInput{}, domainError(ErrorValidation, "unexpected entity fields", nil, nil)
 		}
+	default:
+		return DetailInput{}, domainError(ErrorValidation, "invalid entity", nil, nil)
 	}
 	return input, nil
 }

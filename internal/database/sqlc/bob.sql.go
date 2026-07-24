@@ -165,6 +165,21 @@ func (q *Queries) CopyBobSupplierDetail(ctx context.Context, arg CopyBobSupplier
 	return err
 }
 
+const copyBobWarehouseDetail = `-- name: CopyBobWarehouseDetail :exec
+INSERT INTO bob_warehouse_versions (version_id, name)
+SELECT $1, d.name FROM bob_warehouse_versions d WHERE d.version_id = $2
+`
+
+type CopyBobWarehouseDetailParams struct {
+	NewVersionID    string `db:"new_version_id" json:"new_version_id"`
+	SourceVersionID string `db:"source_version_id" json:"source_version_id"`
+}
+
+func (q *Queries) CopyBobWarehouseDetail(ctx context.Context, arg CopyBobWarehouseDetailParams) error {
+	_, err := q.db.Exec(ctx, copyBobWarehouseDetail, arg.NewVersionID, arg.SourceVersionID)
+	return err
+}
+
 const countBobAuditEvents = `-- name: CountBobAuditEvents :one
 SELECT count(*) FROM bob_audit_events WHERE object_id = $1 AND entity = $2
 `
@@ -439,6 +454,20 @@ func (q *Queries) InsertBobVersion(ctx context.Context, arg InsertBobVersionPara
 		arg.VersionNo,
 		arg.ActorID,
 	)
+	return err
+}
+
+const insertBobWarehouseDetail = `-- name: InsertBobWarehouseDetail :exec
+INSERT INTO bob_warehouse_versions (version_id, name) VALUES ($1, $2)
+`
+
+type InsertBobWarehouseDetailParams struct {
+	VersionID string `db:"version_id" json:"version_id"`
+	Name      string `db:"name" json:"name"`
+}
+
+func (q *Queries) InsertBobWarehouseDetail(ctx context.Context, arg InsertBobWarehouseDetailParams) error {
+	_, err := q.db.Exec(ctx, insertBobWarehouseDetail, arg.VersionID, arg.Name)
 	return err
 }
 
@@ -811,7 +840,7 @@ func (q *Queries) RejectBobVersion(ctx context.Context, arg RejectBobVersionPara
 
 const resolveBobEffectiveReference = `-- name: ResolveBobEffectiveReference :one
 SELECT o.id AS object_id, o.entity, o.code, v.id AS version_id,
-       COALESCE(c.name, s.name, e.name, p.name, sv.name, f.name) AS name,
+       COALESCE(c.name, s.name, e.name, p.name, sv.name, w.name, f.name) AS name,
        COALESCE(p.unit, sv.unit, '') AS unit, f.currency
 FROM bob_objects o
 JOIN bob_versions v ON v.object_id = o.id AND v.entity = o.entity
@@ -820,6 +849,7 @@ LEFT JOIN bob_supplier_versions s ON s.version_id = v.id
 LEFT JOIN bob_employee_versions e ON e.version_id = v.id
 LEFT JOIN bob_product_versions p ON p.version_id = v.id
 LEFT JOIN bob_service_versions sv ON sv.version_id = v.id
+LEFT JOIN bob_warehouse_versions w ON w.version_id = v.id
 LEFT JOIN bob_fund_account_versions f ON f.version_id = v.id
 WHERE o.id = $1 AND o.entity = $2
   AND v.id = $3 AND o.effective_version_id = v.id AND v.status = 'EFFECTIVE'
@@ -1031,6 +1061,23 @@ type UpdateBobSupplierDetailParams struct {
 
 func (q *Queries) UpdateBobSupplierDetail(ctx context.Context, arg UpdateBobSupplierDetailParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateBobSupplierDetail, arg.Name, arg.VersionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateBobWarehouseDetail = `-- name: UpdateBobWarehouseDetail :execrows
+UPDATE bob_warehouse_versions SET name = $1 WHERE version_id = $2
+`
+
+type UpdateBobWarehouseDetailParams struct {
+	Name      string `db:"name" json:"name"`
+	VersionID string `db:"version_id" json:"version_id"`
+}
+
+func (q *Queries) UpdateBobWarehouseDetail(ctx context.Context, arg UpdateBobWarehouseDetailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateBobWarehouseDetail, arg.Name, arg.VersionID)
 	if err != nil {
 		return 0, err
 	}

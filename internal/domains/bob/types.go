@@ -11,6 +11,7 @@ const (
 	EntityEmployee    = "employee"
 	EntityProduct     = "product"
 	EntityService     = "service"
+	EntityWarehouse   = "warehouse"
 	EntityFundAccount = "fund-account"
 
 	StatusDraft     = "DRAFT"
@@ -26,6 +27,7 @@ var entities = [...]string{
 	EntityEmployee,
 	EntityProduct,
 	EntityService,
+	EntityWarehouse,
 	EntityFundAccount,
 }
 

@@ -20,6 +20,8 @@ func insertDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 		return q.InsertBobProductDetail(ctx, dbsqlc.InsertBobProductDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
 	case EntityService:
 		return q.InsertBobServiceDetail(ctx, dbsqlc.InsertBobServiceDetailParams{VersionID: versionID, Name: data.Name, Unit: data.Unit})
+	case EntityWarehouse:
+		return q.InsertBobWarehouseDetail(ctx, dbsqlc.InsertBobWarehouseDetailParams{VersionID: versionID, Name: data.Name})
 	case EntityFundAccount:
 		return q.InsertBobFundAccountDetail(ctx, dbsqlc.InsertBobFundAccountDetailParams{VersionID: versionID, Name: data.Name, Currency: data.Currency})
 	default:
@@ -41,6 +43,8 @@ func updateDetail(ctx context.Context, q *dbsqlc.Queries, entity, versionID stri
 		rows, err = q.UpdateBobProductDetail(ctx, dbsqlc.UpdateBobProductDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
 	case EntityService:
 		rows, err = q.UpdateBobServiceDetail(ctx, dbsqlc.UpdateBobServiceDetailParams{Name: data.Name, Unit: data.Unit, VersionID: versionID})
+	case EntityWarehouse:
+		rows, err = q.UpdateBobWarehouseDetail(ctx, dbsqlc.UpdateBobWarehouseDetailParams{Name: data.Name, VersionID: versionID})
 	case EntityFundAccount:
 		rows, err = q.UpdateBobFundAccountDetail(ctx, dbsqlc.UpdateBobFundAccountDetailParams{Name: data.Name, Currency: data.Currency, VersionID: versionID})
 	default:
@@ -64,6 +68,8 @@ func copyDetail(ctx context.Context, q *dbsqlc.Queries, entity, newVersionID, so
 		return q.CopyBobProductDetail(ctx, dbsqlc.CopyBobProductDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	case EntityService:
 		return q.CopyBobServiceDetail(ctx, dbsqlc.CopyBobServiceDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
+	case EntityWarehouse:
+		return q.CopyBobWarehouseDetail(ctx, dbsqlc.CopyBobWarehouseDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	case EntityFundAccount:
 		return q.CopyBobFundAccountDetail(ctx, dbsqlc.CopyBobFundAccountDetailParams{NewVersionID: newVersionID, SourceVersionID: sourceVersionID})
 	default:

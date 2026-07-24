@@ -27,6 +27,9 @@ INSERT INTO bob_product_versions (version_id, name, unit) VALUES (sqlc.arg(versi
 -- name: InsertBobServiceDetail :exec
 INSERT INTO bob_service_versions (version_id, name, unit) VALUES (sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(unit));
 
+-- name: InsertBobWarehouseDetail :exec
+INSERT INTO bob_warehouse_versions (version_id, name) VALUES (sqlc.arg(version_id), sqlc.arg(name));
+
 -- name: InsertBobFundAccountDetail :exec
 INSERT INTO bob_fund_account_versions (version_id, name, currency) VALUES (sqlc.arg(version_id), sqlc.arg(name), sqlc.arg(currency));
 
@@ -50,6 +53,10 @@ SELECT sqlc.arg(new_version_id), d.name, d.unit FROM bob_product_versions d WHER
 INSERT INTO bob_service_versions (version_id, name, unit)
 SELECT sqlc.arg(new_version_id), d.name, d.unit FROM bob_service_versions d WHERE d.version_id = sqlc.arg(source_version_id);
 
+-- name: CopyBobWarehouseDetail :exec
+INSERT INTO bob_warehouse_versions (version_id, name)
+SELECT sqlc.arg(new_version_id), d.name FROM bob_warehouse_versions d WHERE d.version_id = sqlc.arg(source_version_id);
+
 -- name: CopyBobFundAccountDetail :exec
 INSERT INTO bob_fund_account_versions (version_id, name, currency)
 SELECT sqlc.arg(new_version_id), d.name, d.currency FROM bob_fund_account_versions d WHERE d.version_id = sqlc.arg(source_version_id);
@@ -68,6 +75,9 @@ UPDATE bob_product_versions SET name = sqlc.arg(name), unit = sqlc.arg(unit) WHE
 
 -- name: UpdateBobServiceDetail :execrows
 UPDATE bob_service_versions SET name = sqlc.arg(name), unit = sqlc.arg(unit) WHERE version_id = sqlc.arg(version_id);
+
+-- name: UpdateBobWarehouseDetail :execrows
+UPDATE bob_warehouse_versions SET name = sqlc.arg(name) WHERE version_id = sqlc.arg(version_id);
 
 -- name: UpdateBobFundAccountDetail :execrows
 UPDATE bob_fund_account_versions SET name = sqlc.arg(name), currency = sqlc.arg(currency) WHERE version_id = sqlc.arg(version_id);
@@ -196,7 +206,7 @@ LIMIT sqlc.arg(page_size) OFFSET sqlc.arg(page_offset);
 
 -- name: ResolveBobEffectiveReference :one
 SELECT o.id AS object_id, o.entity, o.code, v.id AS version_id,
-       COALESCE(c.name, s.name, e.name, p.name, sv.name, f.name) AS name,
+       COALESCE(c.name, s.name, e.name, p.name, sv.name, w.name, f.name) AS name,
        COALESCE(p.unit, sv.unit, '') AS unit, f.currency
 FROM bob_objects o
 JOIN bob_versions v ON v.object_id = o.id AND v.entity = o.entity
@@ -205,6 +215,7 @@ LEFT JOIN bob_supplier_versions s ON s.version_id = v.id
 LEFT JOIN bob_employee_versions e ON e.version_id = v.id
 LEFT JOIN bob_product_versions p ON p.version_id = v.id
 LEFT JOIN bob_service_versions sv ON sv.version_id = v.id
+LEFT JOIN bob_warehouse_versions w ON w.version_id = v.id
 LEFT JOIN bob_fund_account_versions f ON f.version_id = v.id
 WHERE o.id = sqlc.arg(object_id) AND o.entity = sqlc.arg(entity)
   AND v.id = sqlc.arg(version_id) AND o.effective_version_id = v.id AND v.status = 'EFFECTIVE'

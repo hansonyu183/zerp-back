@@ -49,12 +49,24 @@ UPDATE app_sessions SET revoked_at = COALESCE(revoked_at, now()), revoked_reason
 WHERE user_id = sqlc.arg(user_id) AND revoked_at IS NULL;
 
 -- name: GetAppUserPermissions :many
-SELECT DISTINCT p.path AS permission_path
-FROM app_user_roles ur
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE ur.user_id = sqlc.arg(user_id)
+SELECT p.path AS permission_path
+FROM app_permissions p
+WHERE p.status = 'ENABLED'
+  AND (
+    EXISTS (
+      SELECT 1
+      FROM app_user_roles ur
+      JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+      WHERE ur.user_id = sqlc.arg(user_id) AND r.code = 'superadmin'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM app_user_roles ur
+      JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+      JOIN app_role_permissions rp ON rp.role_id = r.id
+      WHERE ur.user_id = sqlc.arg(user_id) AND rp.permission_id = p.id
+    )
+  )
 ORDER BY p.path;
 
 -- name: CreateAppAuditEvent :exec
@@ -91,31 +103,83 @@ SELECT role_id FROM app_user_roles WHERE user_id = sqlc.arg(user_id) ORDER BY ro
 SELECT count(*) FROM app_roles WHERE status = 'ENABLED' AND id = ANY(sqlc.arg(ids)::text[]);
 
 -- name: CountOtherEnabledUsersWithPermission :one
-SELECT count(DISTINCT u.id)
+SELECT count(*)
 FROM app_users u
-JOIN app_user_roles ur ON ur.user_id = u.id
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE u.status = 'ENABLED' AND u.id <> sqlc.arg(excluded_user_id) AND p.path = sqlc.arg(path);
+WHERE u.status = 'ENABLED'
+  AND u.id <> sqlc.arg(excluded_user_id)
+  AND EXISTS (
+    SELECT 1
+    FROM app_user_roles ur
+    JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+    WHERE ur.user_id = u.id
+      AND (
+        (
+          r.code = 'superadmin'
+          AND EXISTS (
+            SELECT 1 FROM app_permissions p
+            WHERE p.path = sqlc.arg(path) AND p.status = 'ENABLED'
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM app_role_permissions rp
+          JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+          WHERE rp.role_id = r.id AND p.path = sqlc.arg(path)
+        )
+      )
+  );
 
 -- name: CountEnabledUsersWithPermissionExcludingRole :one
-SELECT count(DISTINCT u.id)
+SELECT count(*)
 FROM app_users u
-JOIN app_user_roles ur ON ur.user_id = u.id
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED' AND r.id <> sqlc.arg(excluded_role_id)
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE u.status = 'ENABLED' AND p.path = sqlc.arg(path);
+WHERE u.status = 'ENABLED'
+  AND EXISTS (
+    SELECT 1
+    FROM app_user_roles ur
+    JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED' AND r.id <> sqlc.arg(excluded_role_id)
+    WHERE ur.user_id = u.id
+      AND (
+        (
+          r.code = 'superadmin'
+          AND EXISTS (
+            SELECT 1 FROM app_permissions p
+            WHERE p.path = sqlc.arg(path) AND p.status = 'ENABLED'
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM app_role_permissions rp
+          JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+          WHERE rp.role_id = r.id AND p.path = sqlc.arg(path)
+        )
+      )
+  );
 
 -- name: CountEnabledUsersWithPermission :one
-SELECT count(DISTINCT u.id)
+SELECT count(*)
 FROM app_users u
-JOIN app_user_roles ur ON ur.user_id = u.id
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE u.status = 'ENABLED' AND p.path = sqlc.arg(path);
+WHERE u.status = 'ENABLED'
+  AND EXISTS (
+    SELECT 1
+    FROM app_user_roles ur
+    JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+    WHERE ur.user_id = u.id
+      AND (
+        (
+          r.code = 'superadmin'
+          AND EXISTS (
+            SELECT 1 FROM app_permissions p
+            WHERE p.path = sqlc.arg(path) AND p.status = 'ENABLED'
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM app_role_permissions rp
+          JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+          WHERE rp.role_id = r.id AND p.path = sqlc.arg(path)
+        )
+      )
+  );
 
 -- name: CountEnabledUsersMissingPermission :one
 SELECT count(*)
@@ -124,9 +188,22 @@ WHERE u.status = 'ENABLED' AND NOT EXISTS (
   SELECT 1
   FROM app_user_roles ur
   JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-  JOIN app_role_permissions rp ON rp.role_id = r.id
-  JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-  WHERE ur.user_id = u.id AND p.path = sqlc.arg(path)
+  WHERE ur.user_id = u.id
+    AND (
+      (
+        r.code = 'superadmin'
+        AND EXISTS (
+          SELECT 1 FROM app_permissions p
+          WHERE p.path = sqlc.arg(path) AND p.status = 'ENABLED'
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM app_role_permissions rp
+        JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+        WHERE rp.role_id = r.id AND p.path = sqlc.arg(path)
+      )
+    )
 );
 
 -- name: InsertAppUser :exec

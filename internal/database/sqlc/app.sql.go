@@ -127,9 +127,22 @@ WHERE u.status = 'ENABLED' AND NOT EXISTS (
   SELECT 1
   FROM app_user_roles ur
   JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-  JOIN app_role_permissions rp ON rp.role_id = r.id
-  JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-  WHERE ur.user_id = u.id AND p.path = $1
+  WHERE ur.user_id = u.id
+    AND (
+      (
+        r.code = 'superadmin'
+        AND EXISTS (
+          SELECT 1 FROM app_permissions p
+          WHERE p.path = $1 AND p.status = 'ENABLED'
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM app_role_permissions rp
+        JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+        WHERE rp.role_id = r.id AND p.path = $1
+      )
+    )
 )
 `
 
@@ -141,13 +154,30 @@ func (q *Queries) CountEnabledUsersMissingPermission(ctx context.Context, path s
 }
 
 const countEnabledUsersWithPermission = `-- name: CountEnabledUsersWithPermission :one
-SELECT count(DISTINCT u.id)
+SELECT count(*)
 FROM app_users u
-JOIN app_user_roles ur ON ur.user_id = u.id
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE u.status = 'ENABLED' AND p.path = $1
+WHERE u.status = 'ENABLED'
+  AND EXISTS (
+    SELECT 1
+    FROM app_user_roles ur
+    JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+    WHERE ur.user_id = u.id
+      AND (
+        (
+          r.code = 'superadmin'
+          AND EXISTS (
+            SELECT 1 FROM app_permissions p
+            WHERE p.path = $1 AND p.status = 'ENABLED'
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM app_role_permissions rp
+          JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+          WHERE rp.role_id = r.id AND p.path = $1
+        )
+      )
+  )
 `
 
 func (q *Queries) CountEnabledUsersWithPermission(ctx context.Context, path string) (int64, error) {
@@ -158,13 +188,30 @@ func (q *Queries) CountEnabledUsersWithPermission(ctx context.Context, path stri
 }
 
 const countEnabledUsersWithPermissionExcludingRole = `-- name: CountEnabledUsersWithPermissionExcludingRole :one
-SELECT count(DISTINCT u.id)
+SELECT count(*)
 FROM app_users u
-JOIN app_user_roles ur ON ur.user_id = u.id
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED' AND r.id <> $1
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE u.status = 'ENABLED' AND p.path = $2
+WHERE u.status = 'ENABLED'
+  AND EXISTS (
+    SELECT 1
+    FROM app_user_roles ur
+    JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED' AND r.id <> $1
+    WHERE ur.user_id = u.id
+      AND (
+        (
+          r.code = 'superadmin'
+          AND EXISTS (
+            SELECT 1 FROM app_permissions p
+            WHERE p.path = $2 AND p.status = 'ENABLED'
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM app_role_permissions rp
+          JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+          WHERE rp.role_id = r.id AND p.path = $2
+        )
+      )
+  )
 `
 
 type CountEnabledUsersWithPermissionExcludingRoleParams struct {
@@ -180,13 +227,31 @@ func (q *Queries) CountEnabledUsersWithPermissionExcludingRole(ctx context.Conte
 }
 
 const countOtherEnabledUsersWithPermission = `-- name: CountOtherEnabledUsersWithPermission :one
-SELECT count(DISTINCT u.id)
+SELECT count(*)
 FROM app_users u
-JOIN app_user_roles ur ON ur.user_id = u.id
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE u.status = 'ENABLED' AND u.id <> $1 AND p.path = $2
+WHERE u.status = 'ENABLED'
+  AND u.id <> $1
+  AND EXISTS (
+    SELECT 1
+    FROM app_user_roles ur
+    JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+    WHERE ur.user_id = u.id
+      AND (
+        (
+          r.code = 'superadmin'
+          AND EXISTS (
+            SELECT 1 FROM app_permissions p
+            WHERE p.path = $2 AND p.status = 'ENABLED'
+          )
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM app_role_permissions rp
+          JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
+          WHERE rp.role_id = r.id AND p.path = $2
+        )
+      )
+  )
 `
 
 type CountOtherEnabledUsersWithPermissionParams struct {
@@ -470,12 +535,24 @@ func (q *Queries) GetAppUserByUsername(ctx context.Context, username string) (Ap
 }
 
 const getAppUserPermissions = `-- name: GetAppUserPermissions :many
-SELECT DISTINCT p.path AS permission_path
-FROM app_user_roles ur
-JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
-JOIN app_role_permissions rp ON rp.role_id = r.id
-JOIN app_permissions p ON p.id = rp.permission_id AND p.status = 'ENABLED'
-WHERE ur.user_id = $1
+SELECT p.path AS permission_path
+FROM app_permissions p
+WHERE p.status = 'ENABLED'
+  AND (
+    EXISTS (
+      SELECT 1
+      FROM app_user_roles ur
+      JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+      WHERE ur.user_id = $1 AND r.code = 'superadmin'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM app_user_roles ur
+      JOIN app_roles r ON r.id = ur.role_id AND r.status = 'ENABLED'
+      JOIN app_role_permissions rp ON rp.role_id = r.id
+      WHERE ur.user_id = $1 AND rp.permission_id = p.id
+    )
+  )
 ORDER BY p.path
 `
 

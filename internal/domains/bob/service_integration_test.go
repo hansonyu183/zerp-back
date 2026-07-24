@@ -521,7 +521,7 @@ func TestWarehouseSchemaAndPermissionsIntegration(t *testing.T) {
 		t.Fatalf("count superadmin roles: %v", err)
 	}
 	if superadminCount > 0 {
-		var grantCount int
+		var storedGrantCount int
 		if err = pool.QueryRow(t.Context(), `
 			SELECT count(*)
 			FROM app_role_permissions rp
@@ -529,12 +529,11 @@ func TestWarehouseSchemaAndPermissionsIntegration(t *testing.T) {
 			JOIN app_permissions p ON p.id = rp.permission_id
 			WHERE r.code = 'superadmin' AND p.domain = 'bob' AND p.entity = 'warehouse'
 			  AND p.action <> 'delete'
-		`).Scan(&grantCount); err != nil {
-			t.Fatalf("count superadmin warehouse grants: %v", err)
+		`).Scan(&storedGrantCount); err != nil {
+			t.Fatalf("count stored superadmin warehouse grants: %v", err)
 		}
-		const grantedActionCount = 10
-		if grantCount != superadminCount*grantedActionCount {
-			t.Fatalf("superadmin warehouse grants = %d, want %d", grantCount, superadminCount*grantedActionCount)
+		if storedGrantCount != 0 {
+			t.Fatalf("stored superadmin warehouse grants = %d, want 0", storedGrantCount)
 		}
 	}
 }
@@ -602,7 +601,7 @@ func TestVehicleSchemaAndPermissionsIntegration(t *testing.T) {
 		t.Fatalf("count superadmin roles: %v", err)
 	}
 	if superadminCount > 0 {
-		var grantCount int
+		var storedGrantCount int
 		if err = pool.QueryRow(t.Context(), `
 			SELECT count(*)
 			FROM app_role_permissions rp
@@ -610,12 +609,11 @@ func TestVehicleSchemaAndPermissionsIntegration(t *testing.T) {
 			JOIN app_permissions p ON p.id = rp.permission_id
 			WHERE r.code = 'superadmin' AND p.domain = 'bob' AND p.entity = 'vehicle'
 			  AND p.action <> 'delete'
-		`).Scan(&grantCount); err != nil {
-			t.Fatalf("count superadmin vehicle grants: %v", err)
+		`).Scan(&storedGrantCount); err != nil {
+			t.Fatalf("count stored superadmin vehicle grants: %v", err)
 		}
-		const grantedActionCount = 10
-		if grantCount != superadminCount*grantedActionCount {
-			t.Fatalf("superadmin vehicle grants = %d, want %d", grantCount, superadminCount*grantedActionCount)
+		if storedGrantCount != 0 {
+			t.Fatalf("stored superadmin vehicle grants = %d, want 0", storedGrantCount)
 		}
 	}
 }

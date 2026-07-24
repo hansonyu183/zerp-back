@@ -51,7 +51,12 @@ func (s *Service) GetRole(ctx context.Context, id string) (RoleView, error) {
 	if err != nil {
 		return RoleView{}, s.internal("get role", err)
 	}
-	permissions, err := s.queries.GetAppRolePermissionIDs(ctx, id)
+	var permissions []string
+	if role.Code == superadminRoleCode {
+		permissions, err = s.queries.ListAllEnabledAppPermissionIDs(ctx)
+	} else {
+		permissions, err = s.queries.GetAppRolePermissionIDs(ctx, id)
+	}
 	if err != nil {
 		return RoleView{}, s.internal("get role permissions", err)
 	}
@@ -66,6 +71,9 @@ func (s *Service) CreateRole(ctx context.Context, input CreateRoleInput, actorID
 	input.PermissionIDs = uniqueStrings(input.PermissionIDs)
 	if !validSegment(input.Code) || len(input.Code) > 64 || !runeLengthBetween(input.Name, 1, 128) || !validPermissionIDs(input.PermissionIDs) {
 		return RoleView{}, domainError(ErrorValidation, "invalid role fields", nil)
+	}
+	if input.Code == superadminRoleCode {
+		return RoleView{}, domainError(ErrorValidation, "role code is reserved", nil)
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -98,7 +106,7 @@ func (s *Service) CreateRole(ctx context.Context, input CreateRoleInput, actorID
 func (s *Service) SaveRole(ctx context.Context, input SaveRoleInput, actorID, requestID string) (RoleView, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.PermissionIDs = uniqueStrings(input.PermissionIDs)
-	if !validID(input.ID) || input.Revision < 1 || !runeLengthBetween(input.Name, 1, 128) || !validPermissionIDs(input.PermissionIDs) {
+	if !validID(input.ID) || input.Revision < 1 || !runeLengthBetween(input.Name, 1, 128) {
 		return RoleView{}, domainError(ErrorValidation, "invalid role fields", nil)
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -110,8 +118,20 @@ func (s *Service) SaveRole(ctx context.Context, input SaveRoleInput, actorID, re
 	if err = qtx.AcquireAppAuthorizationLock(ctx); err != nil {
 		return RoleView{}, s.internal("lock role authorization update", err)
 	}
-	if err = validatePermissions(ctx, qtx, input.PermissionIDs); err != nil {
-		return RoleView{}, err
+	role, err := qtx.GetAppRoleByID(ctx, input.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RoleView{}, domainError(ErrorNotFound, "role not found", nil)
+	}
+	if err != nil {
+		return RoleView{}, s.internal("get role for save", err)
+	}
+	if role.Code != superadminRoleCode {
+		if !validPermissionIDs(input.PermissionIDs) {
+			return RoleView{}, domainError(ErrorValidation, "invalid role fields", nil)
+		}
+		if err = validatePermissions(ctx, qtx, input.PermissionIDs); err != nil {
+			return RoleView{}, err
+		}
 	}
 	rows, err := qtx.UpdateAppRole(ctx, dbsqlc.UpdateAppRoleParams{ID: input.ID, Name: input.Name, Description: trimOptional(input.Description), Revision: input.Revision, ActorID: &actorID})
 	if err != nil {
@@ -120,13 +140,23 @@ func (s *Service) SaveRole(ctx context.Context, input SaveRoleInput, actorID, re
 	if rows != 1 {
 		return RoleView{}, classifyRoleWriteMiss(ctx, qtx, input.ID, input.Revision, "")
 	}
-	if err = replaceRolePermissions(ctx, qtx, input.ID, input.PermissionIDs, actorID); err != nil {
-		return RoleView{}, err
+	if role.Code == superadminRoleCode {
+		if err = qtx.DeleteAppRolePermissions(ctx, input.ID); err != nil {
+			return RoleView{}, s.internal("clear superadmin role permissions", err)
+		}
+	} else {
+		if err = replaceRolePermissions(ctx, qtx, input.ID, input.PermissionIDs, actorID); err != nil {
+			return RoleView{}, err
+		}
 	}
 	if err = ensureGlobalAuthorizationSafety(ctx, qtx); err != nil {
 		return RoleView{}, err
 	}
-	if err = s.audit(ctx, qtx, "ROLE_SAVE", &actorID, "role", &input.ID, "SUCCESS", requestID, map[string]any{"permissionCount": len(input.PermissionIDs)}); err != nil {
+	summary := map[string]any{"permissionCount": len(input.PermissionIDs)}
+	if role.Code == superadminRoleCode {
+		summary = map[string]any{"permissionMode": "wildcard"}
+	}
+	if err = s.audit(ctx, qtx, "ROLE_SAVE", &actorID, "role", &input.ID, "SUCCESS", requestID, summary); err != nil {
 		return RoleView{}, s.internal("audit save role", err)
 	}
 	if err = tx.Commit(ctx); err != nil {

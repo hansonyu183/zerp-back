@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	StatusEnabled  = "ENABLED"
-	StatusDisabled = "DISABLED"
-	signoutPath    = "/app/user/signout"
+	StatusEnabled      = "ENABLED"
+	StatusDisabled     = "DISABLED"
+	superadminRoleCode = "superadmin"
+	signoutPath        = "/app/user/signout"
 )
 
 type ErrorKind int
